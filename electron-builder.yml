@@ -2,13 +2,13 @@
 appId: org.laisiangtho.app
 productName: Lai Siangtho
 # Stamped by scripts/version.mjs; the build number of the day (see app/version.js)
-buildVersion: "3"
+buildVersion: "2"
 # Releases are read by the desktop update check (targets/desktop/electron/ipc.js);
 # both point at the same repository.
 publish:
   provider: github
   owner: laisiangtho
-  repo: lai-siangtho
+  repo: lab
 directories:
   output: release
   buildResources: assets
