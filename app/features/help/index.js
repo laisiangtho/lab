@@ -6,8 +6,9 @@
  * installed and stored rather than what the app was shipped with.
  */
 
-import { storageStatus } from '../../services/store.js';
-import { h } from '../../shell/dom.js';
+import { requestPersistence, storageStatus } from '../../services/store.js';
+import { formatSections } from './formats.js';
+import { fill, h } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
 import { BUILT_AT, VERSION } from '../../version.js';
@@ -44,9 +45,10 @@ export default {
     const keysOf = (id) => registry.commands().find((c) => c.id === id)?.keys ?? '';
     const run = (id) => () => shell.run(id);
 
-    registry.command({ id: 'help.open', title: L('doc.help'), icon: 'help', run: () => shell.openDoc('help') });
-    registry.command({ id: 'help.shortcuts', title: L('doc.shortcuts'), icon: 'cmd', run: () => shell.openDoc('shortcuts') });
-    registry.command({ id: 'help.about', title: L('doc.about'), icon: 'info', run: () => shell.openDoc('about') });
+    registry.command({ id: 'help.open', title: L('doc.help'), icon: 'help', opens: 'help', run: () => shell.openDoc('help') });
+    registry.command({ id: 'help.shortcuts', title: L('doc.shortcuts'), icon: 'cmd', opens: 'shortcuts', run: () => shell.openDoc('shortcuts') });
+    registry.command({ id: 'help.about', title: L('doc.about'), icon: 'info', opens: 'about', run: () => shell.openDoc('about') });
+    registry.command({ id: 'help.formats', title: L('doc.formats'), icon: 'db', opens: 'formats', run: () => shell.openDoc('formats') });
 
     // --- Help ---------------------------------------------------------------
 
@@ -67,7 +69,7 @@ export default {
           has('speech.toggle') ? task('audio', L('cmd.read'), L('doc.t.read'), '', run('speech.toggle')) : null,
         ].filter(Boolean);
 
-        el.append(h('div', { class: 'leaf' }, h('div', { class: 'leaf-scroll scroll' },
+        el.append(
           h('div', { class: 'note doc' },
             h('h1', { class: 'inline-title' }, L('doc.help')),
             h('p', { class: 'doc-lede' }, L('doc.help.lede')),
@@ -76,7 +78,9 @@ export default {
             h('div', { class: 'task-grid' },
               task('cmd', L('doc.shortcuts'), L('doc.t.shortcuts'), '', () => shell.openDoc('shortcuts')),
               task('info', L('doc.about'), L('doc.t.about'), '', () => shell.openDoc('about')),
-              task('settings', L('cmd.settings'), L('doc.t.settings'), '', () => shell.openDoc('settings')))))));
+              task('settings', L('cmd.settings'), L('doc.t.settings'), '', () => shell.openDoc('settings')),
+              task('db', L('doc.formats'), L('doc.t.formats'), '', () => shell.openDoc('formats')),
+              has('welcome.open') ? task('spark', L('doc.welcome'), L('doc.t.welcome'), '', () => shell.openDoc('welcome')) : null)));
       },
     });
 
@@ -118,32 +122,122 @@ export default {
           empty.hidden = shown > 0;
         });
 
-        el.append(h('div', { class: 'leaf' }, h('div', { class: 'leaf-scroll scroll' },
+        // The palette also takes instructions, which are not keys and would
+        // never be found by pressing things. They are listed here because this
+        // is the page a reader opens to find out what they can type.
+        const verbs = registry.verbs();
+        const verbList = verbs.length
+          ? [h('div', { class: 'doc-h' }, L('doc.keys.verbs')),
+            h('p', { class: 'doc-lede' }, L('doc.keys.verbsLede')),
+            h('div', { class: 'key-list' }, verbs.map((verb) => h('div', { class: 'key-row' },
+              h('span', { class: 'k' }, h('span', { class: 'kbd' }, verb.word)),
+              h('span', { class: 'a' }, verb.title, verb.hint ? h('em', { class: 'verb-eg' }, verb.hint) : null))))]
+          : [];
+
+        el.append(
           h('div', { class: 'note doc' },
             h('h1', { class: 'inline-title' }, L('doc.shortcuts')),
             h('div', { class: 'note-sub' }, L('doc.keys.sub', { n: rows.length })),
             h('p', { class: 'doc-lede' }, L('doc.keys.lede')),
             h('div', { class: 'field doc-filter' }, icon('search'), filter),
             list,
-            empty))));
+            empty,
+            ...verbList));
+      },
+    });
+
+    // --- Data and formats ---------------------------------------------------
+
+    /**
+     * Everything this app reads and writes, with a real example of each file.
+     *
+     * A reader who wants to correct a verse, add a translation or read their
+     * own notes with another program has to know the shapes; an app that keeps
+     * them to itself is asking to be trusted rather than checked. The live
+     * figures at the top are what *this* install is actually pointed at and
+     * holding, so the document describes the app in front of the reader rather
+     * than the one that was shipped.
+     */
+    registry.doc({
+      id: 'formats',
+      title: L('doc.formats'),
+      icon: 'db',
+      mount(el) {
+        const facts = h('div', { class: 'fm-facts' });
+
+        const section = ({ heading, body, sample }) => h('section', { class: 'fm-sec' },
+          h('h2', {}, heading),
+          ...body.map((text) => h('p', {}, text)),
+          sample
+            ? h('figure', { class: 'fm-sample' },
+              h('figcaption', {}, sample.caption,
+                h('button', {
+                  class: 'fm-copy', title: L('cmd.copy'), 'aria-label': L('cmd.copy'),
+                  onclick: async () => {
+                    await navigator.clipboard.writeText(sample.code);
+                    shell.notify(L('msg.copied', { what: sample.caption }));
+                  },
+                }, icon('copy'))),
+              h('pre', {}, h('code', {}, sample.code)))
+            : null);
+
+        el.append(
+          h('div', { class: 'note doc fm' },
+            h('h1', { class: 'inline-title' }, L('doc.formats')),
+            h('p', { class: 'doc-lede' }, L('doc.formats.lede')),
+            facts,
+            ...formatSections({ config: ctx.config }).map(section)));
+
+        async function paint() {
+          const installed = await store.list();
+          const departures = installed.reduce((n, t) => n + (t.diagnostics?.total ?? 0), 0);
+          fill(facts,
+            fact(String(installed.length), L('lbl.translationsHeld')),
+            fact(String(installed.reduce((n, t) => n + (t.stats?.verses ?? 0), 0) || '—'), L('lbl.versesHeld')),
+            fact(String(departures), L('lbl.departures'),
+              departures ? L('lbl.departuresHint') : L('lbl.departuresNone')));
+        }
+
+        const fact = (value, label, hint = '') => h('div', { class: 'fm-fact', title: hint },
+          h('strong', {}, value), h('span', {}, label));
+
+        paint().catch(() => { /* the document stands without its figures */ });
+        return store.on?.('change', () => paint().catch(() => {}));
       },
     });
 
     // --- About --------------------------------------------------------------
 
+    /**
+     * About: what this build is and what it is holding.
+     *
+     * Centred, and no wider than it needs to be. The facts are figures, so they
+     * are set as tiles with the number first and its name under it — a reader
+     * scanning for how much is stored finds the number, not the word "Storage".
+     */
     registry.doc({
       id: 'about',
       title: L('doc.about'),
       icon: 'info',
       mount(el) {
-        const facts = h('dl', { class: 'settings-list' });
-        const body = h('div', { class: 'note doc' },
-          h('h1', { class: 'inline-title' }, L('app.name')),
-          h('div', { class: 'note-sub' }, `${VERSION} · ${L('lbl.built', { date: new Date(BUILT_AT).toLocaleDateString() })}`),
-          h('p', { class: 'doc-lede' }, L('doc.about.lede')),
+        const facts = h('div', { class: 'about-facts' });
+        const actions = h('div', { class: 'about-acts' });
+        const card = h('div', { class: 'about' },
+          h('div', { class: 'about-mark' }, h('img', { src: './icons/icon.svg', alt: '', width: 64, height: 64 })),
+          h('h1', {}, L('app.name')),
+          h('div', { class: 'about-ver' }, `v${VERSION} · ${L('lbl.built', { date: new Date(BUILT_AT).toLocaleDateString() })}`),
+          h('p', { class: 'about-lede' }, L('doc.about.lede')),
           facts,
-          h('p', { class: 'muted' }, L('doc.about.sources')));
-        el.append(h('div', { class: 'leaf' }, h('div', { class: 'leaf-scroll scroll' }, body)));
+          actions,
+          h('p', { class: 'about-note' }, L('doc.about.sources')));
+        // The document body is already the scrolling area of its leaf; wrapping
+        // another one inside it leaves the card measured against its own
+        // content, and nothing to centre it in.
+        el.classList.add('about-wrap');
+        el.append(card);
+
+        const tile = (value, label, hint = '') => h('div', { class: 'about-tile', title: hint },
+          h('strong', {}, value), h('span', {}, label));
 
         async function paint() {
           const [installed, { usage, quota, persisted }, native] = await Promise.all([
@@ -152,17 +246,33 @@ export default {
             platform.capabilities.appInfo ? platform.capabilities.appInfo() : Promise.resolve(null),
           ]);
           const size = installed.reduce((n, t) => n + (t.bytes ?? 0), 0);
-          const row = (term, value) => [h('dt', {}, term), h('dd', {}, value)];
           facts.replaceChildren(
-            ...row(L('lbl.version'), VERSION),
-            ...row(L('lbl.runtime'), native ? `${native.runtime} · ${native.platform}` : platform.id),
-            ...row(L('lbl.translationsHeld'), installed.length ? `${installed.length} · ${bytes(size)}` : L('val.none')),
-            ...row(L('pane.notes'), String(annotations.allNotes().length)),
-            ...row(L('pane.marks'), String(annotations.allMarks().length)),
-            ...row(L('lbl.storage'), usage === null
-              ? L('val.unknown')
-              : `${bytes(usage)}${quota ? ` ${L('lbl.ofQuota', { size: bytes(quota), pct: Math.max(1, Math.round(usage / quota * 100)) })}` : ''}`),
-            ...row(L('lbl.eviction'), persisted === true ? L('lbl.persisted') : persisted === false ? L('lbl.notPersisted') : L('val.unknown')));
+            tile(String(installed.length), L('lbl.translationsHeld'), installed.map((t) => t.info.name).join(', ')),
+            tile(bytes(size), L('lbl.textStored')),
+            tile(String(annotations.allNotes().length), L('pane.notes')),
+            tile(String(annotations.allMarks().length), L('pane.marks')),
+            tile(usage === null ? L('val.unknown') : bytes(usage), L('lbl.storage'),
+              quota ? L('lbl.ofQuota', { size: bytes(quota), pct: Math.max(1, Math.round(usage / quota * 100)) }) : ''),
+            tile(native ? native.runtime.split(' ')[0] : L('val.web'), L('lbl.runtime'),
+              native ? `${native.runtime} · ${native.platform}` : platform.id));
+
+          // Storage that may be reclaimed is worth an offer, not a label: the
+          // button asks the browser to keep it, and says what it answered.
+          const update = registry.commands().find((c) => c.id === 'app.checkUpdate');
+          fill(actions,
+            persisted === false
+              ? h('button', {
+                class: 'btn primary',
+                title: L('lbl.notPersisted'),
+                onclick: async () => {
+                  const granted = await requestPersistence();
+                  shell.notify(L(granted ? 'lib.kept' : 'lib.notKept'), granted ? 'ok' : 'info');
+                  paint().catch(() => {});
+                },
+              }, icon('db'), L('lib.keep'))
+              : null,
+            update ? h('button', { class: 'btn', onclick: () => update.run() }, icon('download'), update.title) : null,
+            h('button', { class: 'btn', onclick: () => shell.openDoc('help') }, icon('help'), L('doc.help')));
         }
 
         paint().catch((err) => shell.notify(err.message, 'error'));

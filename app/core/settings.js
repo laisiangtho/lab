@@ -22,8 +22,30 @@ export const READING = Object.freeze({
   size: { min: 14, max: 26, step: 1, default: 18 },        // px
   leading: { min: 1.3, max: 2.2, step: 0.02, default: 1.66 },
   measure: { min: 24, max: 60, step: 1, default: 34 },      // characters, 0 = full width
+  // The interface's own size, which is not the text's: a reader who wants
+  // large scripture does not necessarily want large buttons, and one who finds
+  // the labels small may be happy with the text.
+  ui: { min: 11, max: 17, step: 1, default: 13 },           // px
 });
 export const MODES = Object.freeze(['reading', 'source']);
+
+/** Typefaces the scripture can be set in. The interface keeps its own. */
+export const READING_FONTS = Object.freeze(['serif', 'sans', 'mono']);
+
+/**
+ * The sections of the settings page, in order. Named here rather than in the
+ * page because features contribute rows to them and the registry checks the
+ * name at startup: a typo is a boot error, not a row nobody ever sees.
+ */
+export const SETTING_SECTIONS = Object.freeze([
+  'appearance',   // theme, accent, the chrome that can be hidden
+  'reading',      // layout, sync, Strong's, direction
+  'typography',   // the sizes
+  'study',        // panes and tools: books, search, notes, plans
+  'keys',         // shortcuts
+  'storage',      // translations, quota, updates
+  'material',     // the reader's own notes and marks, and moving them
+]);
 
 /** How many rows a sidebar may be split into. Beyond this nothing is readable. */
 export const MAX_ROWS = 4;
@@ -52,8 +74,24 @@ export const defaultSettings = Object.freeze({
   readingSize: READING.size.default,
   readingLeading: READING.leading.default,
   readingMeasure: READING.measure.default,
+  /** Size of the interface's own text, in pixels. */
+  uiSize: READING.ui.default,
   /** Reading surface or its source text. */
   mode: 'reading',
+  /** Typeface for the scripture itself. */
+  readingFont: 'serif',
+  /** Reopen last session's tabs, or start on the last passage alone. */
+  restoreTabs: true,
+  /** Transitions and animations. Off is a setting, not a fault. */
+  motion: true,
+  /**
+   * The ribbon's buttons, by command id, in the order they are drawn. Null
+   * means "whatever this build offers" — the commands that asked for a ribbon
+   * button, in registration order — which is also what a reset restores. A
+   * stored list may name a command this build no longer has; the shell drops
+   * those when it draws, rather than the parser refusing the file.
+   */
+  ribbonItems: null,
   /** Show Strong's numbers where a translation carries them. */
   strongs: false,
   /**
@@ -176,10 +214,23 @@ export function parseSettings(raw, { source, category }) {
     readingSize: clamp(raw.readingSize, READING.size, defaultSettings.readingSize),
     readingLeading: clamp(raw.readingLeading, READING.leading, defaultSettings.readingLeading),
     readingMeasure: clamp(raw.readingMeasure, READING.measure, defaultSettings.readingMeasure),
+    uiSize: clamp(raw.uiSize, READING.ui, defaultSettings.uiSize),
     mode, strongs: flag('strongs'),
+    readingFont: READING_FONTS.includes(raw.readingFont) ? raw.readingFont : defaultSettings.readingFont,
+    restoreTabs: flag('restoreTabs'), motion: flag('motion'),
+    ribbonItems: commandList(raw.ribbonItems, source, '$.ribbonItems'),
     sidebarLeft: Object.freeze(rows('sidebarLeft')), sidebarRight: Object.freeze(rows('sidebarRight')),
     tabs: Object.freeze(tabs), activeTab: Number.isInteger(raw.activeTab) && raw.activeTab >= 0 ? Math.min(raw.activeTab, Math.max(tabs.length - 1, 0)) : 0,
   });
+}
+
+/** A list of command ids, or null for "this build's own". */
+function commandList(raw, source, path) {
+  if (raw === undefined || raw === null) return null;
+  return Object.freeze(expectArray(raw, source, path)
+    .map((id, i) => expectString(id, source, `${path}[${i}]`))
+    .filter((id, i, all) => all.indexOf(id) === i)
+    .slice(0, 40));
 }
 
 /**

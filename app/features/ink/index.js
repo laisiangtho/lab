@@ -37,8 +37,12 @@ export default {
       id: 'ink.toggle',
       title: L('cmd.ink'),
       icon: 'pen',
-      ribbon: true,
+      // The band, not the ribbon: ink is drawn over a chapter, so the button
+      // belongs with the other things that act on what is being read, where it
+      // greys out on a document tab instead of sitting there dead.
+      bar: true,
       needsChapter: true,
+      state: () => state.get().ink === true,
       run: () => {
         const on = !state.get().ink;
         state.set({ ink: on });

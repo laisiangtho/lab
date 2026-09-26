@@ -42,3 +42,42 @@ test('snippet frames the first hit', () => {
   assert.equal(s.hit, 'light');
   assert.ok(s.after.endsWith('…'));
 });
+
+test('whole-word matching stops at a word boundary', () => {
+  const inside = createMatcher('man', { mode: 'word' });
+  assert.equal(inside.test('in a manner of speaking'), null);
+  assert.ok(inside.test('the man said'));
+  assert.ok(inside.test('(man)'), 'punctuation is a boundary');
+  assert.ok(createMatcher('man', { mode: 'terms' }).test('in a manner of speaking'), 'plain matching still finds it');
+});
+
+test('case matters when asked', () => {
+  const exact = createMatcher('LORD', { matchCase: true });
+  assert.ok(exact.test('the LORD said'));
+  assert.equal(exact.test('the Lord said'), null);
+  assert.ok(createMatcher('LORD').test('the Lord said'), 'and folds when not asked');
+});
+
+test('a regular expression matches as written', () => {
+  const m = createMatcher('lig[ht]+', { mode: 'regex' });
+  assert.ok(m.test('let there be light'));
+  assert.equal(m.test('darkness'), null);
+  const text = 'light and LIGHT';
+  assert.equal(createMatcher('light', { mode: 'regex' }).test(text).length, 2, 'case folds unless asked');
+  assert.equal(createMatcher('light', { mode: 'regex', matchCase: true }).test(text).length, 1);
+});
+
+test('a pattern that cannot compile says so', () => {
+  // The reason, without the pattern and the flags the reader never typed.
+  assert.throws(() => createMatcher('(unclosed', { mode: 'regex' }), /^Error: Unterminated group$/);
+  assert.equal(createMatcher('  ', { mode: 'regex' }), null);
+});
+
+test('a pattern that can match nothing still terminates', () => {
+  const m = createMatcher('x*', { mode: 'regex' });
+  assert.ok(m.test('axbxc'));
+});
+
+test('an unknown match mode is refused', () => {
+  assert.throws(() => createMatcher('a', { mode: 'fuzzy' }), /unknown match mode/);
+});

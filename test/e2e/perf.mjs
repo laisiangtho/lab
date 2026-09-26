@@ -33,6 +33,10 @@ const time = async (label, fn) => {
 
 await time('start with nothing installed', async () => {
   await app.open();
+  // A brand-new install opens on the welcome screen, which is what a reader
+  // sees; the measurement is of reaching the catalog from there.
+  await page.waitForSelector('.wl, .library-item');
+  if (await page.locator('.wl-acts .btn.primary').count()) await page.locator('.wl-acts .btn.primary').click();
   await page.waitForSelector('.library-item');
 });
 
@@ -77,26 +81,58 @@ await time('scroll a 3-pane Psalm 119 to the end', async () => {
   await page.waitForTimeout(300);
 });
 
-await time('search the held translations', async () => {
+const searchPane = () => page.locator('.search-pane');
+const finished = () => page.waitForFunction(
+  () => Boolean(document.querySelector('.search-pane .sr-time')),
+  null,
+  { timeout: 180000 },
+);
+
+await time('open the search pane', async () => {
   await page.locator('.leaf[data-pane="0"]').click({ position: { x: 5, y: 5 } });
-  await page.keyboard.press('Control+p');
-  await page.locator('.modal-input').fill('Search');
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(400);
-  const field = page.locator('.sidebar .pane-view.is-active input[type="search"], .sidebar .pane-view.is-active .field input').first();
-  await field.fill('Genesis 3');
-  await page.waitForFunction(() => document.querySelectorAll('.result-line').length > 0, null, { timeout: 120000 });
-  return `${await page.locator('.result-line').count()} hits`;
+  await page.keyboard.press('Control+f');
+  await searchPane().waitFor();
+});
+
+await time('search one translation for a common word', async () => {
+  // Whichever translation was last read is the one searched by default, so the
+  // word looked for is one every fixture carries.
+  await page.locator('.search-pane > .field input').first().fill('1:1');
+  await finished();
+  return (await page.locator('.search-pane .sr-count').innerText()).replace(/\n/g, ' ');
+});
+
+await time('the same search as a regular expression', async () => {
+  // The modes are adornments in the search box now: switches, not a segment.
+  await page.locator('.sm-btn[data-flag="regex"]').click();
+  await page.locator('.search-pane > .field input').first().fill('1:[12]');
+  await finished();
+  return (await page.locator('.search-pane .sr-count').innerText()).replace(/\n/g, ' ');
 });
 
 // The expensive one: every verse of every held translation, read from storage.
-await time('search every held translation for a word', async () => {
-  await page.locator('.sidebar .pane-view.is-active select').selectOption('*');
-  const field = page.locator('.sidebar .pane-view.is-active input[type="search"]').first();
-  await field.fill('whole of the land');
-  await page.waitForFunction(() => document.querySelectorAll('.result-line').length > 0, null, { timeout: 180000 });
-  await page.waitForTimeout(1500);
-  return `${await page.locator('.result-line').count()} hits`;
+await time('search every held translation', async () => {
+  await page.locator('.sm-btn[data-flag="regex"]').click();
+  await page.locator('.sf-toggle').click();
+  // The chooser is a list of translations to add, not a set of tick boxes:
+  // click each row until the list has nothing left to add.
+  const field = page.locator('.sf-list[data-name="translations"]').locator('xpath=preceding-sibling::div[1]').locator('input');
+  await field.click();
+  const rows = page.locator('.sf-list[data-name="translations"] .sf-row');
+  for (let left = await rows.count(); left > 0; left = await rows.count()) {
+    await rows.first().click();
+    await page.waitForTimeout(150);
+    await field.click();
+  }
+  await page.locator('.search-pane > .field input').first().fill('1:1');
+  await finished();
+  return (await page.locator('.search-pane .sr-count').innerText()).replace(/\n/g, ' ');
+});
+
+await time('narrow that to one book', async () => {
+  await page.locator('.sf-chip', { hasText: 'Open book' }).click();
+  await finished();
+  return (await page.locator('.search-pane .sr-count').innerText()).replace(/\n/g, ' ');
 });
 
 await time('reload with everything open', async () => {

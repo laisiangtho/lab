@@ -7,6 +7,8 @@
 import { createChrome } from './chrome.js';
 import { createModal } from './modal.js';
 import { createNavPop } from './navpop.js';
+import { createColorPicker } from './colorpicker.js';
+import { createConfirm } from './confirm.js';
 import { createTranslationInfo } from './trinfo.js';
 import { createTree } from './tree.js';
 import { createReadingPanel, applyReading } from './readingpanel.js';
@@ -15,6 +17,7 @@ import { createWorkspace } from './workspace.js';
 import { h } from './dom.js';
 import { icon } from './icons.js';
 import { L } from './i18n.js';
+import { createLookup, parsePassageQuery, passageOf } from '../core/lookup.js';
 import { MODES } from '../core/settings.js';
 import { storageStatus } from '../services/store.js';
 import { wordCount } from '../core/markdown.js';
@@ -30,10 +33,21 @@ export function createShell(root, ctx) {
   let readingPanel = null;
   let navPop = null;
   let trInfo = null;
+  let colours = null;
   const modal = createModal();
+  const confirm = createConfirm();
   const strongsPopover = h('div', { class: 'popover', hidden: true });
 
   const ready = [];
+  /**
+   * Whether a feature has taken responsibility for what a brand-new reader
+   * sees. Two features both want the first screen — the Library, because
+   * nothing can be read until something is installed, and the welcome, because
+   * a list of sixty translations does not answer "what is this". Claiming is
+   * done while features are being set up, so neither depends on the order the
+   * other's first paint happens to finish in.
+   */
+  let firstRunClaimed = false;
 
   const shell = {
     /** Run once the shell is up — a feature cannot open a document before then. */
@@ -46,6 +60,13 @@ export function createShell(root, ctx) {
       else console.error(`[${kind}] ${message}`);
     },
     openDoc: (id) => workspace.openDoc(id),
+    /** @returns {boolean} true for the one feature that greets a new reader. */
+    claimFirstRun() {
+      if (firstRunClaimed) return false;
+      firstRunClaimed = true;
+      return true;
+    },
+    get firstRunClaimed() { return firstRunClaimed; },
     openChapter: (book, chapter) => workspace.openChapter(book, chapter),
     openSwitcher,
     openPalette,
@@ -64,6 +85,21 @@ export function createShell(root, ctx) {
     /** The info button at the end of a crumb bar: what this translation is. */
     openTranslationInfo: (anchor, meta) => trInfo.open(anchor, meta),
     repairTranslation,
+    /** The typography panel, opened from wherever the reader asked for it. */
+    openReadingPanel: (anchor) => readingPanel.toggle(anchor),
+    /** The colour picker, for any feature that offers a colour. */
+    pickColour: (anchor, options) => colours.open(anchor, options),
+    /** Ask before something that cannot be undone. Resolves true to go ahead. */
+    confirm: (options) => confirm.ask(options),
+    /**
+     * Read a reference out of typed text — "ps 23:1-6", the translation's own
+     * names and numerals — for a feature that wants a passage without building
+     * its own parser. Null when the text names nothing.
+     */
+    readPassage(text) {
+      const [first] = passageItems(text);
+      return first ? first.passage : null;
+    },
     /** The reader's own correction to a translation's text direction. */
     textDirection: (identify) => workspace.directionOf(identify),
     setTextDirection: (identify, dir) => workspace.setDirection(identify, dir),
@@ -71,8 +107,10 @@ export function createShell(root, ctx) {
     openCrumb: (anchor, mode, at) => navPop.open(anchor, mode, at, (book, chapter) => workspace.openChapter(book, chapter)),
     /** The primary translation finished loading: names may have changed. */
     refreshNames: () => { tree?.paint(); renderStatus(); },
-    openVerseBar: (anchor, passage) => verseBar.show(anchor, passage),
+    openVerseBar: (anchor, passage, options) => verseBar.show(anchor, passage, options),
     get workspace() { return workspace; },
+    /** The ribbon's own arrangement, for the settings page. */
+    get ribbon() { return chrome.ribbon; },
     start,
   };
 
@@ -91,7 +129,9 @@ export function createShell(root, ctx) {
       englishRef: (book, chapter) => workspace.englishRef(book, chapter),
     });
     trInfo = createTranslationInfo(ctx);
-    document.body.append(modal.element, verseBar.element, readingPanel.element, navPop.element, trInfo.element, strongsPopover);
+    colours = createColorPicker();
+    document.body.append(modal.element, confirm.element, verseBar.element, readingPanel.element,
+      navPop.element, trInfo.element, colours.element, strongsPopover);
     applyReading(ctx.state.get());
     chrome.start();
     wireKeys();
@@ -119,7 +159,7 @@ export function createShell(root, ctx) {
   function refresh() {
     applyReading(ctx.state.get());
     chrome.applyChrome(ctx.state.get());
-    chrome.setChapterMode(workspace.activeTab?.kind === 'chapter');
+    chrome.setChapterMode(workspace.activeTab?.kind === 'chapter', workspace.activeTab?.kind ?? null);
     tree?.paint();
     renderStatus();
     measureChapter().catch(() => { counts = null; });
@@ -133,28 +173,67 @@ export function createShell(root, ctx) {
     const { registry } = ctx;
     const command = (id, title, run, extra = {}) => registry.command({ id, title, run, ...extra });
 
-    command('shell.palette', L('cmd.palette'), openPalette, { keys: 'Mod+p' });
-    command('shell.switcher', L('cmd.switcher'), () => openSwitcher(), { keys: 'Mod+o' });
-    command('passage.next-chapter', L('cmd.next'), () => workspace.step(1), { keys: 'Mod+ArrowRight', needsChapter: true });
-    command('passage.prev-chapter', L('cmd.prev'), () => workspace.step(-1), { keys: 'Mod+ArrowLeft', needsChapter: true });
+    command('shell.palette', L('cmd.palette'), openPalette, { keys: 'Mod+p', icon: 'cmd' });
+    command('shell.switcher', L('cmd.switcher'), () => openSwitcher(), { keys: 'Mod+o', icon: 'book-open' });
+    command('passage.next-chapter', L('cmd.next'), () => workspace.step(1), { keys: 'Mod+ArrowRight', icon: 'arrow-right', needsChapter: true });
+    command('passage.prev-chapter', L('cmd.prev'), () => workspace.step(-1), { keys: 'Mod+ArrowLeft', icon: 'arrow-left', needsChapter: true });
     command('reading.add-pane', L('cmd.parallel'), () => workspace.addPane(), { icon: 'add-pane', needsChapter: true });
-    command('reading.translation', L('cmd.translation'), () => openTranslationPicker(0), { needsChapter: true });
-    command('reading.copy', L('cmd.copyRef'), copyPassage, { needsChapter: true });
-    command('reading.layout', L('cmd.layout'), cycleLayout, { needsChapter: true });
-    command('reading.sync', L('cmd.sync'), () => toggleFlag('syncScroll', L('cmd.sync')));
+    command('reading.translation', L('cmd.translation'), () => openTranslationPicker(0), { icon: 'swap', needsChapter: true });
+    command('reading.copy', L('cmd.copyRef'), copyPassage, { icon: 'copy', needsChapter: true });
+    command('reading.layout', L('cmd.layout'), cycleLayout, { icon: 'lay-para', needsChapter: true });
+    command('reading.sync', L('cmd.sync'), () => toggleFlag('syncScroll', L('cmd.sync')), { icon: 'sync', state: () => ctx.state.get().syncScroll });
     command('shell.theme', L('cmd.theme'), cycleTheme);
-    command('shell.about', L('cmd.about'), showAbout);
-    command('shell.left', L('side.left'), () => chrome.toggleSide('left'), { keys: 'Mod+b' });
-    command('shell.right', L('side.right'), () => chrome.toggleSide('right'));
-    command('shell.ribbon', L('cmd.ribbon'), () => toggleFlag('ribbon', L('cmd.ribbon')));
-    command('shell.statusbar', L('cmd.statusBar'), () => toggleFlag('statusBar', L('cmd.statusBar')));
-    command('reading.panel', L('cmd.reading'), () => readingPanel.toggle(document.querySelector('.statusbar .sb-reading') ?? document.body));
-    command('reading.mode', L('cmd.mode'), toggleMode, { keys: 'Mod+e', needsChapter: true });
-    command('reading.strongs', L('cmd.strongs'), toggleStrongs, { needsChapter: true });
-    command('tab.detach', L('cmd.detach'), () => { const tab = workspace.activeTab; if (tab) workspace.detach(tab.id); });
-    command('tab.next', L('cmd.nextTab'), () => stepTab(1), { keys: 'Mod+Shift+ArrowRight' });
-    command('tab.prev', L('cmd.prevTab'), () => stepTab(-1), { keys: 'Mod+Shift+ArrowLeft' });
-    command('tab.close', L('cmd.closeTab'), () => { const tab = workspace.activeTab; if (tab) workspace.closeTab(tab.id); }, { keys: 'Mod+w' });
+    command('shell.about', L('cmd.about'), showAbout, { icon: 'info', opens: 'about' });
+    command('shell.left', L('side.left'), () => chrome.toggleSide('left'), { keys: 'Mod+b', icon: 'panel-l', state: () => ctx.state.get().leftSidebar });
+    command('shell.right', L('side.right'), () => chrome.toggleSide('right'), { icon: 'panel-r', state: () => ctx.state.get().rightSidebar });
+    command('shell.ribbon', L('cmd.ribbon'), () => toggleFlag('ribbon', L('cmd.ribbon')), { icon: 'rail', state: () => ctx.state.get().ribbon });
+    command('shell.statusbar', L('cmd.statusBar'), () => toggleFlag('statusBar', L('cmd.statusBar')), { icon: 'min', state: () => ctx.state.get().statusBar });
+    command('reading.panel', L('cmd.reading'), () => readingPanel.toggle(document.querySelector('.statusbar .sb-reading') ?? document.body), { icon: 'type' });
+    command('reading.mode', L('cmd.mode'), toggleMode, { keys: 'Mod+e', icon: 'edit', needsChapter: true, state: () => ctx.state.get().mode === 'source' });
+    command('reading.strongs', L('cmd.strongs'), toggleStrongs, { icon: 'tag', needsChapter: true, state: () => ctx.state.get().strongs });
+    command('tab.detach', L('cmd.detach'), () => { const tab = workspace.activeTab; if (tab) workspace.detach(tab.id); }, { icon: 'restore' });
+    command('tab.next', L('cmd.nextTab'), () => stepTab(1), { keys: 'Mod+Shift+ArrowRight', icon: 'tab-next' });
+    command('tab.prev', L('cmd.prevTab'), () => stepTab(-1), { keys: 'Mod+Shift+ArrowLeft', icon: 'tab-prev' });
+    command('tab.close', L('cmd.closeTab'), () => { const tab = workspace.activeTab; if (tab) workspace.closeTab(tab.id); }, { keys: 'Mod+w', icon: 'x' });
+    registerShellVerbs();
+  }
+
+  /**
+   * The words the palette takes as instructions. The shell owns the ones that
+   * are about where you are; a feature owns the ones that are about what it
+   * does.
+   */
+  function registerShellVerbs() {
+    const verb = (id, word, title, run, options = {}) => ctx.registry.verb({ id, word, title, run, ...options });
+    verb('go', 'go', L('verb.go'), (passage) => goTo(passage), { icon: 'book-open', hint: L('verb.goHint') });
+    verb('copy', 'copy', L('verb.copy'), (passage) => copyPassageRef(passage), { icon: 'copy', hint: L('verb.copyHint') });
+    verb('parallel', 'parallel', L('verb.parallel'), (name) => openParallel(name), {
+      takes: 'text', icon: 'add-pane', hint: L('verb.parallelHint'),
+    });
+  }
+
+  /** "parallel niv": put a translation beside the one being read, by name. */
+  async function openParallel(name) {
+    const wanted = String(name).trim().toLowerCase();
+    const installed = await ctx.store.list();
+    const found = installed.find((t) => t.identify.toLowerCase() === wanted)
+      ?? installed.find((t) => `${t.info.shortname ?? ''}`.toLowerCase() === wanted)
+      ?? installed.find((t) => t.identify.toLowerCase().startsWith(wanted)
+        || `${t.info.name ?? ''}`.toLowerCase().includes(wanted));
+    if (!found) { shell.notify(L('msg.noTranslation', { name }), 'error'); return; }
+    const open = workspace.panes();
+    if (open.includes(found.identify)) { shell.notify(L('msg.alreadyOpen', { name: found.info.shortname ?? found.identify })); return; }
+    ctx.state.set({ parallel: [...open.slice(1), found.identify] });
+  }
+
+  /** The reference alone, for pasting into something else. */
+  async function copyPassageRef(passage) {
+    const span = passage.verse
+      ? `:${passage.to && passage.to !== passage.verse ? `${passage.verse}-${passage.to}` : passage.verse}`
+      : '';
+    const label = `${workspace.bookName(passage.book)} ${workspace.number(passage.chapter)}${span}`;
+    await navigator.clipboard.writeText(label);
+    shell.notify(L('msg.copied', { what: label }));
   }
 
   function registerBooksPane() {
@@ -175,6 +254,7 @@ export function createShell(root, ctx) {
           englishTestament: (id) => workspace.englishTestament(id),
           englishRef: (book, chapter) => workspace.englishRef(book, chapter),
           has: (id) => workspace.hasBook(id),
+          digits: () => workspace.digits(),
         });
         el.append(tree.element);
         tree.paint();
@@ -274,8 +354,89 @@ export function createShell(root, ctx) {
     modal.open({
       placeholder: L('ph.palette'),
       items: ctx.registry.commands().map((c) => ({ id: c.id, title: c.title, keys: c.keys?.replace('Mod', '⌘/Ctrl'), icon: c.icon ?? 'cmd', run: c.run })),
+      // A reference is a command too: "ps 23", "1 jn 2:1-4". It is offered
+      // above the commands, since somebody who typed a passage meant a passage.
+      // A verb and a reference together — "note ps 23:1-6" — is offered above
+      // both, because it is the most specific reading of what was typed.
+      suggest: (text) => [
+        ...verbItems(text),
+        ...passageItems(text).map((item) => ({ ...item, run: () => goTo(item.passage) })),
+      ],
       onPick: (item) => item.run(),
     });
+  }
+
+  /**
+   * What was typed, read as an instruction: a verb, then whatever it acts on.
+   *
+   * The verb may be abbreviated as long as it is still the only one that
+   * starts that way, so "no ps 23" is the note on Psalm 23. A passage verb with
+   * nothing after it acts on the passage already on screen, which makes the
+   * palette a way of doing something *here* as well as somewhere named.
+   */
+  function verbItems(text) {
+    const trimmed = text.trim();
+    // A word on its own is a name, not an instruction: "parallel" is the
+    // command called Open parallel pane, and a reader who typed it and pressed
+    // enter meant that. The space is what turns the word into a verb — it is
+    // the reader saying something follows — so nothing is offered without one.
+    if (!/\s/.test(text) || trimmed.length < 2) return [];
+    const at = trimmed.search(/\s/);
+    const word = (at === -1 ? trimmed : trimmed.slice(0, at)).toLowerCase();
+    const rest = at === -1 ? '' : trimmed.slice(at + 1).trim();
+    if (!/^[a-z][a-z-]*$/.test(word)) return [];
+    const matched = ctx.registry.verbs().filter((v) => v.word.startsWith(word));
+    if (!matched.length) return [];
+
+    const items = [];
+    for (const verb of matched.slice(0, 4)) {
+      if (verb.takes === 'text') {
+        if (!rest) { items.push(verbHint(verb)); continue; }
+        items.push({
+          id: `verb.${verb.id}`, title: `${verb.title}: ${rest}`, sub: verb.hint ?? undefined,
+          icon: verb.icon, run: () => verb.run(rest),
+        });
+        continue;
+      }
+      const targets = rest ? passageItems(rest).slice(0, 3) : [];
+      if (!rest) {
+        const here = workspace.activeTab?.kind === 'chapter' ? workspace.activeTab : null;
+        if (!here) { items.push(verbHint(verb)); continue; }
+        const passage = { book: here.book, chapter: here.chapter, verse: null, to: null };
+        items.push({
+          id: `verb.${verb.id}.here`,
+          title: `${verb.title} — ${workspace.bookName(here.book)} ${workspace.number(here.chapter)}`,
+          sub: verb.hint ?? L('lbl.onScreen'), icon: verb.icon, run: () => verb.run(passage),
+        });
+        continue;
+      }
+      if (!targets.length) { items.push(verbHint(verb)); continue; }
+      for (const target of targets) {
+        items.push({
+          id: `verb.${verb.id}.${target.id}`,
+          title: `${verb.title} — ${target.title}`,
+          sub: verb.hint ?? undefined,
+          icon: verb.icon,
+          run: () => verb.run(target.passage),
+        });
+      }
+    }
+    return items;
+  }
+
+  /** The verb itself, offered as a reminder of what it wants after it. */
+  function verbHint(verb) {
+    return {
+      id: `verb.${verb.id}.hint`, title: `${verb.word} …`,
+      sub: verb.hint ?? verb.title, icon: verb.icon,
+      run: () => openPaletteWith(`${verb.word} `),
+    };
+  }
+
+  /** Reopen the palette with a line already started. */
+  function openPaletteWith(query) {
+    openPalette();
+    modal.setQuery(query);
   }
 
   function openSwitcher(book) {
@@ -290,8 +451,46 @@ export function createShell(root, ctx) {
       placeholder: L('ph.switcher'),
       items,
       query: book ? `${bookName(book)} ` : '',
-      onPick: (item) => workspace.openChapter(item.book, item.chapter),
+      suggest: passageItems,
+      onPick: (item) => (item.passage ? goTo(item.passage) : workspace.openChapter(item.book, item.chapter)),
     });
+  }
+
+  /**
+   * What somebody typed, read as a passage: "ps 23", "psa 3:2-4", and the same
+   * in the translation's own name and numerals. A token that fits several
+   * books offers each of them rather than guessing.
+   */
+  function passageItems(text) {
+    const lookup = createLookup({
+      category: ctx.category,
+      resolver: workspace.resolver(),
+      bookName: (id) => workspace.bookName(id),
+      digits: workspace.digits(),
+    });
+    const query = parsePassageQuery(text, lookup);
+    if (!query) return [];
+    return query.books.slice(0, 5).map((book) => {
+      const passage = passageOf(query, book, lookup);
+      const span = passage.verse
+        ? `:${passage.to ? `${passage.verse}–${passage.to}` : passage.verse}`
+        : '';
+      const name = workspace.bookName(book);
+      const canon = ctx.category.book(book).name;
+      return {
+        id: `go.${book}.${passage.chapter}`,
+        title: `${name} ${workspace.number(passage.chapter)}${span}`,
+        sub: name === canon ? L('cmd.goToPassage') : `${canon} ${passage.chapter}${span}`,
+        icon: 'book-open',
+        passage,
+      };
+    });
+  }
+
+  /** Open a passage, and reveal the verse when one was named. */
+  function goTo({ book, chapter, verse }) {
+    if (verse) workspace.openVerse(book, chapter, verse);
+    else workspace.openChapter(book, chapter);
   }
 
   async function openTranslationPicker(index) {
@@ -327,8 +526,13 @@ export function createShell(root, ctx) {
    */
   function wireKeys() {
     window.addEventListener('keydown', (e) => {
-      if (modal.isOpen || isTyping(e.target)) return;
+      if (modal.isOpen) return;
       const mod = e.ctrlKey || e.metaKey;
+      // Typing in a field takes the plain keys, but not the ones held with
+      // Control or Command: a writer who wants the palette should not have to
+      // leave the note first. The combinations the field itself owns —
+      // copy, paste, undo and their neighbours — are left alone.
+      if (isTyping(e.target) && (!mod || EDITING_KEYS.has(e.key.toLowerCase()))) return;
       if (mod && !e.altKey && /^[1-9]$/.test(e.key)) {
         e.preventDefault();
         goToTab(Number(e.key));
@@ -355,6 +559,9 @@ export function createShell(root, ctx) {
     const at = tabs.findIndex((t) => t.id === current?.id);
     workspace.activate(tabs[(at + delta + tabs.length) % tabs.length].id);
   }
+
+  /** What a text field does with Control held, and the shell must not take. */
+  const EDITING_KEYS = new Set(['a', 'c', 'v', 'x', 'z', 'y', 'backspace', 'delete', 'arrowleft', 'arrowright']);
 
   function isTyping(target) {
     return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));

@@ -26,7 +26,7 @@ export default {
     };
     const save = (list) => records.save(KEY, { cards: list });
 
-    registry.command({ id: 'board.open', title: L('doc.board'), icon: 'canvas', run: () => shell.openDoc('board') });
+    registry.command({ id: 'board.open', title: L('doc.board'), icon: 'canvas', opens: 'board', run: () => shell.openDoc('board') });
 
     registry.doc({
       id: 'board',

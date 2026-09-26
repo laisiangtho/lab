@@ -97,11 +97,16 @@ export function chapterNote(p) {
         class: `verse${mark ? ' is-marked' : ''}`, id: `v${key}`,
         dataset: mark?.colour ? { colour: mark.colour } : undefined,
       },
-        h('button', { class: 'vnum', type: 'button', onclick: (e) => p.onVerse?.(key, e.currentTarget) }, label),
+        // Shift takes the passage between the verse already chosen and this
+        // one — the way a run of anything is chosen everywhere else.
+        h('button', {
+          class: 'vnum', type: 'button',
+          onclick: (e) => p.onVerse?.(key, e.currentTarget, { extend: e.shiftKey }),
+        }, label),
         verseText(verse.text, p),
         noteCount ? h('button', {
           class: 'verse-note-dot', title: L('lbl.notes', { n: noteCount }), 'aria-label': L('lbl.notes', { n: noteCount }),
-          onclick: (e) => p.onVerse?.(key, e.currentTarget),
+          onclick: (e) => p.onVerse?.(key, e.currentTarget, { extend: e.shiftKey }),
         }, icon('note')) : null),
       verse.ref && !compare ? refsLine(verse.ref, meta, p.resolver, p.onRef) : null));
   }

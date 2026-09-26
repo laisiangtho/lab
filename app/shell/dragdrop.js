@@ -403,3 +403,92 @@ export function wirePaneDrag(panes, api) {
     window.addEventListener('pointercancel', finish);
   });
 }
+
+/**
+ * The ribbon: drag a button up or down the rail to move it, or onto the bin
+ * under the rail to take it off.
+ *
+ * Removal used to be a small × on the button, revealed by hovering it. That is
+ * a trap: the ribbon is a column of 30 px buttons pressed dozens of times a
+ * day, and the one control that destroys part of it sat a few pixels from the
+ * one that runs it. So there is nothing to hit by accident any more. The add
+ * button at the foot becomes a bin while a drag is running — the only time it
+ * could mean anything — and a button is removed only by being carried to it and
+ * let go. Anywhere else, the drag is a move, or nothing at all.
+ *
+ * @param {HTMLElement} rail
+ * @param {{ commit(from: number, to: number): void, remove(id: string): void,
+ *           run(id: string): void, bin: HTMLElement }} api
+ */
+export function wireRibbonDrag(rail, api) {
+  rail.addEventListener('pointerdown', (e) => {
+    const node = e.target.closest('.rib[data-command]');
+    if (!node || e.button !== 0) return;
+
+    const buttons = [...rail.querySelectorAll('.rib[data-command]')].filter((b) => !b.hidden);
+    const from = buttons.indexOf(node);
+    if (from < 0) return;
+    e.preventDefault();
+
+    const rects = buttons.map((b) => b.getBoundingClientRect());
+    const height = rects[from].height;
+    const railRect = rail.getBoundingClientRect();
+    const start = { x: e.clientX, y: e.clientY };
+    const id = node.dataset.command;
+    let moved = false;
+    let overBin = false;
+    let to = from;
+
+    /** Is the pointer on the bin? Measured live: the foot does not move. */
+    const onBin = (ev) => {
+      const box = api.bin.getBoundingClientRect();
+      return ev.clientX >= box.left - 10 && ev.clientX <= box.right + 10
+        && ev.clientY >= box.top - 10 && ev.clientY <= box.bottom + 10;
+    };
+
+    const move = (ev) => {
+      const dy = ev.clientY - start.y;
+      if (Math.abs(dy) > TRAVEL || Math.abs(ev.clientX - start.x) > TRAVEL) moved = true;
+      if (!moved) return;
+      if (!rail.dataset.dragging) rail.dataset.dragging = '1';
+
+      const bin = onBin(ev);
+      if (bin !== overBin) {
+        overBin = bin;
+        api.bin.classList.toggle('is-target', bin);
+        node.classList.toggle('is-leaving', bin);
+      }
+
+      node.style.transform = `translate(${ev.clientX - start.x}px, ${dy}px)`;
+      if (overBin) {
+        for (const b of buttons) if (b !== node) b.style.transform = "";
+        return;
+      }
+      // Where it would land: the others slide by exactly one button.
+      const centre = rects[from].top + rects[from].height / 2 + dy;
+      to = rects.findIndex((r, i) => (i === rects.length - 1 ? true : centre < r.bottom));
+      if (to < 0) to = rects.length - 1;
+      for (const [i, b] of buttons.entries()) {
+        if (b === node) continue;
+        const shift = (i > from && i <= to) ? -height : (i < from && i >= to) ? height : 0;
+        b.style.transform = shift ? `translateY(${shift}px)` : "";
+      }
+    };
+
+    const up = (ev) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      for (const b of buttons) b.style.transform = "";
+      node.classList.remove('is-leaving');
+      api.bin.classList.remove('is-target');
+      delete rail.dataset.dragging;
+      if (!moved) { api.run(id); return; }
+      if (onBin(ev)) { api.remove(id); return; }
+      // Carried off the rail but not to the bin: a slip, not an instruction.
+      if (to !== from) api.commit(from, to);
+    };
+
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  });
+}

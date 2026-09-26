@@ -28,6 +28,21 @@ export default {
   setup(ctx) {
     const { annotations, records, registry, shell, state } = ctx;
 
+    // The composer opens in the mode the reader last used; this is where that
+    // can be set without opening it.
+    registry.setting({
+      id: 'composer.mode',
+      section: 'study',
+      order: 30,
+      build: (ui) => ui.choice({
+        name: L('set.composerMode'),
+        hint: L('set.composerModeHint'),
+        options: MODES.map((id) => [id, L(`val.${id}`)]),
+        value: (records.get(KEY, null) ?? {}).mode ?? DEFAULT.mode,
+        onChange: (mode) => { setMode(mode); ui.refresh(); },
+      }),
+    });
+
     const title = h('input', { class: 'cw-title', dir: 'auto', spellcheck: 'false', placeholder: L('lbl.untitled') });
     const chip = h('span', { class: 'cw-chip' });
     const text = h('textarea', { class: 'scroll', dir: 'auto', spellcheck: 'true', placeholder: L('ph.note') });
@@ -70,6 +85,14 @@ export default {
 
     registry.command({ id: 'composer.open', title: L('cmd.composer'), icon: 'note', ribbon: true, keys: 'Mod+j', run: () => open() });
     registry.command({ id: 'composer.mode', title: L('cmd.composerMode'), icon: 'split', run: cycleMode });
+    registry.verb({
+      id: 'composer.note',
+      word: 'note',
+      title: L('verb.note'),
+      icon: 'note',
+      hint: L('verb.noteHint'),
+      run: (passage) => open(passage),
+    });
     registry.verseAction({
       id: 'composer.verse',
       title: L('cmd.compose'),

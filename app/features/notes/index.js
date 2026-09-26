@@ -6,6 +6,7 @@
 import { h } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
+import { verseLabelOf } from '../../core/annotations.js';
 
 const SAVE_DELAY_MS = 600;
 
@@ -21,7 +22,7 @@ export default {
       isOn: (p) => annotations.forChapter(p.book, p.chapter).notes.some((n) => n.verse === p.verse),
       run: (p) => {
         shell.selectPane('right', 'notes');
-        state.set({ noteFor: p.verse });
+        state.set({ noteFor: p.verse, noteTo: p.to ?? null });
       },
     });
 
@@ -29,7 +30,7 @@ export default {
       id: 'notes.chapter',
       title: L('cmd.chapterNote'),
       icon: 'edit',
-      run: () => { shell.selectPane('right', 'notes'); state.set({ noteFor: null }); },
+      run: () => { shell.selectPane('right', 'notes'); state.set({ noteFor: null, noteTo: null }); },
     });
 
     registry.pane({
@@ -49,13 +50,14 @@ export default {
         let lastKey = '';
 
         function passage() {
-          const { book, chapter, noteFor = null } = state.get();
-          return { book, chapter, verse: noteFor };
+          const { book, chapter, noteFor = null, noteTo = null } = state.get();
+          return { book, chapter, verse: noteFor, to: noteFor === null ? null : noteTo };
         }
 
         function label(p) {
           const book = shell.workspace.bookName(p.book);
-          return p.verse === null ? `${book} ${p.chapter}` : `${book} ${p.chapter}:${p.verse}`;
+          if (p.verse === null) return `${book} ${p.chapter}`;
+          return `${book} ${p.chapter}:${verseLabelOf(p, (n) => shell.workspace.number(n))}`;
         }
 
         async function save() {
@@ -71,16 +73,17 @@ export default {
 
         function paint() {
           const p = passage();
-          const key = `${p.book}.${p.chapter}.${p.verse}`;
+          const key = `${p.book}.${p.chapter}.${p.verse}.${p.to ?? ''}`;
           const { notes } = annotations.forChapter(p.book, p.chapter);
-          const mine = notes.find((n) => n.verse === p.verse && (!editing || n.id === editing.id));
+          const mine = notes.find((n) => n.verse === p.verse && (n.to ?? null) === (p.to ?? null)
+            && (!editing || n.id === editing.id));
 
           target.replaceChildren(
             h('span', { class: 'plan-label' }, L('lbl.noteFor')),
             h('div', { class: 'note-target-row' },
               h('strong', {}, label(p)),
               p.verse !== null
-                ? h('button', { class: 'btn', onclick: () => state.set({ noteFor: null }) }, L('cmd.chapterNote'))
+                ? h('button', { class: 'btn', onclick: () => state.set({ noteFor: null, noteTo: null }) }, L('cmd.chapterNote'))
                 : null));
 
           // Only reset the text when the target changed; typing must survive repaints.
@@ -91,10 +94,12 @@ export default {
           }
 
           list.replaceChildren(...notes.filter((n) => n.id !== editing?.id).map((note) => h('div', { class: 'card' },
-            h('h4', {}, note.verse === null ? L('lbl.chapterNote') : `${L('lbl.verse')} ${note.verse}`),
+            h('h4', {}, note.verse === null
+              ? L('lbl.chapterNote')
+              : `${L('lbl.verse')} ${verseLabelOf(note, (n) => shell.workspace.number(n))}`),
             h('p', { class: 'note-text' }, note.text),
             h('div', { class: 'note-actions' },
-              h('button', { class: 'btn', onclick: () => { state.set({ noteFor: note.verse }); } }, L('cmd.edit')),
+              h('button', { class: 'btn', onclick: () => { state.set({ noteFor: note.verse, noteTo: note.to ?? null }); } }, L('cmd.edit')),
               h('button', { class: 'btn', onclick: () => annotations.deleteNote(note.id) }, L('cmd.delete'))))));
         }
 

@@ -37,6 +37,8 @@ export function checkFeatures(features, platform) {
   }
 }
 
+import { SETTING_SECTIONS } from './core/settings.js';
+
 const SIDES = new Set(['left', 'right']);
 
 export function createRegistry() {
@@ -44,6 +46,8 @@ export function createRegistry() {
   const panes = new Map();
   const commands = new Map();
   const verseActions = new Map();
+  const settingRows = new Map();
+  const verbs = new Map();
 
   return {
     /**
@@ -70,10 +74,20 @@ export function createRegistry() {
     },
     /**
      * @param {{ id: string, title: string, run(): unknown, keys?: string, icon?: string,
-     *           ribbon?: boolean, needsChapter?: boolean }} c
+     *           ribbon?: boolean, bar?: boolean, needsChapter?: boolean,
+     *           opens?: string, state?: () => boolean }} c
+     *        `opens` names the document this command brings up, and `state`
+     *        answers whether what it does is currently on. Either one makes its
+     *        button say so rather than looking the same whatever is happening —
+     *        a button that opens the Library should be lit while the Library is
+     *        the tab in front of the reader.
      *        `needsChapter` marks a command that only means something with a
      *        chapter open; the shell shows its button but does not let it be
      *        pressed while a document tab is active.
+     *        `ribbon` asks for a button on the rail down the side — a place to
+     *        go. `bar` asks for one in the band over the text, beside the tabs —
+     *        something done to what is being read. Both are a starting
+     *        arrangement: the ribbon is the reader's to rearrange.
      */
     command(c) {
       if (!c?.id || !c.title || typeof c.run !== 'function') throw new Error('registry.command: expected { id, title, run }');
@@ -90,6 +104,55 @@ export function createRegistry() {
       if (verseActions.has(a.id)) throw new Error(`registry.verseAction: duplicate id "${a.id}"`);
       verseActions.set(a.id, Object.freeze({ ...a }));
     },
+    /**
+     * A row on the settings page.
+     *
+     * Settings is the one place a reader looks for what they can change, but
+     * most of what they can change belongs to a feature — which pane follows
+     * the reading position, what search assumes, whether updates are looked
+     * for. So the page owns the layout and the feature owns the setting: it
+     * contributes a row and is handed the vocabulary to build it with.
+     *
+     * @param {{ id: string, section: string, order?: number,
+     *           build(ui: object): HTMLElement|HTMLElement[]|null }} s
+     */
+    setting(s) {
+      if (!s?.id || typeof s.build !== 'function') throw new Error('registry.setting: expected { id, section, build }');
+      if (!SETTING_SECTIONS.includes(s.section)) {
+        throw new Error(`registry.setting: unknown section ${JSON.stringify(s.section)} (expected ${SETTING_SECTIONS.join(', ')})`);
+      }
+      if (settingRows.has(s.id)) throw new Error(`registry.setting: duplicate setting id "${s.id}"`);
+      settingRows.set(s.id, Object.freeze({ order: 100, ...s }));
+    },
+    /**
+     * A word the palette accepts as an instruction, with what follows it as its
+     * argument: `note ps 23:1-6`, `mark jn 3:16`, `find mercy`.
+     *
+     * The palette is already how a reader reaches everything by name; a verb
+     * makes it how they reach everything *with something*, without first
+     * navigating to the passage and then finding the button. Nothing is hidden
+     * behind it: every verb is also an ordinary command or a button somewhere.
+     *
+     * @param {{ id: string, word: string, title: string, icon?: string,
+     *           takes?: 'passage'|'text', hint?: string,
+     *           run(argument: object|string): unknown }} v
+     *        `takes: 'passage'` (the default) is handed { book, chapter, verse,
+     *        to }; with nothing typed after the verb it is the passage on
+     *        screen. `takes: 'text'` is handed the rest of the line.
+     */
+    verb(v) {
+      if (!v?.id || !v.word || !v.title || typeof v.run !== 'function') {
+        throw new Error('registry.verb: expected { id, word, title, run }');
+      }
+      if (!/^[a-z][a-z-]*$/.test(v.word)) throw new Error(`registry.verb: word must be lower-case letters, got ${JSON.stringify(v.word)}`);
+      if (verbs.has(v.word)) throw new Error(`registry.verb: duplicate word "${v.word}"`);
+      verbs.set(v.word, Object.freeze({ icon: 'cmd', takes: 'passage', hint: null, ...v }));
+    },
+    verbs: () => [...verbs.values()],
+    /** The rows a section has gathered, in order. */
+    settingRows: (section) => [...settingRows.values()]
+      .filter((s) => s.section === section)
+      .sort((a, b) => a.order - b.order),
     verseActions: () => [...verseActions.values()],
     hasCommand: (id) => commands.has(id),
     docs: () => [...docs.values()],

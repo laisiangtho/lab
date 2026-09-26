@@ -1,8 +1,10 @@
 # Lai Siangtho — Phase 2 Architecture
 
-Status: the Phase 1 feature set and its shell behaviour are ported (26.09.23.4) — see README.md for commands and layout. Phase 1 single-file `index.html` is preserved as git tag `v0.2.0`; Phase 2 intentionally drops the single-file / no-build-tools constraint.
+Status: the Phase 1 feature set and its shell behaviour are ported, and Phase 2 now goes past them (26.09.26.4) — see README.md for commands and layout. Phase 1 single-file `index.html` is preserved as git tag `v0.2.0`; Phase 2 intentionally drops the single-file / no-build-tools constraint.
 
 Targets: web (PWA over HTTPS) and desktop (Electron), sharing one UI codebase.
+
+Beyond Phase 1, this build adds: a settings page features contribute their own rows to; a ribbon the reader arranges; palette verbs (`note ps 23:1-6`, `find mercy`); taking a passage out as Markdown, a citation or a printed sheet; verse cards drawn from templates the reader owns; study projects, which hold the passages a sermon or a lesson is made from; a public "Data and formats" document; and a first-run screen. Sections 3c-ii, 3c-iii, 3d-ii, 3d-iii, 3d-iv and 9e cover them.
 
 ---
 
@@ -128,7 +130,7 @@ Layout:
 
 ## 3b. Settings and transfer
 
-- Persisted settings (IndexedDB store `settings`, schema v2): `translation`, `book`, `chapter`, `parallel`. Validated and clamped against `category.json` on every read and write; unknown keys are an error.
+- Persisted settings (IndexedDB store `settings`, schema v2): `translation`, `book`, `chapter`, `parallel`, the chrome flags, and the typography — including `uiSize`, the interface's own text size, from which the whole interface ramp and the heights of the controls in it are derived. Validated and clamped against `category.json` on every read and write; unknown keys are an error.
 - Writes are coalesced (250 ms) because chapter stepping fires rapidly.
 - `boot` seeds the session state from settings and writes back only the persisted subset, so features may keep other state without it being stored.
 - Export envelope: `{ app, schema, exportedAt, settings, library: { catalog, translations[] } }`. Translation text is excluded by design; import restores state and offers to re-download the listed translations.
@@ -190,6 +192,47 @@ Settings has a fixed schema, validated key by key; reading-plan progress, the st
 | `ink` | ink | `{ "book.chapter": [{ colour, size, width, points }] }` |
 | `composer` | composer | window geometry, mode, split ratio |
 | `voices` | speech | chosen voice per language |
+| `projects` | projects | `{ projects: [ … ], open: id }` — study projects and which one is open |
+| `welcome` | welcome | `{ seen, at }` — the first run happened |
+| `books` | shell tree | `{ follow, counts }` |
+| `search` | search | mode, matchCase, the translations and books it is pointed at |
+| `library` | library | which listing the Library opens in |
+| `updates` | updates | `{ auto, checkedAt, latest }` |
+| `direction` | workspace | per-translation text-direction corrections |
+| `lang:{code}` | langpacks | a cached language pack |
+
+## 3c-ii. What features contribute to the shell
+
+A feature registers four kinds of thing through `registry`, and two more were added in this batch. All six are pure data plus a callback, so the boundary tests still hold and a target can leave any feature out.
+
+| Call | Contributes | Notes |
+|---|---|---|
+| `doc` | a workspace tab | Library, Settings, Projects, Data and formats, Welcome |
+| `pane` | a sidebar pane | `{ side, order }` |
+| `command` | a palette entry, optionally a hotkey and a ribbon button | |
+| `verseAction` | a button in the verse bar | receives `{ book, chapter, verse, to }` |
+| `setting` | **a row on the settings page** | `{ section, order, build(ui) }`; sections are named in `core/settings.js` and checked at registration, so a typo is a boot error rather than a row nobody sees |
+| `verb` | **a word the palette accepts as an instruction** | `{ word, takes: 'passage'\|'text', run(argument) }` |
+
+A command also says where its button goes: `ribbon: true` for the rail down the side — a place to go — and `bar: true` for the band over the text, beside the tabs — something done to what is being read. Ink moved from the first to the second, because a button that is dead on every document tab does not belong in a column of destinations; in the band it greys out with the rest, like Open parallel pane.
+
+**Settings rows.** Settings is the one place a reader looks for what they can change, but most of what they can change belongs to a feature. The page owns the layout and the feature owns the setting: `registry.setting` hands the feature the row vocabulary (`shell/settingrows.js`: `toggle`, `choice`, `select`, `number`, `action`, `readout`, `row`), so a row written by Search looks like a row written by the page. The page's own destructive pair (reset settings, erase everything) is registered the same way with `order: 900`, which keeps it at the bottom however many rows the features add above it.
+
+A page that reads settings on every paint cannot repaint while a control on it is being held — the control would be replaced under the pointer. Settings therefore holds still while a picker is open (`hold(true)`), and the colour picker reports a drag in two parts: `onChange` on every pointer move (paint only — a CSS variable and the swatch), `onCommit` once on release (`state.set`). An e2e test counts repaints during a drag and requires zero.
+
+**Palette verbs.** `note ps 23:1-6`, `mark jn 3:16`, `find mercy`, `parallel kjv`, `export gen 1:1-2`, `project ps 23`, `go 1 jn 2`, `copy jn 3:16`. A verb may be abbreviated while it is still unambiguous. A *word on its own is never a verb* — "parallel" is the command called Open parallel pane, and a reader who typed it and pressed Enter meant that; the space after the word is what turns it into an instruction. A passage verb with a space and nothing after it acts on the passage on screen. Every verb is also an ordinary command or button, so nothing is reachable only by typing; the Shortcuts document lists them all from the registry.
+
+### 3c-iii. The ribbon is the reader's
+
+What a feature asks for (`ribbon: true`) is only the starting arrangement. `settings.ribbonItems` — a list of command ids, or null for "this build's own" — is what the rail draws once the reader has touched it. A button is dragged up or down the rail to move it and off the rail to remove it (with an undo in the toast that restores the exact order), right-clicked for the rest, and any command in the build can be added by name. The four fixed buttons — go to, the palette, help, theme — stay, because they are how the reader reaches everything else, including the way back from a ribbon they have emptied.
+
+Every shell command carries its own icon — the quick switcher and the palette used to share a fallback glyph — and a button can say what is happening: `state()` for something that is on or off, `opens` for something that brings up a document. The Library button is lit while the Library is the tab in front of the reader, the ink button while ink is on.
+
+Nothing on the rail is locked. The quick switcher, the palette, help and the theme are the *default* list rather than fixed furniture — a reader who never uses the switcher can take it off — and the way to put anything back is under the rail, not in it: a footer carrying the `+` that adds any command by name and, when the rail runs out of height, the `⋯` that lists what did not fit along with "add" and "reset". That footer is chrome, so the ribbon can never be emptied into a state it cannot be recovered from.
+
+Removing is a bin, not a button on the thing being removed. The first attempt put a small × on each button, revealed by hovering it — which is a trap: the ribbon is a column of 30 px buttons pressed dozens of times a day, and the one control that destroys part of it sat a few pixels from the one that runs it. There is now nothing to hit by accident. The add button at the foot *becomes* a bin while a drag is running — the only moment removal can be meant — a button is removed only by being carried to it and let go, a drag that ends anywhere else is a move or nothing at all, and the toast that follows offers an undo that restores the exact order.
+
+Two rules keep the rest honest. A stored id this build no longer has is dropped as the rail is drawn, so a list outlives the features it was written against. And a press that never travels is still a press: dragging never costs the reader a click, which is the same bargain the tab strip makes.
 
 ## 3d. Workspace, source mode and chrome
 
@@ -200,6 +243,12 @@ Settings has a fixed schema, validated key by key; reading-plan progress, the st
   - `pointermove` / `pointerup` are listened for on the **window**, not on the dragged element, and come off in one place. Listening on the element loses the drag the moment the pointer outruns it, and leaves the class, the ghost and the drop marks on screen.
   - **Nothing is re-rendered mid-drag.** The model changes once, on release. Re-rendering per move destroyed the element under the pointer: the drag stopped, the caret stayed behind, and the order was never committed — exactly the "dragging stops working and leaves a mark" report.
 - **Tab reorder** follows Phase 1's feel: the dragged tab tracks the pointer, the others slide by exactly one tab width to open the gap, and the splice happens on release.
+- **A document already on screen is left alone.** `renderPanes` runs on every state change — a theme cycled, a chapter stepped, a translation installed — and used to tear down the open document tab and mount it again each time. That is why the Library scrolled back to the top whenever a button on it was pressed: not the list repainting, but the whole page being rebuilt from nothing, which is also what it looked like. The workspace now remembers which document is mounted and leaves it standing; documents repaint themselves through their own listeners.
+- **A repaint keeps the reader's place.** `dom.js` has `keepPlace(el, render)`: the scroll position of the enclosing scroller and the focus (by `data-place`) are taken before the rebuild and put back in the same frame, before anything is painted. The Library, Settings, Projects and the card studio all repaint through it.
+- **A document that is a workspace takes the room it is given.** `.doc` caps its width at a comfortable measure and centres it, which is right for reading and wrong for a canvas: the link graph, the study board and the card studio were being drawn in a column with the workspace empty on either side. `.doc-full` clears the cap and the margin, and the leaf it sits in stops scrolling — what is inside it does.
+- **One scrolling box per document.** The workspace hands a document a `.leaf-scroll`; a document that built another inside it ended up with two, and `overscroll-behavior: contain` on the inner one can stop a wheel reaching the outer. Help, Shortcuts, Data and formats and the notes manager each built their own; they no longer do, and an e2e check counts the scrollers in every document.
+- **A strip that cannot show everything hides what does not fit**, and the button at its end says how many and lists them. `shell/overflow.js` holds the rules and both strips use it — the sidebar's pane tabs and the workspace's own tabs, the second stood on end for the ribbon. Scrolling was the obvious answer and the wrong one: a scrollbar in a 28 px band is unusable, a swipe hides that there is anything to swipe for, and either way the item at the edge is drawn cut in half, which reads as a fault. Three rules make it legible: the button is an item of the strip like any other, never an overlay; the active item is never the one that disappears (an earlier one goes instead, so the active item ends up beside the button — which is also how it stays visible in a narrow window); and the menu lists the whole row, setting back the ones already on show, so it does not change shape with the width of the window. Widths are measured from the items themselves, not from `scrollWidth`, which counts the absolutely positioned pseudo-elements that draw the sheet's curve outside the box. In the narrow layout this button replaced the chevron the active tab used to carry: one mechanism instead of two.
+- **Asking before something cannot be undone** is `shell/confirm.js`: one dialog, the cancel focused, Escape and the backdrop both meaning no.
 - **The reading panel** is built once and only its values are repainted; geometry is set when it opens, so clicking inside it cannot make it move under the pointer. It carries the popover arrow (`--arrow-x`, `.is-above`) pointing at whatever opened it, and its reset is a quiet link in the foot rather than a button the size of the controls.
 - **Source mode** (`core/source.js`) renders the chapter as Markdown and accepts edits only under `## Notes`; the scripture section is compared on save and a change is refused. Verse notes are `- **17** text`, the chapter note is loose text.
 - **Strong's** (`core/strongs.js`) reads `{H7225}`, `<S>430</S>` and `[H430]`, attaching each code to the preceding word. No published translation carries the markup today, so the toggle reports that rather than appearing to do nothing. The regex is built per call — a shared `/g` regex carries `lastIndex` between `test()` and `matchAll()`, which silently skipped the first match until a test caught it.
@@ -220,6 +269,59 @@ Settings has a fixed schema, validated key by key; reading-plan progress, the st
 - **The breadcrumb picker** (`shell/navpop.js`) opens the siblings of whichever crumb is pressed: the testament's books, or the book's chapters, marking the chapters the translation actually carries. Choosing a book moves to its chapters without moving the arrow.
 - **Scroll fades** (`shell/fade.js`) set `--fade-top` / `--fade-bottom` on scrollable areas, so an edge with more beyond it fades rather than drawing a line. Nothing is dimmed when the content fits.
 - **Icons**: `public/icons/icon.svg` is the source; PNGs at 1024/512/192/32 are derived for the manifest, the favicon and desktop packaging.
+
+## 3d-i. Passages
+
+- A note or a bookmark may cover a run of verses: `verse` is where it starts and `to` where it ends (null for one verse). `parsePassage` checks the order only — how many verses a chapter holds is the translation's business, so a run past the end of one edition is still a reference. `chapterIndex` expands a run so every verse it covers is tinted; a note's dot stays on the verse it starts at.
+- `toggleMark` over a run clears whatever bookmarks it overlaps rather than adding another on top, so pressing the same control twice returns the reader to where they started.
+- `app/core/lookup.js` reads a reference out of typed text — `ps 23`, `psa 3:2-4`, the translation's own names and numerals — for the palette, the quick switcher and the books filter. Exact match first (canon and translation names, short names, published abbreviations), then prefix; a prefix that fits several books returns them all.
+
+---
+
+## 3d-ii. Taking a passage out
+
+`core/passage.js` (pure, tested) writes a gathered passage three ways: Markdown (a blockquote per verse, the reader's notes under it, marked verses in `==…==`), a citation (one paragraph with the reference after it), and a printable sheet (a whole HTML document with its own print styles, opened in a window of its own). The `export-passage` feature gathers what those need — text from the store, notes from annotations, names from the translation being read — and offers the five shapes through the modal. Saving prefers the platform's `saveFile` capability and falls back to a browser download, so the web build is not short of a feature the desktop has.
+
+## 3d-iii. Study projects
+
+A note answers "what do I think about this verse"; a project answers "what am I making". `core/projects.js` (pure, tested) holds the model — an ordered list of entries, each a passage reference, a piece of Markdown, or a task — with add/edit/move/remove, a progress count, a Markdown export and a strict file parser.
+
+Three decisions worth keeping:
+
+- **A passage is a reference, never copied text.** The text comes from whichever translation is being read, so a project opens correctly for whoever receives it and stays correct when the translation is updated.
+- **A project is a file.** `{ app, kind: 'project', schema, project }` exports and re-imports whole; the same project also exports as Markdown for people who do not use this app. An import never replaces a project already held — a same-id import lands as a second copy, because the file may be an older version of what its owner has been working on all morning.
+- **The shelf drops what it cannot read** rather than refusing to open: a project from a future build is skipped, and the export file remains the copy of record.
+
+The feature adds the Projects document (shelf beside the open project), a right-hand pane for use while reading, a verse action, a palette verb and a Settings row.
+
+## 3d-iv. Cards
+
+A card is a picture of a passage made for somewhere this app is not — a message, a slide, a printed sheet.
+
+`core/card.js` (pure, tested) holds the template and every piece of arithmetic the editor needs: `layoutCard` places the two frames and fits the words inside them, `resizeFrame` moves or resizes a frame by a handle, `snapLines` and `snapTo` say what a frame should line up with and which line it took, `frameToTemplate` turns pixels back into the fractions a template keeps, `wrapLines` carries each piece's kind so verse numbers can be drawn in their own colour, and `contrastRatio` answers whether a card will be readable anywhere but here.
+
+**The frames are the design.** The first version described the text by an alignment and an anchor down the card — a fine way to *store* a layout and a hopeless way to edit one: dragging could only snap the text between three places, and no handle could mean "make this box this big". A template now carries `box {x, y, w, h}` and `ref {x, y, w}` as fractions of the card, and `align` says what it says — where the lines sit inside their own frame. A template written against the old model is read through it, so it opens where its author left it.
+
+**The studio is an editor.** Press a frame to pick it up; drag and it follows exactly; take a corner and the opposite one stays where it is; edges keep the edge across from them; guides appear where it lines up with a margin, a centre or the other frame, and Alt ignores them; arrow keys nudge by a pixel of the card, ten with shift; Escape puts it down; `Mod+Z` and `Mod+Shift+Z` walk the history. None of that is special to cards — it is what an editor is, and until all of it was there the studio was a settings page with a picture beside it.
+
+Everything else is behind six icon buttons — templates, which verses, shape, colour, type, reference — each opening a panel of this document with no heading of its own: the pressed button says what it is, and Escape, the button again or a press anywhere else closes it. The toolbar uses the same overflow button as every other strip. Where a symbol is universal it is drawn rather than spelled (alignment), with the words as the title and the accessible name.
+
+Two rules the panels follow, both learned from defects. A panel is built when it opens and is **not** rebuilt while it is being used: rebuilding on the first step of a drag replaces the slider under the pointer and the drag dies with it, which is how a slider comes to behave like a button — so `numberRow` separates `onChange` (every step) from `onCommit` (the release), and only a change that alters which rows belong asks for a rebuild. And a panel never scrolls sideways: a control too wide for the panel is a panel that should have been two.
+
+Three things that are help rather than knobs: a new reader starts with four finished templates instead of one grey default; the foot says when the text and its ground are too close in lightness to read, measured against both stops of a gradient — the failure that actually happens, because it looks fine on the screen it was made on; and a card taller than 16:9 shows where a story app's own header and buttons will cover it, drawn on the stage and never on the canvas.
+
+## 3e. Search
+
+No index is built at install time; the scan is a cursor over `chapters` in a worker.
+
+- **Matching** (`app/core/search.js`) has three modes and one flag — offered to the reader as two independent switches (whole words, regular expression) plus case, since a pattern sets its own boundaries and the two cannot both apply: plain terms (ANDed, `"quoted"` as a phrase), whole words (a term must sit on a word boundary, tested with `\p{L}\p{N}_`), and a regular expression compiled as written. Case folds unless the reader asks otherwise. Plain and whole-word matching fold to NFD and strip Latin combining marks only; a pattern is matched against the text as written, since folding would change what it means. A pattern that cannot compile raises the reason, without the flags the reader never typed.
+- **Scope**: a set of translations and a set of books. `store.scanChapters(identify, visit, { books, while })` opens one cursor per book when a set is given — the key is `[identify, book, chapter]`, so each book is one contiguous range — and asks `while()` between records, which is how a newer query abandons an older one mid-translation.
+- **Counting is not limited**: the worker counts every match and keeps only the first `limit` rows (2,000). So the answer states how many verses matched, in how many chapters and books, and the tree lists every book that matched. Opening a book whose verses were past the limit searches that one book again, which is cheap.
+- Results stream in batches of 40, each carrying the counts so far; the pane repaints at most once a frame.
+
+Measured on three full-size translations: one translation 1.6 s, the same as a regular expression 0.3 s, all three 4.2 s, one book 0.17 s.
+
+---
 
 ## 4. Catalog update flow
 
@@ -253,12 +355,15 @@ app/                      shared UI — never imports from targets/
   services/               store (IndexedDB), library, settings, records, search,
                           transfer, aliases loader
   workers/                library.worker.js, search.worker.js
+  core/  … plus passage.js (export shapes), projects.js (study projects)
+  core/  … plus card.js (verse-card templates and layout)
   shell/                  chrome, workspace, reading, readingpanel, versebar, floats,
-                          dragdrop, markdown, tree, modal, theme, i18n, icons, dom
+                          dragdrop, markdown, tree, modal, menu, confirm, colorpicker,
+                          numberrow, settingrows, theme, i18n, icons, dom
   features/               library, settings, search, notes, bookmarks, composer,
                           notes-manager, tags, backlinks, outline, plans, graph,
-                          board, ink, speech, verse-card, help, updates,
-                          export-chapter
+                          board, ink, speech, verse-card, help (help/formats.js),
+                          updates, export-chapter, export-passage, projects, welcome
   styles/                 shell.css (Phase 1 design system), views.css
 targets/
   csp.js                  production Content-Security-Policy
@@ -411,11 +516,41 @@ The check runs at most once a day, silently unless there is something to say, an
 
 ## 9d. Distribution
 
-- `electron-builder.yml` publishes to the same repository the desktop update check reads; the tag (`v26.09.24.3`) must match the stamped version, minus the `v`.
+- `electron-builder.yml` publishes to `laisiangtho/lab`, the same repository the desktop update check reads; the tag (`v26.09.24.3`) must match the stamped version, minus the `v`.
 - Targets: AppImage, NSIS, dmg + zip. `.deb` and `.rpm` are left out because they require a maintainer address in metadata that ships with every copy.
 - Window chrome: the system title bar is hidden only where the system still draws its own buttons — `hiddenInset` on macOS, `titleBarOverlay` on Windows. Linux keeps its title bar; the overlay is not drawn there, and a window with no close button is worse than an extra row. The renderer is told which arrangement it got (`platform.frame`) and reserves the corner.
 - Window size, position and maximised state are kept in `userData/window.json`, outside the reader's library: they belong to this installation on this machine, and they are needed before the renderer exists. A position on a display that is no longer attached is discarded.
 - `.github/workflows/check.yml` runs the unit tests, the browser suite and the packaged desktop app on every push; `release.yml` builds and publishes installers on a `v*` tag.
+
+---
+
+## 9e. Reaching every kind of reader
+
+The app is meant for people who use a Bible very differently — somebody reading
+a chapter a night, a student comparing editions, a preacher preparing Sunday, a
+translator checking a name, a programmer fixing a verse. What each of them
+needs is not a different app but a different *way in*, and the cheapest way in
+is the one they already know how to use.
+
+| Way in | For whom it is the natural one |
+|---|---|
+| Buttons, panes, the books tree | anyone, and the only way that needs nothing learned |
+| The command palette, by name | a reader who knows what a thing is called but not where it is |
+| Palette verbs, by instruction | someone who works in a terminal and would rather type than point |
+| References in shorthand (`ps 23`, `psa 3:2-4`) — palette, switcher and the books filter | anyone in a hurry; a student moving between passages |
+| Projects and the composer | a preacher, a teacher, a student writing something |
+| Export: Markdown, citation, sheet, file | whoever the writing is *for* — and every program that is not this one |
+| "Data and formats", diagnostics, the alias tool | a translator, a maintainer, a programmer |
+
+Two rules keep this from becoming several apps in a trenchcoat:
+
+- **Nothing is reachable only by typing.** Every verb is also a button or a
+  command; the Shortcuts document lists the verbs from the registry, so the
+  keyboard route is discoverable from the pointer route.
+- **Nothing is reachable only by pointing.** Everything on the settings page is
+  also a command, and every document opens from the palette.
+
+The first run says as much in four lines, and is in Help afterwards.
 
 ---
 
@@ -426,7 +561,7 @@ Everything below was run by hand during development. What is worth keeping now l
 | Command | What it covers | Cost |
 |---|---|---|
 | `npm test` | 68 unit and boundary tests — parsers, alignment, references, settings, language packs, registry, and the rules that keep `app/` target-agnostic | ~1 s |
-| `npm run test:e2e` | 15 ordered checks against the real `dist/web` build in a browser, with the catalog repository answered from generated fixtures: first run, install and read, the reading panel, parallel alignment, three-source names with the canon as the accessible name, language packs fetched once and cached, marks surviving a translation switch, tab reorder and detach leaving nothing behind, sidebar rows and the empty-sidebar rail, search, the narrow layout, reload persistence, the install report, and a damaged copy repairing itself. It ends by asserting that nothing was logged and nothing 404'd but the language pack the fixtures deliberately omit | ~80 s |
+| `npm run test:e2e` | 35 ordered checks against the real `dist/web` build in a browser, with the catalog repository answered from generated fixtures: first run, install and read, the reading panel, parallel alignment, three-source names with the canon as the accessible name, language packs fetched once and cached, marks surviving a translation switch, tab reorder and detach leaving nothing behind, sidebar rows and the empty-sidebar rail, search, the narrow layout, reload persistence, the install report, a damaged copy repairing itself, and the search engine — its counts, its tree, whole-word and regular-expression matching, a pattern that cannot compile, and a scope narrowed to one book that survives a reload; that the chrome selects nothing and keeps the arrow while the scripture selects normally; that the books tree opens and shuts as asked with following on and off; and that the text panel stays on screen without a scrollbar at every interface size. Batch J added six: that the first run shows the greeting and hands over to the Library; that the palette takes an instruction (`mark exo 2:3` bookmarks and goes there, twice to undo it) while a bare word is still the command of that name; that a passage leaves as Markdown with a note written through the palette inside it; that a project keeps a passage, its verses and what was written about it across a reload; that Settings gathers the rows Search and the Books pane own, keeps what cannot be undone at the bottom, and reaches the reading surface; that dragging the accent colour repaints nothing and keeps only the colour it stopped on; and that Escape answers the confirmation dialog with no. Batch K added six more: that a card is drawn from the verses that were chosen rather than the first one; that the card studio draws the template it is given and keeps the templates across a reload; that a ribbon button can be dragged to a new place, dragged off the rail and put back by its undo, and still runs its command on a plain press; that a pane strip too narrow for its tabs hides them whole, counts them on its button and lists the row; that a document repainting itself keeps the reader's scroll position; and that every document has exactly one box that scrolls. It ends by asserting that nothing was logged and nothing 404'd but the language pack the fixtures deliberately omit | ~150 s |
 | `npm run test:desktop` | The packaged Electron application started under a display: the `app://` protocol, the preload bridge, the shell rendering, and a clean console | ~10 s |
 | `npm run test:perf` | Measurements at full size (below) | ~30 s |
 
@@ -438,14 +573,20 @@ Three complete Bibles — the canon's real chapter and verse counts, verses of r
 
 | | |
 |---|---|
-| install a 4.0 MB translation | 510 ms |
-| install a 10.1 MB translation (Burmese, UTF-8) | 1,178 ms |
-| open Psalm 119 (176 verses) | 361 ms |
-| next chapter | 63 ms |
-| three parallel panes over Psalm 119 | 174 ms |
-| scroll that to the end | 426 ms |
-| search 93,000 verses across all three | 2,898 ms (results stream as they are found) |
-| reload with everything open | 516 ms |
+| start with nothing installed, to the catalog | 714 ms |
+| install a 4.0 MB translation | 482 ms |
+| install a 10.1 MB translation (Burmese, UTF-8) | 1,199 ms |
+| open Psalm 119 (176 verses) | 356 ms |
+| next chapter | 145 ms |
+| three parallel panes over Psalm 119 | 233 ms |
+| scroll that to the end | 424 ms |
+| search one full translation (31,102 verses) | 1,185 ms (results stream as they are found) |
+| the same, as a regular expression | 239 ms |
+| search all three (93,000 verses) | 3,061 ms |
+| the same, narrowed to one book | 150 ms |
+| reload with everything open | 752 ms |
+
+Measured again at 26.09.26.4. Nothing in the reading or search path changed, but the machine these run on is shared and its figures drift by a factor of two between runs on the same build — the second run of the same suite gave 1,873 ms for one translation and 4,853 ms for three. The numbers are therefore worth comparing only against numbers taken the same afternoon. The bundle grew from 238 kB to 300 kB (98 kB gzipped) across this batch and the last.
 
 ### Earlier, by hand
 

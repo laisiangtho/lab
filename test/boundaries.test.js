@@ -24,10 +24,28 @@ test('app/ is target-agnostic', () => {
   }
 });
 
+/**
+ * Comments are prose, and prose is allowed to use the words. A module that
+ * explains it returns a printable *document* is not touching the DOM; a module
+ * that writes `document.createElement` is. Block comments and whole-line
+ * comments are removed before the check — a trailing comment is left in, so
+ * the rule stays conservative where stripping would be ambiguous.
+ */
+function code(src) {
+  return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+}
+
 test('app/core/ is pure', () => {
   const banned = [/\bdocument\b/, /\bwindow\b/, /\bindexedDB\b/, /\blocalStorage\b/, /import\.meta\.glob/, /\bfetch\(/];
   for (const f of files(root('app/core'))) {
-    const src = readFileSync(f, 'utf8');
+    const src = code(readFileSync(f, 'utf8'));
     for (const re of banned) assert.doesNotMatch(src, re, `${rel(f)} matches ${re}`);
   }
+});
+
+test('the purity check still sees what it is for', () => {
+  // Guarding the guard: stripping comments must not strip the thing being
+  // looked for.
+  assert.match(code('/** a document */\nconst el = document.createElement("p");'), /\bdocument\b/);
+  assert.doesNotMatch(code('/** a document */\nconst x = 1;'), /\bdocument\b/);
 });

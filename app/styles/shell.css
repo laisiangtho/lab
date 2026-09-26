@@ -47,8 +47,28 @@
   --font-ui:"Inter var","Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
   --font-text:"Iowan Old Style","Source Serif 4","Charter","Palatino Linotype","Book Antiqua",Georgia,serif;
   --font-mono:ui-monospace,"JetBrains Mono","SFMono-Regular","Cascadia Code","Roboto Mono",Menlo,monospace;
+  /* The serif above is the default for scripture; the reader may ask for the
+     interface's own face, or a monospaced one for lining verses up. Only the
+     reading surface follows this, never the chrome. */
+  --font-read:var(--font-text);
+}
+body[data-font="sans"]{--font-read:var(--font-ui)}
+body[data-font="mono"]{--font-read:var(--font-mono)}
+/* Off is a setting the reader chose, so it wins over every transition in the
+   app; the same block answers a system-level preference for less movement. */
+body[data-motion="off"] *,body[data-motion="off"] *::before,body[data-motion="off"] *::after{
+  transition:none!important;animation:none!important;scroll-behavior:auto!important;
+}
+@media (prefers-reduced-motion:reduce){
+  body:not([data-motion="on"]) *{transition:none!important;animation:none!important}
+}
+:root{
 
-  --fs-ui-s:12px; --fs-ui-m:13px; --fs-ui-l:14px;
+  /* The interface ramp is derived from one size the reader can change
+     (--ui-size, set by the reading panel). Control heights follow it, or a
+     larger label would not fit the box it sits in. */
+  --ui-size:13px;
+  --fs-ui-s:calc(var(--ui-size) - 1px); --fs-ui-m:var(--ui-size); --fs-ui-l:calc(var(--ui-size) + 1px);
   --fs-text:var(--reading-size,18px);
   --lh-text:1.66;
   --measure-em:34;          /* line length in the text's own size; 0 = full width */
@@ -56,12 +76,12 @@
   --ribbon-w:44px;
   --sidebar-l:264px;
   --sidebar-r:300px;
-  --tab-h:30px;        /* every control in the band is this tall */
+  --tab-h:calc(var(--ui-size) + 17px);   /* every control in the band is this tall */
   --bar-gap:6px;       /* breathing room above the tabs; raise this, not bar-h */
   --bar-h:calc(var(--tab-h) + var(--bar-gap));   /* the single top band */
   --wc-w:138px;        /* space the window buttons occupy at the corner */
   --mac-inset:0px;     /* traffic-light strip, set only on darwin */
-  --statusbar-h:24px;
+  --statusbar-h:calc(var(--ui-size) + 11px);
   --reading-width:44rem;
   --speed:.14s;
 
@@ -155,6 +175,25 @@ button,input,textarea,select{font:inherit;color:inherit}
 :where(#app,.toast,.popover,.drag-ghost,.win-buttons,.composer) svg{width:15px;height:15px}
 button{background:none;border:0;padding:0;cursor:default}
 .wikilink,.tag-inline,.pill,.vnum,.tagcloud .pill{cursor:pointer}
+
+/* Chrome is not a document. Its labels are not there to be selected, and a
+   half-selected tree row that expands the moment the button is released leaves
+   a highlight behind that looks like a fault. So the shell selects nothing and
+   keeps the arrow throughout; everything a reader might actually want to copy
+   — the scripture, their own notes, a copyright line, whatever they typed —
+   opts back in below. */
+#app,.toast,.popover,.drag-ghost,.float-win,.composer,.mobile-bar,.win-buttons{
+  user-select:none;-webkit-user-select:none;cursor:default;
+}
+.note,.doc,.about,.tri-body,.md-body,.cw-preview,.key-list,
+input,textarea,select,[contenteditable="true"]{
+  user-select:text;-webkit-user-select:text;cursor:auto;
+}
+/* Controls inside a selectable region are still controls. */
+.doc button,.about button,.tri-body button,.note button,.md-body button,
+.doc a,.about a,.tri-body a,.note a{user-select:none;-webkit-user-select:none}
+input,textarea,[contenteditable="true"]{cursor:text}
+input[type="checkbox"],input[type="radio"],input[type="range"],input[type="color"],select{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent-1);outline-offset:1px;border-radius:var(--radius-s)}
 :focus:not(:focus-visible){outline:none}
 
@@ -249,10 +288,29 @@ body[data-shell="on"][data-right="shut"] .tabbar{padding-inline-end:var(--wc-w)}
 }
 .rib-rail{
   flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;
-  padding:7px 0 8px;gap:2px;
+  padding:7px 0 0;gap:2px;overflow:hidden;
   background:var(--bg-secondary);
-  border-radius:0;border-start-end-radius:var(--radius-sheet);border-end-end-radius:var(--radius-sheet);
+  border-radius:0;border-start-end-radius:var(--radius-sheet);
 }
+/* The ribbon's own controls, under the rail rather than in it: the way to put
+   a button back must not be a button that can itself be taken away. */
+.rib-foot{
+  flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:4px 0 8px;background:var(--bg-secondary);
+  border-end-end-radius:var(--radius-sheet);
+}
+.rib-foot::before{
+  content:"";width:18px;height:1px;background:var(--border);margin:2px 0 4px;
+}
+.rib-more{position:relative}
+.rib-more::after{
+  content:attr(data-count);position:absolute;top:-1px;inset-inline-end:-1px;
+  min-width:14px;height:14px;padding:0 3px;border-radius:99px;
+  background:var(--accent);color:#fff;box-shadow:0 0 0 2px var(--bg-secondary);
+  font-family:var(--font-ui);font-size:9px;line-height:14px;font-weight:700;text-align:center;pointer-events:none;
+}
+.rib-more[hidden]{display:none}
+.rib[hidden]{display:none}
 .rib{
   width:30px;height:30px;border-radius:var(--radius-m);display:grid;place-items:center;
   color:var(--text-faint);position:relative;transition:background var(--speed),color var(--speed);
@@ -260,6 +318,26 @@ body[data-shell="on"][data-right="shut"] .tabbar{padding-inline-end:var(--wc-w)}
 .rib svg{width:17px;height:17px}
 .rib:hover{background:var(--bg-hover);color:var(--text-normal)}
 .rib.is-active{color:var(--accent-2);background:var(--accent-fade)}
+/* Dragging a ribbon button: it follows the pointer, the others slide by one,
+   and nothing is committed until release. Carried out of the rail it is on its
+   way off the ribbon, and says so by fading. */
+.rib[data-command]{cursor:grab;touch-action:none}
+.rib[data-command]:active{cursor:grabbing}
+/* The way to put one on. Quiet until the ribbon is pointed at, since a ribbon
+   is read far more often than it is arranged. */
+.rib-add{opacity:.4;transition:opacity var(--speed),background var(--speed),color var(--speed)}
+.ribbon:hover .rib-add,.rib-add:focus-visible{opacity:.75}
+.rib-add:hover{opacity:1}
+.rib-add svg{width:14px;height:14px}
+/* While a button is being carried, the add button is a bin. It is the only
+   moment removal can be meant, so it is the only moment it is offered. */
+.rib-bin{position:absolute;inset:0;display:none;place-items:center}
+.rib-bin svg{width:16px;height:16px}
+.ribbon [data-dragging] ~ .rib-foot .rib-add{opacity:1;color:var(--c-red);box-shadow:inset 0 0 0 1px var(--c-red)}
+.ribbon [data-dragging] ~ .rib-foot .rib-add > svg:first-child{display:none}
+.ribbon [data-dragging] ~ .rib-foot .rib-add .rib-bin{display:grid}
+.rib-add.is-target{background:var(--c-red);color:#fff;box-shadow:none;transform:scale(1.12)}
+.rib.is-leaving{opacity:.5}
 .rib-speech{position:relative}
 .rib-speech .ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);pointer-events:none}
 .rib-speech .ring circle{fill:none;stroke-width:2.2}
@@ -319,6 +397,10 @@ body[data-shell="on"][data-right="shut"] .tabbar{padding-inline-end:var(--wc-w)}
   padding-inline:calc(var(--sheet-inset) + var(--radius-sheet) + var(--radius-flare))
                  calc(var(--sheet-inset-r) + var(--radius-sheet) + var(--radius-flare));
   flex:0 0 auto;position:relative;z-index:2;
+  /* More panes than room is the ordinary case in a narrow sidebar. The strip
+     does not scroll: what does not fit is hidden and the button at the end
+     lists it. A 24 px icon is not worth a swipe to reach. */
+  min-width:0;max-width:100%;overflow:hidden;
   background:var(--tabstrip-bg);--seam:var(--bg-secondary);
 }
 .pane-tab{
@@ -394,7 +476,7 @@ body[data-shell="on"][data-right="shut"] .tabbar{padding-inline-end:var(--wc-w)}
 }
 .pane-head button:hover{background:var(--bg-hover);color:var(--text-normal)}
 .pane-head svg{width:14px;height:14px}
-.pane-body{flex:1;min-height:0;padding:0 6px 10px}
+.pane-body{flex:1;min-height:0;padding:10px 6px}
 
 /* ---- sidebar rows -------------------------------------------------------- */
 .side-body{flex:1;min-height:0;display:flex;flex-direction:column}
@@ -495,12 +577,15 @@ body.is-dragging-tab,body.is-dragging-tab *{cursor:grabbing!important}
 }
 .tree-item.is-open>.tree-children.grid{display:grid}
 .ch-chip{
-  height:26px;border-radius:var(--radius-s);display:grid;place-items:center;
+  height:30px;border-radius:var(--radius-s);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:0;line-height:1.1;
   font-size:11px;font-variant-numeric:tabular-nums;color:var(--text-faint);
-  background:var(--base-10);transition:background var(--speed),color var(--speed);
+  /* A grid of fifty boxed chips is a wall of boxes; the numbers are enough,
+     and the box arrives under the pointer. */
+  background:none;transition:background var(--speed),color var(--speed);
 }
 .ch-chip:hover{background:var(--bg-active);color:var(--text-normal)}
-.ch-chip.has-text{color:var(--text-muted);box-shadow:inset 0 0 0 1px var(--border-strong)}
+.ch-chip.has-text{color:var(--text-muted)}
 .ch-chip.is-active{background:var(--accent);color:#fff;font-weight:600;box-shadow:none}
 /* A breadcrumb reveal points at the row it opened, then lets go. */
 @keyframes row-flash{0%,40%{background:var(--accent-fade)}100%{background:transparent}}
@@ -519,12 +604,13 @@ body.is-dragging-tab,body.is-dragging-tab *{cursor:grabbing!important}
   border-top-left-radius:3px;transform:rotate(45deg);
 }
 .navpop.is-above::before{top:auto;bottom:-7px;transform:rotate(225deg)}
+.navpop.no-arrow::before{display:none}
 .np-grid{
   display:grid;gap:4px;padding:8px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
   scrollbar-width:none;border-radius:inherit;
 }
 .np-grid::-webkit-scrollbar{display:none}
-.np-grid .ch-chip{height:30px;min-width:0}
+.np-grid .ch-chip{height:34px;min-width:0}
 .np-book{
   display:flex;align-items:baseline;gap:7px;min-height:30px;padding-block:6px;padding-inline:4px 9px;
   border-radius:var(--radius-s);text-align:start;font-size:var(--fs-ui-m);line-height:1.3;
@@ -572,12 +658,31 @@ body.is-dragging-tab,body.is-dragging-tab *{cursor:grabbing!important}
 }
 .tabstrip{
   display:flex;gap:0;flex:1;min-width:0;align-items:flex-end;
-  /* Past a certain number of tabs the strip scrolls rather than squeezing every
-     label down to two letters. Only the horizontal axis moves; the tabs sit on
-     the band's bottom edge and must not be clipped along it. */
-  overflow-x:auto;overflow-y:hidden;scrollbar-width:none;scroll-behavior:smooth;
+  /* The active tab's flares are drawn outside its own box; without this the
+     first and last tab lose the curve that fuses them to the sheet. */
+  padding-inline:var(--radius-flare);
+  /* Past a certain number of tabs the strip does not scroll: what does not fit
+     is hidden whole and listed behind the button at the end. A tab drawn cut in
+     half reads as a fault, and a scrollbar in a 30 px band is unusable. */
+  overflow:hidden;
 }
-.tabstrip::-webkit-scrollbar{height:0}
+/* The button that opens the tabs that did not fit. An item of the strip like
+   the tabs themselves, sitting on the band's bottom edge with them. */
+.tab-more{
+  flex:0 0 auto;align-self:center;position:relative;width:26px;height:26px;margin-inline-start:2px;
+  display:grid;place-items:center;border-radius:var(--radius-s);color:var(--text-faint);cursor:pointer;
+  transition:background var(--speed),color var(--speed);
+}
+.tab-more:hover{background:var(--bg-hover);color:var(--text-normal)}
+.tab-more[hidden]{display:none}
+.tab-more svg{width:15px;height:15px}
+.tab-more::after{
+  content:attr(data-count);position:absolute;top:-2px;inset-inline-end:-3px;
+  min-width:14px;height:14px;padding:0 3px;border-radius:99px;
+  background:var(--accent);color:#fff;box-shadow:0 0 0 2px var(--tabstrip-bg);
+  font-family:var(--font-ui);font-size:9px;line-height:14px;font-weight:700;text-align:center;pointer-events:none;
+}
+.tab[hidden]{display:none}
 .tab{
   position:relative;display:flex;align-items:center;gap:6px;height:var(--tab-h);
   padding:0 6px 0 11px;z-index:1;flex:1 1 auto;min-width:108px;max-width:190px;
@@ -786,7 +891,7 @@ body[data-measure="full"] .note{max-width:none}
 .pill.plain{background:var(--base-20);color:var(--text-muted);border-color:var(--border-strong)}
 
 /* verses */
-.chapter{font-family:var(--font-text);font-size:var(--fs-text);line-height:var(--lh-text);color:var(--text-normal)}
+.chapter{font-family:var(--font-read);font-size:var(--fs-text);line-height:var(--lh-text);color:var(--text-normal)}
 .chapter.flow .verse{display:inline}
 /* List: the number is a bullet in its own column, sized to the widest number
    in the chapter, and wrapped lines hang clear of it. */
@@ -804,11 +909,11 @@ body[data-measure="full"] .note{max-width:none}
    needs. Burmese stacks tall above and below the line; Arabic reads best a
    little larger. */
 :is(.chapter,.pd-text):lang(my){
-  font-family:"Myanmar Text",var(--font-text);
+  font-family:"Myanmar Text",var(--font-read);
   line-height:2.05;
 }
 :is(.chapter,.pd-text):lang(ar){
-  font-family:"Noto Naskh Arabic","Amiri","Geeza Pro","Traditional Arabic",var(--font-text);
+  font-family:"Noto Naskh Arabic","Amiri","Geeza Pro","Traditional Arabic",var(--font-read);
   font-size:calc(var(--fs-text) * 1.12);line-height:1.9;
 }
 .pd-text:lang(ar){font-size:17px}
@@ -837,13 +942,22 @@ body[data-measure="full"] .note{max-width:none}
 .chapter:not(.flow) .verse.is-twin{background:var(--accent-fade)}
 .vbar{display:flex;gap:2px;padding:4px;border-radius:var(--radius-m)}
 /* ---- reading panel ---- */
-.rpanel{width:min(360px,calc(100vw - 16px));padding:12px 14px 10px;display:flex;flex-direction:column;gap:12px}
+.popover.rpanel{
+  /* The base popover caps at 300px and is declared after this one, so the cap
+     is lifted here by name: this panel carries sliders and needs the room. */
+  width:min(380px,calc(100vw - 16px));max-width:calc(100vw - 16px);
+  padding:11px 14px 9px;display:flex;flex-direction:column;gap:9px;
+}
 .rpanel.no-arrow::before{display:none}
 .rpanel:focus{outline:none}
 body.study-in-margin .outline-study{display:none}
-.rp-row{display:flex;flex-direction:column;gap:6px}
+.rp-row{display:flex;align-items:center;gap:10px}
+.rp-row>.rp-l{flex:0 0 88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* A control too wide to sit beside its label takes the line under it. */
+.rp-row.is-wide{flex-direction:column;align-items:stretch;gap:6px}
+.rp-row.is-wide>.rp-l{flex:0 0 auto}
 .rp-l{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-faint)}
-.rp-ctl{display:flex;align-items:center;gap:8px}
+.rp-ctl{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
 .rp-ctl input[type=range]{flex:1;min-width:0;accent-color:var(--accent)}
 .rp-step{width:30px;height:28px;border-radius:var(--radius-s);display:grid;place-items:center;color:var(--text-muted);background:var(--base-10)}
 .rp-step:hover{background:var(--bg-hover);color:var(--text-normal)}
@@ -908,7 +1022,7 @@ body.study-in-margin .outline-study{display:none}
 .doc-p:last-child{margin-bottom:0}
 .task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:8px}
 .task{
-  background:var(--surface-raised);border:var(--divider);border-radius:var(--radius-m);
+  background:var(--surface-raised);border:var(--divider);border-radius:var(--radius-l);
   padding:11px 12px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;
   text-align:start;transition:background var(--speed),border-color var(--speed);
 }
@@ -977,6 +1091,11 @@ body.study-in-margin .outline-study{display:none}
 .btn.primary{background:var(--accent);box-shadow:none;color:#fff;font-weight:500}
 .btn.primary:hover{background:var(--accent-1)}
 .btn svg{width:14px;height:14px}
+/* A button for something that removes data. It is styled as a warning rather
+   than as the obvious next step: the reader should have to mean it. */
+.btn.danger{background:none;color:var(--c-red);box-shadow:inset 0 0 0 1px currentColor}
+.btn.danger:hover{background:rgba(251,70,76,.12)}
+.btn:disabled{opacity:.45;pointer-events:none}
 
 /* ---- search / backlinks / tags -------------------------------------------*/
 .field{
@@ -1024,6 +1143,29 @@ body.study-in-margin .outline-study{display:none}
   animation:pop .16s cubic-bezier(.2,.9,.3,1);
 }
 @keyframes pop{from{opacity:0;transform:translateY(-6px) scale(.985)}to{opacity:1;transform:none}}
+/* The question dialog. Narrower than the palette, because it is a sentence and
+   two buttons; the text can be selected, since a reader may want to copy what
+   they are about to lose. The mark carries the weight of the question, so the
+   words do not have to shout. */
+.modal.confirm{
+  width:min(430px,92vw);padding:20px 22px 16px;display:flex;flex-direction:column;gap:18px;
+}
+.cf-body{display:flex;gap:14px;align-items:flex-start}
+.cf-mark{
+  flex:0 0 auto;width:34px;height:34px;display:grid;place-items:center;border-radius:50%;
+  background:var(--accent-fade);color:var(--accent-2);
+}
+.modal.confirm[data-tone="danger"] .cf-mark{background:rgba(251,70,76,.14);color:var(--c-red)}
+.cf-mark svg{width:17px;height:17px}
+.cf-text{min-width:0}
+.cf-h{margin:0 0 5px;font-family:var(--font-ui);font-size:var(--fs-ui-l);font-weight:650;line-height:1.35;color:var(--text-normal)}
+.cf-p{margin:0;font-size:var(--fs-ui-m);line-height:1.6;color:var(--text-muted);user-select:text}
+.cf-p[hidden]{display:none}
+.cf-acts{display:flex;justify-content:flex-end;gap:8px}
+/* A label that wraps inside a fixed-height button is how "Erase everything"
+   became two lines in a 28 px box. */
+.cf-acts .btn{height:32px;padding:0 14px;white-space:nowrap}
+
 .modal-input{
   width:100%;height:48px;padding:0 18px;background:none;border:0;border-bottom:var(--divider);
   font-size:16px;outline:none;
@@ -1454,11 +1596,13 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
 
   .tabbar .nav-group,.tabbar .tb-actions,.tabbar .win-ctl,.tabbar .bar-sep{display:none}
   #barApp{padding:0 6px}
-  .tabstrip .tab:not(.is-active){display:none}
+  /* The strip fits itself, so in a narrow window the active tab is the one
+     that stays and the button beside it holds the rest. It takes the room. */
   .tabstrip .tab.is-active{flex:1 1 auto;max-width:none}
   .tabstrip .t-close{display:none}
   .tabstrip>.tb-btn{display:none}
-  .t-switch{display:grid!important}
+  /* The strip has its own button for the tabs that do not fit, so the active
+     tab no longer has to carry a chevron of its own. */
   /* A floating window makes no sense on a phone. */
   .composer{
     left:var(--gutter)!important;right:var(--gutter)!important;
@@ -1482,8 +1626,6 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
 }
 
 /* ---- verse action sheet ---------------------------------------------------*/
-.t-switch{display:none;place-items:center;width:18px;height:18px;flex:0 0 auto;color:var(--text-faint)}
-.t-switch svg{width:12px;height:12px;transform:rotate(90deg)}
 .sheet-scrim{
   position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:215;
   opacity:0;pointer-events:none;transition:opacity .18s ease;
@@ -1576,7 +1718,9 @@ body.drawer-dragging .sidebar{transition:none}
   .win-ctl button:nth-child(3){display:none}
 }
 @media (max-width:760px){
-  .tabbar .tb-actions #btnSplit,.tabbar .tb-actions #btnInk{display:none}
+  /* In a narrow window the band keeps only the palette: everything else is a
+     press away in it, and the tab needs the room more. */
+  .tabbar .tb-actions #btnSplit,.tabbar .tb-actions [id^="bar-"]{display:none}
   .bar-sep{display:none}
 }
 @media (max-width:560px){

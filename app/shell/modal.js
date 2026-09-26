@@ -20,10 +20,13 @@ export function createModal() {
   let shown = [];
   let selected = 0;
   let onPick = null;
+  /** Items worked out from what was typed, offered above the fixed list. */
+  let suggest = null;
 
   function open(options) {
     items = options.items;
     onPick = options.onPick;
+    suggest = options.suggest ?? null;
     input.placeholder = options.placeholder ?? '';
     input.value = options.query ?? '';
     selected = 0;
@@ -40,7 +43,10 @@ export function createModal() {
   }
 
   function paint() {
-    shown = filter(items, input.value).slice(0, 200);
+    // What the query itself asks for comes first — a reference somebody typed
+    // is a better answer than the closest command with the same letters.
+    const offered = suggest?.(input.value) ?? [];
+    shown = [...offered, ...filter(items, input.value).slice(0, 200)];
     selected = Math.min(selected, Math.max(shown.length - 1, 0));
     list.replaceChildren(...shown.map((item, i) => h('div', {
       class: `mi${i === selected ? ' is-sel' : ''}`, role: 'option', dataset: { index: i },
@@ -68,7 +74,18 @@ export function createModal() {
     else if (e.key === 'Escape') close();
   });
 
-  return { element, open, close, get isOpen() { return !element.hidden; } };
+  /** Put a line in the box and act as though it were typed. */
+  function setQuery(text) {
+    input.value = text;
+    selected = 0;
+    paint();
+    input.focus();
+    // The caret goes to the end: the line is a start, not a suggestion to
+    // replace, and the reader is about to keep typing.
+    input.setSelectionRange(text.length, text.length);
+  }
+
+  return { element, open, close, setQuery, get isOpen() { return !element.hidden; } };
 }
 
 /** Subsequence match on title + sub, ranked by how tightly the query fits. */

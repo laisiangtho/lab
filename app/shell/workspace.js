@@ -20,6 +20,8 @@ import { createFloats } from './floats.js';
 import { wireFades } from './fade.js';
 import { icon } from './icons.js';
 import { L } from './i18n.js';
+import { openMenu } from './menu.js';
+import { fitStrip, watchStrip } from './overflow.js';
 import { chapterNote, LAYOUTS } from './reading.js';
 
 const MAX_PANES = 4;
@@ -32,6 +34,8 @@ export function createWorkspace(ctx, chrome) {
   let activeId = null;
   let seq = 1;
   let disposeDoc = null;
+  /** Which document is mounted in the workspace right now, if any. */
+  let mountedDoc = null;
   let pendingReveal = null;
   let revealTimer = null;
   const openTranslations = new Map(); // identify -> { meta, resolver }
@@ -190,7 +194,10 @@ export function createWorkspace(ctx, chrome) {
    */
   function restore(fromTabs, fromIndex) {
     const stored = state.get();
-    const saved = fromTabs ?? stored.tabs;
+    // A reader who does not want last session's tabs back still wants the
+    // passage they left off at, so the fallback below opens it. A chrome
+    // rebuild passes its own list and is never the start of a session.
+    const saved = fromTabs ?? (stored.restoreTabs === false ? [] : stored.tabs);
     const index = fromIndex ?? stored.activeTab;
     const { book, chapter } = stored;
     for (const entry of saved) {
@@ -259,7 +266,20 @@ export function createWorkspace(ctx, chrome) {
 
   // --- rendering ----------------------------------------------------------
 
+  /** Strips already being watched for a change of width. */
+  const watchedStrips = new WeakSet();
+
   function renderTabs() {
+    // More tabs than room is ordinary — a narrow window has room for one — so
+    // the ones that do not fit are hidden whole and listed behind a button,
+    // the same bargain a sidebar's pane strip makes. In the narrow layout this
+    // button is how the reader reaches the other tabs at all.
+    const more = h('button', {
+      class: 'tab-more no-drag', hidden: true, 'aria-haspopup': 'menu',
+      title: L('cmd.moreTabs'), 'aria-label': L('cmd.moreTabs'),
+      onclick: (e) => openTabMenu(e.currentTarget),
+    }, icon('more'));
+
     chrome.tabStrip.replaceChildren(...tabs.map((tab) => {
       const doc = tab.kind === 'chapter' ? null : registry.getDoc(tab.kind);
       const title = doc ? doc.title : `${bookLabel(tab.book)} ${localNumber(tab.chapter)}`;
@@ -279,19 +299,46 @@ export function createWorkspace(ctx, chrome) {
           class: 't-close', title: L('cmd.closeTab'), 'aria-label': L('cmd.closeTab'),
           onclick: (e) => { e.stopPropagation(); closeTab(tab.id); },
         }, icon('x')),
-        // Only the active tab is shown in the narrow layout, so it carries the
-        // way to the others.
-        h('span', { class: 't-switch' }, icon('chev')));
+        );
     }),
+    more,
     h('button', {
-      class: 'tab-new', title: L('cmd.newTab'), 'aria-label': L('cmd.newTab'), onclick: () => newChapterTab(),
+      class: 'tab-new no-drag', title: L('cmd.newTab'), 'aria-label': L('cmd.newTab'), onclick: () => newChapterTab(),
     }, icon('plus')));
-    // With more tabs than the strip can show, the one in front is the one that
-    // has to be visible.
-    const active = chrome.tabStrip.querySelector('.tab.is-active');
-    if (active && chrome.tabStrip.scrollWidth > chrome.tabStrip.clientWidth) {
-      active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    }
+    fitTabs();
+    watchStrip(chrome.tabStrip, fitTabs, watchedStrips);
+  }
+
+  function fitTabs() {
+    const strip = chrome.tabStrip;
+    fitStrip(strip, {
+      items: [...strip.querySelectorAll('.tab')],
+      more: strip.querySelector('.tab-more'),
+      fixed: [strip.querySelector('.tab-new')].filter(Boolean),
+    });
+  }
+
+  /**
+   * Every open tab as a list, marking the ones already on the strip: a menu
+   * whose contents change with the width of the window is a menu nobody can
+   * learn.
+   */
+  function openTabMenu(anchor) {
+    const shown = new Set([...chrome.tabStrip.querySelectorAll('.tab:not([hidden])')].map((el) => el.dataset.tab));
+    openMenu(anchor, [
+      ...tabs.map((tab) => {
+        const doc = tab.kind === 'chapter' ? null : registry.getDoc(tab.kind);
+        return {
+          id: tab.id,
+          icon: doc ? doc.icon : 'book-open',
+          title: doc ? doc.title : `${bookLabel(tab.book)} ${localNumber(tab.chapter)}`,
+          active: tab.id === activeId,
+          quiet: shown.has(tab.id),
+          run: () => activate(tab.id),
+        };
+      }),
+      { id: 'new', icon: 'plus', title: L('cmd.newTab'), run: () => newChapterTab() },
+    ]);
   }
 
   /** Every open tab as a list, plus a way to open or close one. */
@@ -440,8 +487,26 @@ export function createWorkspace(ctx, chrome) {
   }
 
   async function renderPanes() {
-    if (typeof disposeDoc === 'function') { disposeDoc(); disposeDoc = null; }
     const tab = activeTab();
+
+    /**
+     * A document already on screen is left alone.
+     *
+     * Every state change runs this — a theme cycled, a chapter stepped, a
+     * translation installed — and the document tabs were being torn down and
+     * mounted again each time. That is how the Library came to scroll back to
+     * the top whenever a button on it was pressed: not the list repainting,
+     * but the whole page being built again from nothing, which is also what it
+     * looked like. Documents repaint themselves through their own listeners,
+     * so nothing is lost by leaving them standing.
+     */
+    if (tab && tab.kind !== 'chapter' && mountedDoc === tab.kind && chrome.panes.querySelector(`.leaf[data-doc="${tab.kind}"]`)) {
+      await ensurePrimaryMeta();
+      return;
+    }
+
+    if (typeof disposeDoc === 'function') { disposeDoc(); disposeDoc = null; }
+    mountedDoc = null;
 
     if (!tab) {
       chrome.panes.replaceChildren(emptyLeaf(L('empty.workspace'), L('empty.workspaceAct'),
@@ -457,6 +522,7 @@ export function createWorkspace(ctx, chrome) {
       // the reader can close it and carry on reading.
       try {
         disposeDoc = doc.mount(body) ?? null;
+        mountedDoc = doc.id;
       } catch (err) {
         disposeDoc = null;
         body.replaceChildren(h('div', { class: 'pane-broken' },
@@ -558,7 +624,7 @@ export function createWorkspace(ctx, chrome) {
         compare, layout, annotations, strongs,
         primaryVerses: compare ? all[0].verses : null,
         onRef: (ref) => state.set({ book: ref.book, chapter: ref.chapter }),
-        onVerse: (verse, anchor) => ctx.shell.openVerseBar(anchor, { book, chapter, verse }),
+        onVerse: (verse, anchor, options) => ctx.shell.openVerseBar(anchor, { book, chapter, verse }, options),
         onStrongs: (code, anchor) => ctx.shell.openStrongs(code, anchor),
         onRepair: (identify) => ctx.shell.repairTranslation(identify),
       });
@@ -743,6 +809,8 @@ export function createWorkspace(ctx, chrome) {
     primaryName: () => primaryMeta?.info.shortname ?? state.get().translation ?? '–',
     /** Reference resolver of the primary translation, for wikilinks in notes. */
     resolver: () => primaryResolver,
+    /** The primary translation's own numerals, when it carries a table. */
+    digits: () => (primaryMeta?.digit?.length ? primaryMeta.digit : pack()?.digit ?? null),
     layouts: LAYOUTS,
     get activeTab() { return activeTab(); },
     get tabs() { return tabs.map((t) => ({ ...t })); },

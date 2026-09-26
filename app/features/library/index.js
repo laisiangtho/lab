@@ -3,7 +3,7 @@
  * and remove them, and check the remote catalog for changes.
  */
 
-import { formatBytes, h } from '../../shell/dom.js';
+import { fill, formatBytes, h, keepPlace } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
 import { requestPersistence, storageStatus } from '../../services/store.js';
@@ -24,6 +24,21 @@ export default {
       view = next;
       records.save(KEY, { view: next }).catch(() => { /* a view is not worth a toast */ });
     };
+
+    // How the library lists itself is a setting; the page also offers it, which
+    // is where a reader who is already looking at the list will change it.
+    registry.setting({
+      id: 'library.view',
+      section: 'storage',
+      order: 10,
+      build: (ui) => ui.choice({
+        name: L('set.libraryView'),
+        hint: L('set.libraryViewHint'),
+        options: VIEWS.map((id) => [id, L(`lib.view.${id}`)]),
+        value: view,
+        onChange: (next) => { setView(next); ui.refresh(); },
+      }),
+    });
 
     async function check() {
       try {
@@ -80,15 +95,18 @@ export default {
     };
 
     // A reader with nothing installed cannot read anything, so the first run
-    // opens here rather than on an empty workspace.
+    // opens here rather than on an empty workspace — unless another feature has
+    // taken the first screen, in which case this list is one press away from it
+    // and does not need to open over it.
     ctx.shell.whenReady(async () => {
+      if (ctx.shell.firstRunClaimed) return;
       const installed = await ctx.store.list();
       if (installed.length) return;
       ctx.shell.openDoc('library');
     });
 
     registry.command({ id: 'library.check', title: L('cmd.checkUpdates'), icon: 'download', run: check });
-    registry.command({ id: 'library.open', title: L('doc.library'), icon: 'library', ribbon: true, run: () => ctx.shell.openDoc('library') });
+    registry.command({ id: 'library.open', title: L('doc.library'), icon: 'library', ribbon: true, opens: 'library', run: () => ctx.shell.openDoc('library') });
 
     registry.doc({
       id: 'library',
@@ -112,6 +130,36 @@ export default {
           return [row.identify, e?.name, e?.shortname, e?.language.text, e?.publisher, e?.year]
             .filter(Boolean).join(' ').toLowerCase().includes(q);
         }
+
+        /**
+         * The page is built once and only the list is replaced afterwards.
+         * Rebuilding the whole document on every keystroke moved the filter
+         * field in the document, and moving a focused element takes the focus
+         * with it — the caret jumped out of the box on every letter typed.
+         */
+        const note = h('p', { class: 'muted' });
+        const count = h('span', { class: 'muted lib-count' });
+        const views = h('div', { class: 'rp-seg lib-views' }, VIEWS.map((id) => h('button', {
+          dataset: { view: id }, 'aria-pressed': String(id === view),
+          onclick: () => { setView(id); paintViews(); run(); },
+        }, L(`lib.view.${id}`))));
+        const list = h('div', { class: 'library-body' });
+
+        const paintViews = () => {
+          for (const button of views.children) button.setAttribute('aria-pressed', String(button.dataset.view === view));
+        };
+
+        el.replaceChildren(h('section', { class: 'doc library' },
+          h('header', { class: 'doc-head' },
+            h('h1', { class: 'inline-title' }, L('doc.library')),
+            note,
+            h('div', { class: 'lib-tools' },
+              h('div', { class: 'field' }, icon('search'), filter),
+              views,
+              h('span', { class: 'grow' }),
+              count,
+              h('button', { class: 'btn', onclick: check }, icon('undo'), L('cmd.checkUpdates')))),
+          list));
 
         async function render() {
           const [rows, storage] = await Promise.all([library.status(), storageStatus()]);
@@ -141,36 +189,24 @@ export default {
           }
           // The reader's own languages come first, whatever the arrangement.
           const ordered = [...groups.entries()].sort(([a, listA], [b, listB]) => {
-            const mine = (list) => (list.some(suggested) ? 0 : 1);
+            const mine = (l) => (l.some(suggested) ? 0 : 1);
             return mine(listA) - mine(listB) || a.localeCompare(b);
           });
 
-          const views = h('div', { class: 'rp-seg lib-views' }, VIEWS.map((id) => h('button', {
-            'aria-pressed': String(id === mode),
-            onclick: () => { setView(id); run(); },
-          }, L(`lib.view.${id}`))));
-
-          el.replaceChildren(
-            h('section', { class: 'doc library' },
-              h('header', { class: 'doc-head' },
-                h('h1', { class: 'inline-title' }, L('doc.library')),
-                h('p', { class: 'muted' },
-                  `${header} · ${L('lib.storageUsed', { size: formatBytes(storage.usage) })}`,
-                  storage.persisted === false
-                    ? [' · ', L('lib.notPersistent'), ' ',
-                      h('button', { class: 'link-btn', onclick: () => keep().then(run) }, L('lib.keep'))]
-                    : null),
-                h('div', { class: 'lib-tools' },
-                  h('div', { class: 'field' }, icon('search'), filter),
-                  views,
-                  h('span', { class: 'grow' }),
-                  h('span', { class: 'muted lib-count' }, L('lib.count', { n: shown.length })),
-                  h('button', { class: 'btn', onclick: check }, icon('undo'), L('cmd.checkUpdates')))),
-              shown.length
-                ? ordered.map(([lang, list]) => h('div', { class: 'library-group' },
-                  lang ? h('h2', {}, lang) : null,
-                  h('ul', { class: 'library-list' }, list.map((row) => item(row)))))
-                : h('p', { class: 'empty-hint' }, L('lib.noHits', { query: query.trim() }))));
+          fill(note,
+            `${header} · ${L('lib.storageUsed', { size: formatBytes(storage.usage) })}`,
+            storage.persisted === false
+              ? [' · ', L('lib.notPersistent'), ' ',
+                h('button', { class: 'link-btn', onclick: () => keep().then(run) }, L('lib.keep'))]
+              : null);
+          count.textContent = L('lib.count', { n: shown.length });
+          // Installing or removing repaints this list; the reader stays where
+          // they were looking, with the focus still on the button they pressed.
+          keepPlace(list, () => fill(list, (shown.length
+            ? ordered.map(([lang, group]) => h('div', { class: 'library-group' },
+              lang ? h('h2', {}, lang) : null,
+              h('ul', { class: 'library-list' }, group.map((row) => item(row)))))
+            : h('p', { class: 'empty-hint' }, L('lib.noHits', { query: query.trim() })))));
         }
 
         function item(row) {
@@ -194,7 +230,9 @@ export default {
             h('div', { class: 'library-actions' }, busy
               ? h('span', { class: 'muted' }, busy)
               : actions.map(([label, action]) => h('button', {
-                class: action === 'remove' ? 'btn' : 'btn primary', onclick: () => act(row.identify, action),
+                class: action === 'remove' ? 'btn' : 'btn primary',
+                dataset: { place: `${action}:${row.identify}` },
+                onclick: () => act(row.identify, action),
               }, label))));
         }
 

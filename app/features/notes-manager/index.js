@@ -7,6 +7,7 @@
  * internal id.
  */
 
+import { verseLabelOf } from '../../core/annotations.js';
 import { noteTitle, wordCount } from '../../core/markdown.js';
 import { relativeTime } from '../../core/time.js';
 import { h } from '../../shell/dom.js';
@@ -22,11 +23,11 @@ export default {
     let query = '';
     let sort = 'updated';
 
-    registry.command({ id: 'notes.manager', title: L('doc.notes'), icon: 'notes', run: () => shell.openDoc('notes-manager') });
+    registry.command({ id: 'notes.manager', title: L('doc.notes'), icon: 'notes', opens: 'notes-manager', run: () => shell.openDoc('notes-manager') });
 
     const passage = (note) => (note.verse === null
       ? `${shell.workspace.bookName(note.book)} ${note.chapter}`
-      : `${shell.workspace.bookName(note.book)} ${note.chapter}:${note.verse}`);
+      : `${shell.workspace.bookName(note.book)} ${note.chapter}:${verseLabelOf(note, (n) => shell.workspace.number(n))}`);
 
     function download(name, text) {
       const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown' }));
@@ -51,7 +52,7 @@ export default {
         const subtitle = h('div', { class: 'note-sub' });
         const list = h('div', { class: 'nm-list' });
 
-        el.append(h('div', { class: 'leaf' }, h('div', { class: 'leaf-scroll scroll' },
+        el.append(
           h('div', { class: 'nm' },
             h('h1', { class: 'inline-title' }, L('doc.notes')),
             subtitle,
@@ -67,7 +68,7 @@ export default {
               h('span', {}, L('lbl.updated')),
               h('span', {}, '#'),
               h('span', {})),
-            list))));
+            list));
 
         function ordered(notes) {
           const by = {
@@ -98,7 +99,7 @@ export default {
 
         function row(note) {
           const open = () => {
-            state.set({ noteFor: note.verse });
+            state.set({ noteFor: note.verse, noteTo: note.to ?? null });
             shell.openVerse(note.book, note.chapter, note.verse ?? 1);
             shell.run('composer.open');
           };

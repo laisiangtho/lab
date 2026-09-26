@@ -26,7 +26,7 @@ export default {
   setup(ctx) {
     const { annotations, registry, shell, state, store } = ctx;
 
-    registry.command({ id: 'graph.open', title: L('doc.graph'), icon: 'graph', run: () => shell.openDoc('graph') });
+    registry.command({ id: 'graph.open', title: L('doc.graph'), icon: 'graph', opens: 'graph', run: () => shell.openDoc('graph') });
 
     registry.doc({
       id: 'graph',

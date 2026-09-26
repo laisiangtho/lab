@@ -18,7 +18,7 @@ Phase 2 of the project. The Phase 1 single-file `index.html` is preserved as git
 | `npm run desktop:build` | Compile main, preload and renderer → `out/` |
 | `npm run desktop:package` | Installers → `release/` (`.dmg`, `.exe`, AppImage) |
 | `npm test` | Unit and boundary tests (`node:test`, no framework) — about a second |
-| `npm run test:e2e` | The built web app driven in a browser: build → serve → 15 ordered checks |
+| `npm run test:e2e` | The built web app driven in a browser: build → serve → 35 ordered checks |
 | `npm run test:desktop` | The packaged Electron application, started and inspected |
 | `npm run test:perf` | Timings at full size: three complete Bibles, the longest chapter, a whole-library search |
 | `npm run test:all` | `npm test` then the browser suite |
@@ -38,6 +38,8 @@ app/                      shared UI — never imports from targets/
   registry.js             feature / view / command registry, checkFeatures()
   core/                   pure data logic, no DOM (tested under node:test)
     settings.js           persisted settings + export/import envelope
+    passage.js            a passage as Markdown, as a citation, as a printable sheet
+    projects.js           study projects: entries, ordering, export, strict parser
     markdown.js           the small Markdown notes are written in
     plans.js              reading plans derived from the canon, verse of the day
     time.js               relative times from Intl
@@ -54,7 +56,8 @@ app/                      shared UI — never imports from targets/
   services/               browser APIs
     store.js              IndexedDB (v4: translations, chapters, catalog, settings,
                           notes, marks, records)
-    records.js            feature-owned documents: plan, board, ink, composer, voices
+    records.js            feature-owned documents: plan, board, ink, composer,
+                          voices, projects, search, books, library, updates, welcome
     library.js            catalog checks, install / update / remove via worker
     settings.js           persisted settings (position coalesced, rest written at once)
     annotations.js        notes and bookmarks in memory, written through
@@ -74,10 +77,15 @@ app/                      shared UI — never imports from targets/
     dragdrop.js           tab / pane dragging, sidebar resizing
     readingpanel.js       text size, line height, line length
     markdown.js           note Markdown → DOM (wikilinks, tags)
+    settingrows.js        the row vocabulary features build settings with
+    confirm.js            the one question dialog, for what cannot be undone
+    colorpicker.js        the app's own colour picker (drag to choose, commit on release)
+    numberrow.js  menu.js
     theme.js  i18n.js  icons.js  dom.js
   features/               library/, settings/, search/, notes/, bookmarks/,
                           composer/, notes-manager/, tags/, backlinks/, outline/,
                           plans/, graph/, board/, ink/, speech/, verse-card/,
+                          projects/, export-passage/, welcome/, help/ (+ formats.js),
                           export-chapter/ (desktop only)
   styles/                 shell.css (Phase 1 design system), views.css (additions)
 targets/
@@ -106,16 +114,61 @@ The Phase 1 interface is the shell, and `app/styles/shell.css` is Phase 1's styl
 | Verse bar | `shell/versebar.js`; buttons come from `registry.verseAction()` |
 | Parallel panes, synced scroll | `workspace.js`, aligned by verse spans from `core/align.js` |
 | Themes and accents | `shell/theme.js`; the preference lives in settings, so an export carries it |
+| Typography | `shell/readingpanel.js` — the scripture's size, line height and line length, and the interface's own size, which the whole ramp and every control height are derived from |
+
+A sidebar pane carries no title row: the tab above it already names it, and the name is the tab's accessible name and the panel's `aria-label` rather than a line out of every column.
+
+The shell is chrome, not a document: it selects nothing and keeps the arrow throughout. A half-selected tree row that expanded on release used to leave a highlight behind that looked like a fault. Everything a reader might actually want to copy — the scripture, their own notes, a copyright line, the fields they type in — opts back in.
 
 Parallel alignment works on blocks, not pixels: each verse, its section headings and its references form one `.vblock`, and blocks that cover the same verses are levelled per row. A translation that merges 17–18 stays level with one that does not, and synchronised scrolling follows the verse rather than the scroll offset.
 
 ## Search, notes and bookmarks
 
-**Search** scans the chapters of the translations that are offline; no index is built at install time. The scan runs in a worker over an IndexedDB cursor, so memory stays flat and results stream in as they are found; a new query abandons the running one. One full translation takes about 1 second (5.2 MB, 1,189 chapters, 31,000 verses), two about 2 seconds. An index would cut that, at the cost of build time and storage — worth adding only if the wait starts to bite.
+**Search** scans the chapters of the translations that are offline; no index is built at install time. The scan runs in a worker over an IndexedDB cursor, so memory stays flat and results stream in as they are found; a new query abandons the running one.
 
-Queries: bare words are ANDed in any order, `"a phrase"` matches as written. Matching folds case and Latin accents (`etait` finds `était`) while leaving Myanmar, Arabic and Hebrew marks alone, and match offsets map back to the original string so highlighting lands on the right characters.
+What comes back is the shape of the answer, not the first forty lines of it: **how many verses matched, in how many chapters, in how many books**, and then those books as a tree to open. Counting carries on past the display limit, so a common word reports all nine thousand of its verses and shows the first two thousand; opening a book whose verses were past that limit searches that one book again, which costs a fraction of the first scan.
 
-**Notes and bookmarks key on the passage** — book, chapter, verse — never on a translation. A note written while reading Tedim is on that verse in NIV too. Notes attach to a chapter or to a verse (several per verse allowed); a bookmark is one per verse. Both live in their own IndexedDB stores, appear in the sidebar panes, and travel in the settings export.
+Three switches sit at the end of the field they act on, shown when it is pointed at or typed in, and left on show whenever one of them is on:
+
+| | |
+|---|---|
+| `ab\|` | Whole words only — `man` no longer matches `manner`. Off, a term matches anywhere in a word |
+| `.*` | The query is a regular expression, as written. A pattern that does not compile says why. With this on, whole words is not offered: a pattern sets its own boundaries |
+| `Aa` | Capitals matter |
+
+Under them, the scope: which translations — none chosen means the one being read — and where. Both are chosen the same way, because a checkbox for each of sixty-odd translations is a column of scrolling nothing: what is chosen shows as chips, and a field beside them finds the rest. Where can also be the whole Bible, the open book, a testament, or a section of the canon (Law, Poetry, Gospels…), in one press.
+
+Every choice is remembered. Plain and whole-word matching fold case and Latin accents (`etait` finds `était`) while leaving Myanmar, Arabic and Hebrew marks alone, and match offsets map back to the original string so highlighting lands on the right characters. A regular expression is matched against the text as written, since folding it would change what the pattern means.
+
+A search limited to a few books opens one cursor per book instead of reading the whole translation and discarding most of it: one book of a full-size Bible answers in about 170 ms, where the whole of one translation takes about 1.6 s and three take about 4 s.
+
+### Going somewhere quickly
+
+The command palette (`Mod+P`), the quick switcher (`Mod+O`) and the books filter all read a reference written the way a reader would say it: `ps 23`, `Psa 3:5`, `psa 3:2-4`, `1 jn 2:1`, and the same in the translation's own name and numerals (`ကမ္ဘာဦးကျမ်း ၃:၅`). A book is matched exactly first — a name, a short name or a published abbreviation — then by prefix; a token that fits several books offers each of them rather than guessing. In the palette a passage is offered above the commands, since somebody who typed a passage meant a passage. `app/core/lookup.js` does the reading and touches nothing else.
+
+### Telling it to do something
+
+The palette takes an instruction as well as a name: a word, then what it acts on.
+
+| Typed | Does |
+|---|---|
+| `note ps 23:1-6` | opens the composer on that passage |
+| `mark jn 3:16` | bookmarks that verse and goes there |
+| `find mercy endures` | runs the search |
+| `parallel kjv` | opens that translation beside the one being read |
+| `export gen 1:1-2` | offers the shapes it can leave in |
+| `card ps 23:1-3` | draws that passage as an image |
+| — | a ribbon button lights while what it does is on: the Library while the Library is in front, ink while ink is on |
+| `project ps 23` | files the passage in the open project |
+| `go 1 jn 2:1-4`, `copy jn 3:16` | go there; copy the reference |
+
+A verb may be shortened while it is still the only one starting that way. A word on its own is never a verb — "parallel" typed alone is still the command called Open parallel pane — the space after it is what says something follows. A passage verb with nothing after it acts on the passage on screen. Every verb is also a button or a command, and the Shortcuts document lists them from the registry.
+
+### The books pane
+
+Testaments, books and a grid of chapter chips. The switch in the filter field decides whether the tree **follows the reading**: with it on, the book on screen opens itself; with it off, every branch is the reader's to open and close. Either way a branch shut by hand stays shut — the tree records what was opened and what was deliberately closed, so no rule overrules the reader.
+
+**Notes and bookmarks key on the passage** — book, chapter, verse — never on a translation. A note written while reading Tedim is on that verse in NIV too. Notes attach to a chapter, to a verse, or to **a run of verses**: press a verse number, then Shift-press another, and the passage between them is what the note or the bookmark covers — which is what a study note or a sermon is usually about. Every verse of a run is tinted, and pressing any of them clears the whole run. Both live in their own IndexedDB stores, appear in the sidebar panes, and travel in the settings export.
 
 The verse bar opens from a verse number and holds whatever the features registered — note, bookmark, copy. A build without the bookmarks feature simply shows fewer buttons.
 
@@ -135,7 +188,9 @@ Everything Phase 1 offered is here, each as its own feature, so a build can leav
 | **Study board** | verses and thoughts as cards on a canvas. Double-click the board for a card, a card to edit it, Delete to remove one. |
 | **Ink** | freehand marking over the reading surface, kept per chapter and scaled to whatever width the window has next time. |
 | **Read aloud** | the device's own voices, from the chapter or from a verse. Where no voice exists for the translation's language, the command says so rather than doing nothing. |
-| **Verse card** | one verse drawn as a PNG to keep or share, in the script's own fonts, direction and word breaks, and in the running theme's colours. |
+| **Cards** | any passage drawn as a PNG — one verse or a run of them, numbered — in the script's own fonts, direction and word breaks. The studio is an editor: press the text or the reference to pick it up, drag it and it follows exactly, take a corner and the opposite one stays put, guides appear where it lines up with a margin or a centre (Alt ignores them), arrow keys nudge, Ctrl/⌘ Z undoes. The rest is behind six tool buttons — templates, which verses, shape, colour, type, reference — each opening a panel of the card workspace. You start with four finished templates; the foot warns when text and background are too close in lightness to read on someone else's screen, and a story-shaped card shows where the app it is posted to will cover it. A template holds size (post, square, story, slide, page, or your own), margin, corners, background (theme, solid or a gradient at any angle), ink and accent colours, border, typeface, alignment, a size that fits itself to the card, where the reference goes and whether the translation is named; it exports and imports as a file. |
+| **Projects** | the work the reading is for: a sermon, a lesson, a series, a chapter. A project is an ordered list of passages, Markdown notes and tasks; passages are kept as references, so the verses are quoted from whichever translation is open and a project sent to somebody else reads correctly in theirs. It exports as its own file to come back whole, and as Markdown for anyone who does not use this app. There is a pane for it beside the reading. |
+| **Export a passage** | any passage, with your notes in it: Markdown to paste into a document, a citation to drop into a paragraph, the plain text, a Markdown file, or a sheet set for paper. |
 
 Notes are written in a small Markdown: headings, emphasis, code, quotes, lists, links, `[[Genesis 1]]` wikilinks and `#tags`. Notes are rendered as DOM nodes, never as HTML strings.
 
@@ -152,6 +207,9 @@ Notes are written in a small Markdown: headings, emphasis, code, quotes, lists, 
 | Drag a row divider | share the height between two sidebar rows |
 | Drag a sidebar's inner edge | resize it; the width is remembered |
 | Click a breadcrumb | its siblings — the testament's books, or the book's chapters, marking the ones this translation carries |
+| Drag a ribbon button up or down the rail | move it; carry it to the bin at the foot — which is the add button, while a drag is running — to take it out, with an undo in the toast |
+| The `+` under the ribbon, or right-click a button | add any command in the build, or put the defaults back |
+| The `⋯` at the end of a strip | whatever did not fit — tabs, or the panes of a sidebar too narrow for all of them. It carries the count, and the one you are on is never the one hidden |
 | `Ctrl/Cmd+B` | hide or show the left sidebar; the ribbon and status bar have their own commands |
 | `Ctrl/Cmd+E` | source mode |
 | `Ctrl/Cmd+W` | close the tab |
@@ -161,11 +219,17 @@ Open tabs and their order, the active one, sidebar rows and their heights, panel
 
 Two rules keep dragging honest, both learned from defects: every drag listens on the window rather than on the element it started from, and nothing re-renders while a drag is running — the model changes once, on release. Re-rendering per pointer move destroyed the element under the pointer, which is why dragging used to stop working and leave a caret behind.
 
+Nothing rebuilds a page the reader is looking at, either. A document tab that is already mounted is left standing when the state changes, and a part of a page that does repaint keeps the scroll position and the focus across the rebuild — pressing a button in the Library used to throw the list back to the top, which made an application feel like a web page reloading.
+
 While a document tab is active — Library, Settings, Help, a board — the controls that act on a chapter are shown but not pressable, rather than failing when pressed. Detached windows remember the size and position they were last left at.
 
 The status bar carries the app's mark, the translation, the passage, and the word and verse counts of the chapter on screen; on the right, typography, mode, Strong's, synchronised scrolling, and how much storage the app is using (its tooltip names the quota and whether the browser has agreed to keep the data).
 
-**Help, Shortcuts and About** are documents, reachable from the `?` at the foot of the ribbon. The shortcut table is generated from the command list, so it cannot describe a key this build does not bind; About reports what is installed and what is stored.
+**Help, Shortcuts, About, Data and formats** and **Welcome** are documents, reachable from the `?` at the foot of the ribbon. The shortcut table is generated from the command list, so it cannot describe a key this build does not bind, and it lists the palette verbs the same way; About reports what is installed and what is stored.
+
+**Data and formats** documents every file the app reads and writes, with a real example of each: the catalog, a translation file, a language pack, the diagnostics report, what is kept in IndexedDB, the settings envelope and a project file — and where this build is actually pointed. Anyone who wants to correct a verse, add a translation or read their own notes with another program can do it from that page; an app that keeps its formats to itself is asking to be trusted rather than checked.
+
+**Welcome** is shown once, on the very first run, and stays in Help afterwards. It claims the first screen from the Library (`shell.claimFirstRun()`, decided while features are being set up so it does not depend on which first paint finishes first), because a list of sixty translations is not an answer to "what is this".
 
 **Source mode** shows the chapter as Markdown. Scripture is read-only — it belongs to the translation file, which the app never writes to. What can be edited is your own material under `## Notes`: a chapter note as plain text, verse notes as `- **17** …`. On save, everything above that heading is compared with what was rendered, and a change there is refused with a message rather than silently dropped.
 
@@ -240,7 +304,9 @@ export default { id: 'export-chapter', requires: ['saveFile'], setup(ctx) { … 
 2. In `setup`, register views (`ctx.registry.view`) and commands (`ctx.registry.command`). Navigation and the command palette pick them up automatically.
 3. List the feature in each target's `main.js` that should include it.
 
-`ctx` provides `platform`, `config`, `category`, `store`, `library`, `settings`, `annotations`, `search`, `state`, `shell`, `registry` and `aliases(identify)`. A feature registers documents (`ctx.registry.doc`), sidebar panes (`ctx.registry.pane`, with an `order`), commands (`ctx.registry.command`) and verse actions (`ctx.registry.verseAction`); the shell renders all four.
+`ctx` provides `platform`, `config`, `category`, `store`, `library`, `settings`, `annotations`, `search`, `records`, `state`, `shell`, `registry` and `aliases(identify)`. A feature registers documents (`ctx.registry.doc`), sidebar panes (`ctx.registry.pane`, with an `order`), commands (`ctx.registry.command`), verse actions (`ctx.registry.verseAction`), **settings rows** (`ctx.registry.setting`, with a `section` and an `order`) and **palette verbs** (`ctx.registry.verb`); the shell renders all six.
+
+A settings row is built from the vocabulary the page hands it — `ui.toggle`, `ui.choice`, `ui.select`, `ui.number`, `ui.action`, `ui.readout` — so a row contributed by Search looks like a row written by the page itself. Sections are named in `core/settings.js` and checked when the row is registered, so a mistyped section is a startup error rather than a row nobody ever sees.
 
 ## Alias overlays
 
@@ -257,7 +323,21 @@ Tedim status: 69.5% of reference parts resolve without the overlay, 92.7% with i
 
 ## Settings
 
-Persisted per device in IndexedDB: last translation, book and chapter, the parallel selection, theme, accent, verse layout, synchronised scrolling and row alignment. The reading position is coalesced (250 ms); every other change is written at once, since a write started from `pagehide` is not reliably finished by the browser. Writes are coalesced (250 ms), so chapter stepping does not cost a transaction each time.
+Persisted per device in IndexedDB: last translation, book and chapter, the parallel selection, theme, accent, verse layout, synchronised scrolling, row alignment, and the sizes of the scripture and of the interface.
+
+The Settings page is where they are seen rather than remembered: a column of sections with a list of them beside it, one setting a line, each with a sentence saying what it does.
+
+| Section | Holds |
+|---|---|
+| Appearance | theme, accent (a palette, a colour of your own, a reset that greys out when there is nothing to reset), ribbon, status bar, movement, and which buttons the ribbon carries |
+| Reading | verse layout, scripture typeface, synchronised scrolling, levelled verses, Strong's numbers, reopening last session, and a fold with every installed translation's text direction |
+| Typography | the four sizes, and a reset |
+| Study | what the Books pane, Search, the composer and the card studio each own — contributed by those features rather than duplicated here |
+| Keyboard | the shortcut document |
+| Storage | what is installed, what the browser has room for, how the Library lists itself, update checking, and — last, always — resetting every setting and erasing everything on this device |
+| Your material | notes, bookmarks, projects, and moving them to another device |
+
+Anything that cannot be undone asks first, in the app's own dialog, with the cancel focused. Everything on the page is also in the command palette, which is how it is found by name rather than by looking. The reading position is coalesced (250 ms); every other change is written at once, since a write started from `pagehide` is not reliably finished by the browser. Writes are coalesced (250 ms), so chapter stepping does not cost a transaction each time.
 
 Export (Settings view, or the command palette) writes `lai-siangtho-settings-YYYY-MM-DD.json`:
 

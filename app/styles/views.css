@@ -20,7 +20,7 @@
 .library-group h2 { color: var(--text-faint); font-size: var(--fs-ui-m); font-weight: 500; }
 .library-list {
   list-style: none; margin: 0; padding: 0;
-  border: 1px solid var(--border); border-radius: var(--radius-m); overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--radius-l); overflow: hidden;
 }
 .library-item {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
@@ -82,8 +82,100 @@
 /* Search pane */
 .search-pane { display: flex; flex-direction: column; min-height: 0; padding-top: 2px; }
 .search-pane .field { margin-inline: 0; }
-.search-scope { padding: 0 0 6px; }
-.search-scope select { width: 100%; }
+
+/* ---- how to match --------------------------------------------------------*/
+/* The switches sit at the end of the field they act on. They appear when the
+   field is pointed at or typed in, and stay when one of them is on — a search
+   that behaves unusually always shows why. */
+.search-field { position: relative; }
+.search-flags {
+  display: flex; align-items: center; gap: 2px; flex: 0 0 auto;
+  opacity: 0; transition: opacity var(--speed);
+}
+.search-field:hover .search-flags,
+.search-field:focus-within .search-flags,
+.search-flags[data-on="true"] { opacity: 1; }
+.sm-btn {
+  min-width: 22px; height: 20px; padding: 0 5px; border-radius: var(--radius-s);
+  color: var(--text-faint); cursor: pointer;
+  font: 600 10px var(--font-mono); letter-spacing: .02em;
+}
+.sm-btn:hover:not([disabled]) { color: var(--text-normal); background: var(--bg-hover); }
+.sm-btn[aria-pressed="true"] {
+  color: var(--accent-2); background: var(--accent-fade); box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+.sm-btn[disabled] { opacity: .3; cursor: default; }
+
+/* ---- what is searched ----------------------------------------------------*/
+.sf-toggle {
+  display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 7px; margin-bottom: 6px;
+  border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--fs-ui-s);
+  cursor: pointer; text-align: start; background: none;
+}
+.sf-toggle:hover { background: var(--bg-hover); color: var(--text-normal); }
+.sf-toggle svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--text-faint); }
+.sf-toggle .sf-scope { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sf-toggle[aria-expanded="true"] svg:last-child { transform: rotate(90deg); }
+
+.search-filters {
+  border-radius: var(--radius-l); background: var(--bg-secondary);
+  box-shadow: inset 0 0 0 1px var(--border); padding: 9px 10px; margin-bottom: 8px;
+}
+.sf-block + .sf-block { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 9px; }
+.search-filters .field { margin: 0; height: 26px; }
+.sf-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.sf-chosen { margin-bottom: 6px; }
+.sf-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 999px; cursor: pointer;
+  background: var(--base-10); color: var(--text-muted); font-size: 11px; white-space: nowrap;
+}
+.sf-chip:hover { color: var(--text-normal); }
+.sf-chip[aria-pressed="true"], .sf-chip.is-chosen {
+  background: var(--accent-fade); color: var(--accent-2); box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+.sf-chip.is-chosen svg { width: 10px; height: 10px; opacity: .7; }
+.sf-chip.is-chosen:hover svg { opacity: 1; }
+.sf-note { color: var(--text-faint); font-size: 11px; line-height: 1.6; margin: 0; }
+
+/* The list under a field: open while the field is in use, and never tall. */
+.sf-list { display: none; max-height: 168px; margin-top: 4px; }
+.sf-list[data-open="true"] { display: block; }
+.sf-row {
+  display: flex; align-items: baseline; gap: 6px; width: 100%; padding: 4px 6px;
+  border-radius: var(--radius-s); cursor: pointer; text-align: start;
+  color: var(--text-muted); font-size: var(--fs-ui-s);
+}
+.sf-row:hover { background: var(--bg-hover); color: var(--text-normal); }
+.sf-row > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sf-row-sub { margin-inline-start: auto; color: var(--text-faint); font-size: 10px; white-space: nowrap; }
+.sf-row.is-absent { opacity: .55; }
+
+/* ---- what was found ------------------------------------------------------*/
+.search-pane .empty-hint { padding: 8px 2px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.sr-count { color: var(--text-muted); font-size: var(--fs-ui-s); }
+.sr-time, .sr-more { color: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+.search-bad { display: flex; gap: 6px; align-items: flex-start; color: var(--c-red); font-size: var(--fs-ui-s); }
+.search-bad svg { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
+.sr-head {
+  display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 6px;
+  border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--fs-ui-m);
+  cursor: pointer; text-align: start; background: none;
+}
+.sr-head:hover { background: var(--bg-hover); color: var(--text-normal); }
+.sr-head .twisty { display: grid; place-items: center; flex: 0 0 auto; transition: transform var(--speed); }
+.sr-head .twisty svg { width: 12px; height: 12px; }
+.sr-book.is-open > .sr-head .twisty, .sr-chapter.is-open > .sr-head .twisty { transform: rotate(90deg); }
+.sr-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sr-n {
+  margin-inline-start: auto; padding: 1px 6px; border-radius: 999px;
+  background: var(--base-20); color: var(--text-faint);
+  font-size: 10px; font-variant-numeric: tabular-nums;
+}
+.sr-ch { padding-inline-start: 18px; font-size: var(--fs-ui-s); }
+.sr-ch > span:nth-child(2) { flex: 1; }
+.sr-chapter .result-line { padding-inline-start: 34px; }
+.search-results { padding-bottom: 8px; }
 .search-results { min-height: 0; }
 .result-head, .result-line { width: 100%; text-align: start; font: inherit; }
 .result-line .kbd { margin-inline-end: 4px; }
@@ -185,7 +277,13 @@ body.is-dragging-ui { user-select: none; cursor: grabbing; }
 .plan-daily, .plan-card { padding: 12px; }
 
 /* ---- full-surface documents: graph and board -----------------------------*/
-.doc-full { display: flex; flex-direction: column; min-height: 0; height: 100%; padding: 0; }
+/* A document that is a workspace rather than a page: the graph, the board, the
+   card studio. `.doc` caps its width at a comfortable measure and centres it,
+   which is right for reading and wrong for a canvas — it left the graph in a
+   column with the workspace empty on both sides. These take the room they are
+   given, in both directions, and do not scroll: what is inside them does. */
+.doc-full { display: flex; flex-direction: column; min-height: 0; height: 100%; padding: 0; max-width: none; margin: 0; }
+.leaf-scroll:has(> .doc-full) { overflow: hidden; }
 .board-surface { position: relative; flex: 1; min-height: 0; display: flex; }
 .board-edit {
   position: absolute; z-index: 3; resize: none;
@@ -310,12 +408,7 @@ body.is-dragging-tab .sidebar[data-empty="true"] .side-body::after {
 .library-group h2 { font-size: var(--fs-ui-l); font-weight: 650; color: var(--text-muted); margin: 20px 0 8px; }
 
 /* ---- the crumb bar carries the translation --------------------------------*/
-.crumb-tr {
-  font-weight: 600; color: var(--accent-2);
-  background: var(--accent-fade); box-shadow: inset 0 0 0 1px var(--accent-line);
-  border-radius: var(--radius-s); padding: 1px 7px;
-}
-.crumb-tr:hover { color: var(--text-normal); }
+.crumb-tr { font-weight: 500; }
 .leaf-head .tr-btn { flex: 0 0 auto; }
 .leaf-head .tr-btn svg { width: 14px; height: 14px; }
 
@@ -353,7 +446,7 @@ body.is-dragging-tab .sidebar[data-empty="true"] .side-body::after {
 /* ---- a pane or document that could not build itself ----------------------*/
 .pane-broken { padding: 16px; color: var(--text-muted); }
 .pane-broken pre {
-  margin: 8px 0 0; padding: 8px 10px; border-radius: var(--radius-s);
+  margin: 8px 0 0; padding: 8px 10px; border-radius: var(--radius-m);
   background: var(--bg-secondary); color: var(--text-faint);
   font-size: var(--fs-ui-s); white-space: pre-wrap; overflow-wrap: anywhere;
 }
@@ -365,7 +458,7 @@ body.is-dragging-tab .sidebar[data-empty="true"] .side-body::after {
 }
 .fatal h1 { font-size: 1.4rem; font-weight: 650; margin: 0 0 12px; }
 .fatal pre {
-  margin: 0; padding: 12px 14px; border-radius: var(--radius-m);
+  margin: 0; padding: 12px 14px; border-radius: var(--radius-l);
   background: var(--bg-secondary); color: var(--text-muted);
   font-size: var(--fs-ui-m); white-space: pre-wrap; overflow-wrap: anywhere;
 }
@@ -422,3 +515,593 @@ body[data-shell="on"] {
 .tri-dir { margin-top: 12px; }
 .tri-dir-label { display: block; color: var(--text-faint); font-size: var(--fs-ui-s); margin-bottom: 5px; }
 .tri-dir .rp-seg button { white-space: nowrap; }
+
+/* A sidebar toggle for a side that holds no panes: shown, explained, inert.
+   The shared disabled rule drops pointer events, which would take the
+   explanation with it. */
+.win-ctl button[disabled] { pointer-events: auto; cursor: default; opacity: .32; }
+
+/* The reading panel's break between the scripture's typography and the
+   interface's own */
+.rp-sep { height: 1px; background: var(--border); margin: 10px 0 8px; }
+
+/* ---- About ---------------------------------------------------------------*/
+/* One card, centred in the page: this is a page of figures about the build,
+   and there is nothing to read down the left edge. */
+/* The scroller is a flex child of the leaf; it has to claim the height before
+   it can centre anything in it. */
+.about-wrap { display: grid; place-items: center; align-content: center; padding: 32px 16px; }
+.about { width: min(520px, 100%); text-align: center; }
+.about-mark { width: 76px; height: 76px; margin: 0 auto 16px; display: grid; place-items: center; }
+.about-mark img { width: 64px; height: 64px; }
+.about h1 { font-size: 1.6rem; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+.about-ver { margin-top: 4px; color: var(--text-faint); font-size: var(--fs-ui-s); font-variant-numeric: tabular-nums; }
+.about-lede { margin: 14px 0 22px; color: var(--text-muted); font-size: var(--fs-ui-l); line-height: 1.6; }
+.about-facts {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+}
+.about-tile {
+  padding: 12px 8px; border-radius: var(--radius-l);
+  background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--border);
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+}
+.about-tile strong {
+  font-size: var(--fs-ui-l); font-weight: 650; color: var(--text-normal);
+  font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.about-tile span { font-size: 11px; color: var(--text-faint); }
+.about-acts { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+.about-note { margin-top: 20px; color: var(--text-faint); font-size: var(--fs-ui-s); line-height: 1.6; }
+@media (max-width: 560px) { .about-facts { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---- settings rows -------------------------------------------------------*/
+/* One setting a line: what it is on the left, the control on the right. */
+.set-group {
+  border-radius: var(--radius-l); background: var(--bg-secondary);
+  box-shadow: inset 0 0 0 1px var(--border); overflow: hidden; margin-bottom: 8px;
+}
+.set-row {
+  display: flex; align-items: center; gap: 16px; padding: 11px 14px;
+  border-top: 1px solid var(--border);
+}
+.set-group > .set-row:first-child { border-top: 0; }
+label.set-row { cursor: pointer; }
+label.set-row:hover { background: var(--bg-hover); }
+.set-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.set-name { color: var(--text-normal); font-size: var(--fs-ui-m); font-weight: 500; }
+.set-hint { color: var(--text-faint); font-size: var(--fs-ui-s); line-height: 1.45; }
+.set-row .rp-seg, .set-row .btn, .set-row .accent-row { flex: 0 0 auto; }
+.set-row .rp-seg button { padding: 4px 10px; white-space: nowrap; }
+
+/* A switch, not a tick box: the state is visible from across the room. */
+.switch { position: relative; flex: 0 0 auto; width: 38px; height: 22px; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.switch-track {
+  position: absolute; inset: 0; border-radius: 99px; background: var(--bg-elevated);
+  box-shadow: inset 0 0 0 1px var(--border-strong); transition: background var(--speed);
+  pointer-events: none;
+}
+.switch-track::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--text-faint); transition: transform var(--speed), background var(--speed);
+}
+.switch input:checked + .switch-track { background: var(--accent); box-shadow: none; }
+.switch input:checked + .switch-track::after { transform: translateX(16px); background: #fff; }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The accent row: the swatches, a custom colour, and a way back to the theme's own. */
+.accent-row { display: flex; align-items: center; gap: 6px; }
+.accent-row .accent-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; }
+.accent-pick {
+  display: grid; place-items: center; position: relative; overflow: hidden;
+  background: conic-gradient(#e11d48, #e9973f, #e0de71, #44cf6e, #0ea5e9, #7c3aed, #e11d48);
+}
+.accent-pick input { position: absolute; inset: -6px; opacity: 0; cursor: pointer; }
+.set-reset {
+  width: 26px; height: 26px; border-radius: var(--radius-s); display: grid; place-items: center;
+  color: var(--text-faint); background: none; cursor: pointer; margin-inline-start: 2px;
+}
+.set-reset:hover:not([disabled]) { background: var(--bg-hover); color: var(--text-normal); }
+.set-reset[disabled] { opacity: .3; cursor: default; }
+.set-reset svg { width: 15px; height: 15px; }
+
+/* Which translation a result came from, when more than one was searched */
+.sr-tr {
+  margin-inline-start: 4px; padding: 0 4px; border-radius: 3px;
+  background: var(--base-20); color: var(--text-faint); font-size: 9px; letter-spacing: .02em;
+}
+.sr-loading { padding: 4px 6px 4px 24px; color: var(--text-faint); font-size: var(--fs-ui-s); }
+
+
+/* The books pane's follow switch, in the filter field */
+/* On, it is filled like any pressed control; off, it is struck through, so
+   which state it is in can be seen rather than remembered. */
+.tree-follow {
+  width: 22px; height: 22px; flex: 0 0 auto; border-radius: var(--radius-s);
+  display: grid; place-items: center; color: var(--text-faint); cursor: pointer;
+  position: relative;
+}
+.tree-follow:hover { color: var(--text-normal); background: var(--bg-hover); }
+.tree-follow[aria-pressed="true"] {
+  color: var(--accent-2); background: var(--accent-fade);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+.tree-follow[aria-pressed="false"]::after {
+  content: ""; position: absolute; left: 3px; right: 3px; top: 50%;
+  border-top: 1.5px solid currentColor; transform: rotate(-45deg); opacity: .8;
+}
+.tree-follow svg { width: 14px; height: 14px; }
+.tree-aux { font-variant-numeric: tabular-nums; }
+
+/* The canon's sections: a second rank of scopes, quieter than the first */
+.sf-chips.is-quiet { margin-top: 4px; }
+.sf-chips.is-quiet .sf-chip { background: none; box-shadow: inset 0 0 0 1px var(--border); font-size: 10px; padding: 2px 7px; }
+.sf-chips.is-quiet .sf-chip[aria-pressed="true"] { background: var(--accent-fade); box-shadow: inset 0 0 0 1px var(--accent-line); }
+
+/* ---- a small menu, anchored to its control -------------------------------*/
+.popover.menu { padding: 5px; min-width: 168px; max-width: min(280px, calc(100vw - 16px)); }
+.menu-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px;
+  border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--fs-ui-m);
+  cursor: pointer; text-align: start;
+}
+.menu-item:hover { background: var(--bg-hover); color: var(--text-normal); }
+.menu-item.is-active { color: var(--accent-2); }
+.menu-item svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.menu-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-sub { color: var(--text-faint); font-size: 11px; }
+
+/* The button that appears when a pane strip runs out of room. It is an item of
+   the strip like the tabs, never an overlay: a button floating over the last
+   tab hides the very thing it is meant to help you reach. */
+.pane-more {
+  width: 24px; height: 24px; flex: 0 0 auto; align-self: center; position: relative;
+  border-radius: var(--radius-s); display: grid; place-items: center;
+  color: var(--text-faint); cursor: pointer;
+}
+.pane-more:hover { color: var(--text-normal); background: var(--bg-hover); }
+/* `display` here outranks the browser's own rule for [hidden]. */
+.pane-more[hidden] { display: none; }
+.pane-more svg { width: 15px; height: 15px; }
+/* How many are behind it, so a strip that has hidden something says so. */
+.pane-more::after {
+  content: attr(data-count); position: absolute; top: -2px; inset-inline-end: -3px;
+  min-width: 13px; height: 13px; padding: 0 3px; border-radius: 99px;
+  background: var(--accent); color: #fff; box-shadow: 0 0 0 2px var(--tabstrip-bg);
+  font-family: var(--font-ui); font-size: 9px; line-height: 13px; font-weight: 700;
+  text-align: center; pointer-events: none;
+}
+.pane-tab[hidden] { display: none; }
+
+
+/* ---- the colour picker ---------------------------------------------------*/
+.popover.colorpicker { padding: 10px; width: 232px; }
+.cp-body { display: flex; gap: 8px; flex-direction: column; }
+.cp-field {
+  position: relative; height: 132px; border-radius: var(--radius-m); cursor: crosshair;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.cp-hue {
+  position: relative; height: 14px; border-radius: 999px; cursor: ew-resize;
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.cp-thumb {
+  position: absolute; width: 14px; height: 14px; border-radius: 50%;
+  transform: translate(-50%, -50%); pointer-events: none;
+  box-shadow: 0 0 0 2px #fff, 0 1px 4px rgba(0, 0, 0, .5);
+}
+.cp-hue-thumb { top: 50%; }
+.cp-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.cp-swatch { width: 26px; height: 26px; border-radius: 50%; flex: 0 0 auto; box-shadow: inset 0 0 0 1px var(--border-strong); }
+.cp-hex {
+  flex: 1; min-width: 0; height: 26px; padding: 0 8px; border-radius: var(--radius-s);
+  background: var(--base-10); border: 1px solid var(--border); color: var(--text-normal);
+  font-family: var(--font-mono); font-size: var(--fs-ui-s);
+}
+.cp-hex:focus { outline: none; border-color: var(--accent-line); }
+
+/* Every swatch is round, the reader's own colour included. */
+.accent-row .accent-swatch, .accent-pick { border-radius: 50%; }
+.accent-pick { position: relative; overflow: hidden; cursor: pointer; }
+
+/* ---- the verse bar, which may hold a passage -----------------------------*/
+.vbar { padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.vbar-ref {
+  padding: 1px 6px 3px; color: var(--text-faint); font-size: 10px;
+  font-variant-numeric: tabular-nums; white-space: nowrap; text-align: center;
+}
+.vbar-acts { display: flex; gap: 2px; }
+
+/* A chapter chip: the number, and how many verses are in it */
+.cc-n { font-size: 11px; }
+.cc-v { font-size: 8px; opacity: .55; line-height: 1; }
+.ch-chip.is-active .cc-v { opacity: .8; }
+
+/* ---- the settings page ---------------------------------------------------*/
+/* A column of sections with the list of them beside it. On a narrow window the
+   list goes above, as a row of chips. */
+.set-layout { display: grid; grid-template-columns: 168px 1fr; gap: 28px; align-items: start; }
+.set-nav { position: sticky; top: 8px; display: flex; flex-direction: column; gap: 1px; }
+.set-nav-item {
+  display: flex; align-items: center; gap: 8px; padding: 6px 9px; border-radius: var(--radius-m);
+  color: var(--text-muted); font-size: var(--fs-ui-m); text-decoration: none; cursor: pointer;
+}
+.set-nav-item:hover { background: var(--bg-hover); color: var(--text-normal); }
+.set-nav-item svg { width: 15px; height: 15px; color: var(--text-faint); flex: 0 0 auto; }
+.set-main { min-width: 0; }
+.set-section { scroll-margin-top: 12px; }
+.set-section + .set-section { margin-top: 26px; }
+.set-value { color: var(--text-muted); font-size: var(--fs-ui-m); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.set-after { margin: 8px 2px 0; font-size: var(--fs-ui-s); line-height: 1.6; }
+.set-foot { margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--border); font-size: var(--fs-ui-s); }
+/* A dropdown for a setting with more values than fit as buttons. */
+.set-select {
+  flex: 0 0 auto; max-width: 46%; height: 26px; padding: 0 8px;
+  background: var(--base-10); color: var(--text-normal); border: var(--divider);
+  border-radius: var(--radius-m); font-family: var(--font-ui); font-size: var(--fs-ui-m);
+}
+/* A number inside a settings row: the same control as the text panel, laid out
+   to the width the row leaves rather than the panel's own. */
+.set-slider { flex: 1 1 260px; min-width: 0; max-width: 60%; }
+.set-slider .rp-row { padding: 0; }
+.set-slider .rp-l { display: none; }
+/* A group of rows a reader opens when they need it — one per translation, say,
+   which is sixty rows nobody wants unfolded. */
+.set-fold { margin-bottom: 8px; }
+.set-fold > summary {
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; cursor: pointer;
+  border-radius: var(--radius-l); background: var(--bg-secondary);
+  box-shadow: inset 0 0 0 1px var(--border); list-style: none;
+}
+.set-fold > summary::-webkit-details-marker { display: none; }
+.set-fold > summary::after {
+  content: ""; position: absolute; inset-inline-end: 16px; width: 7px; height: 7px;
+  margin-top: 5px; border-right: 1.6px solid var(--text-faint); border-bottom: 1.6px solid var(--text-faint);
+  transform: rotate(45deg); transition: transform var(--speed);
+}
+.set-fold > summary { position: relative; padding-inline-end: 34px; }
+.set-fold[open] > summary::after { transform: rotate(-135deg); margin-top: 8px; }
+.set-fold > summary:hover { background: var(--bg-hover); }
+.set-fold[open] > summary { border-end-start-radius: 0; border-end-end-radius: 0; }
+.set-fold[open] > .set-group { border-start-start-radius: 0; border-start-end-radius: 0; margin-top: -1px; }
+
+.set-sliders { padding: 6px 14px; display: flex; flex-direction: column; gap: 4px; }
+.set-sliders .rp-row { padding: 6px 0; }
+.set-sliders .rp-row + .rp-row { border-top: 1px solid var(--border); }
+.settings-import h3 { margin: 16px 0 6px; font-size: var(--fs-ui-l); font-weight: 600; }
+@media (max-width: 720px) {
+  .set-layout { grid-template-columns: 1fr; gap: 14px; }
+  .set-nav { position: static; flex-direction: row; flex-wrap: wrap; }
+  .set-nav-item { background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--border); font-size: var(--fs-ui-s); }
+  .set-nav-item span { display: none; }
+}
+
+/* ---- study projects ------------------------------------------------------*/
+/* The shelf on the left, the open project on the right: a project is read and
+   written at the same time, so the list of them must not take the page over. */
+.doc.projects { max-width: 76rem; }
+.pj-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 22px; align-items: start; }
+.pj-shelf { position: sticky; top: 8px; display: flex; flex-direction: column; gap: 10px; }
+.pj-shelf-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pj-shelf-head h2 { margin: 0; font-size: var(--fs-ui-l); font-weight: 650; }
+.pj-list { display: flex; flex-direction: column; gap: 2px; }
+.pj-item {
+  display: flex; flex-direction: column; gap: 2px; text-align: start; padding: 8px 10px;
+  border-radius: var(--radius-m); color: var(--text-muted); cursor: pointer;
+}
+.pj-item:hover { background: var(--bg-hover); }
+.pj-item.is-on { background: var(--accent-fade); color: var(--text-normal); box-shadow: inset 2px 0 0 var(--accent); }
+.pj-item-n { font-size: var(--fs-ui-m); font-weight: 500; color: var(--text-normal); }
+.pj-item-s { font-size: var(--fs-ui-s); color: var(--text-faint); }
+.pj-empty { padding: 10px 2px; font-size: var(--fs-ui-s); }
+.pj-shelf-foot { border-top: 1px solid var(--border); padding-top: 10px; }
+
+.pj-main { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.pj-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 14px; align-items: center; }
+.pj-name {
+  grid-column: 1; min-width: 0; background: none; border: 0; padding: 2px 0;
+  font-family: var(--font-ui); font-size: 26px; font-weight: 650; letter-spacing: -.01em;
+  color: var(--text-normal); outline: none; border-bottom: 1px solid transparent;
+}
+.pj-name:focus { border-bottom-color: var(--accent-line); }
+.pj-head-acts { grid-column: 2; display: flex; gap: 6px; }
+.pj-progress { grid-column: 1 / -1; margin: 0; font-size: var(--fs-ui-s); }
+.pj-summary {
+  width: 100%; min-height: 54px; resize: vertical; padding: 9px 11px;
+  background: var(--bg-secondary); border: var(--divider); border-radius: var(--radius-m);
+  font-family: var(--font-ui); font-size: var(--fs-ui-m); line-height: 1.55; color: var(--text-normal);
+}
+
+.pj-entries { display: flex; flex-direction: column; gap: 10px; }
+/* Each entry is a card so the eye can tell where one thought ends and the next
+   begins — which is the whole difference between a project and a long note. */
+.pj-entry {
+  border-radius: var(--radius-l); background: var(--bg-secondary);
+  box-shadow: inset 0 0 0 1px var(--border); padding: 10px 12px 12px;
+}
+.pj-entry.pj-passage { box-shadow: inset 0 0 0 1px var(--border), inset 3px 0 0 var(--accent); }
+.pj-entry.is-done { opacity: .6; }
+.pj-entry-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pj-ref {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; cursor: pointer;
+  border-radius: var(--radius-s); color: var(--accent-2); font-weight: 600; font-size: var(--fs-ui-m);
+}
+.pj-ref:hover { background: var(--accent-fade); }
+.pj-kind, .pj-check { display: inline-flex; align-items: center; gap: 6px; color: var(--text-faint); font-size: var(--fs-ui-s); }
+.pj-check { cursor: pointer; }
+.pj-kind svg, .pj-ref svg { width: 14px; height: 14px; }
+.pj-tools { margin-inline-start: auto; display: flex; gap: 2px; }
+.pj-tool {
+  width: 24px; height: 24px; display: grid; place-items: center; border-radius: var(--radius-s);
+  color: var(--text-faint); cursor: pointer;
+}
+.pj-tool:hover { background: var(--bg-hover); color: var(--text-normal); }
+.pj-tool:disabled { opacity: .3; pointer-events: none; }
+.pj-tool.danger:hover { color: var(--c-red); }
+.pj-tool svg { width: 14px; height: 14px; }
+/* One chevron glyph, turned to point the way the button moves things. */
+.pj-tool.is-up svg { transform: rotate(-90deg); }
+.pj-tool.is-down svg { transform: rotate(90deg); }
+/* The verses, quoted under the reference: the point of the card is to have
+   them in front of you while you write about them. */
+.pj-quote {
+  margin: 0 0 9px; padding: 8px 11px; border-radius: var(--radius-m);
+  background: var(--base-10); font-family: var(--font-read); font-size: calc(var(--fs-ui-m) + 1px);
+  line-height: 1.62; color: var(--text-muted); max-height: 15em; overflow: auto;
+}
+.pj-v { margin: 0 0 4px; user-select: text; }
+.pj-v b { font-family: var(--font-ui); font-size: .72em; color: var(--text-faint); margin-inline-end: 4px; vertical-align: 2px; }
+.pj-text {
+  width: 100%; min-height: 76px; resize: vertical; padding: 8px 10px;
+  background: var(--base-00); border: var(--divider); border-radius: var(--radius-m);
+  font-family: var(--font-ui); font-size: var(--fs-ui-m); line-height: 1.6; color: var(--text-normal);
+}
+.pj-text:focus { border-color: var(--accent-line); outline: none; }
+.pj-preview { padding: 2px 2px 0; }
+.pj-add { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
+.pj-blank { text-align: center; padding: 48px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.pj-blank h2 { margin: 0; font-size: 20px; }
+.pj-blank p { max-width: 34em; margin: 0; }
+
+/* The same project, in the sidebar, while reading. */
+.pj-pane { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.pj-pane-blank { padding: 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.pj-pane-blank p { margin: 0; color: var(--text-faint); font-size: var(--fs-ui-s); line-height: 1.55; }
+.pj-pane-head {
+  display: flex; flex-direction: column; gap: 2px; text-align: start; width: 100%;
+  padding: 9px 11px; border-bottom: var(--divider); cursor: pointer;
+}
+.pj-pane-head:hover { background: var(--bg-hover); }
+.pj-pane-list { flex: 1; min-height: 0; overflow: auto; padding: 4px; }
+.pj-pane-row {
+  display: flex; align-items: center; gap: 7px; width: 100%; text-align: start;
+  padding: 5px 8px; border-radius: var(--radius-s); color: var(--text-muted);
+  font-size: var(--fs-ui-s); cursor: pointer;
+}
+.pj-pane-row:hover { background: var(--bg-hover); color: var(--text-normal); }
+.pj-pane-row svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--text-faint); }
+.pj-pane-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj-pane-row.is-done span { text-decoration: line-through; opacity: .6; }
+.pj-pane-foot { padding: 8px; border-top: var(--divider); }
+@media (max-width: 820px) {
+  .pj-layout { grid-template-columns: 1fr; }
+  .pj-shelf { position: static; }
+}
+
+/* ---- data and formats ----------------------------------------------------*/
+/* A reference document: prose the width of a page, and samples that look like
+   what they are — files, not decoration. */
+.fm .fm-facts { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 8px; }
+.fm-fact {
+  display: flex; flex-direction: column; gap: 1px; padding: 9px 14px;
+  border-radius: var(--radius-l); background: var(--bg-secondary);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.fm-fact strong { font-size: 19px; font-weight: 650; color: var(--text-normal); font-variant-numeric: tabular-nums; }
+.fm-fact span { font-size: var(--fs-ui-s); color: var(--text-faint); }
+.fm-sec { margin-top: 26px; }
+.fm-sec h2 { margin: 0 0 8px; font-size: var(--fs-ui-l); font-weight: 650; color: var(--text-normal); }
+.fm-sec p { margin: 0 0 10px; line-height: 1.68; color: var(--text-muted); }
+.fm-sample { margin: 12px 0 0; }
+.fm-sample figcaption {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+  background: var(--bg-secondary); border: 1px solid var(--border); border-bottom: 0;
+  border-radius: var(--radius-m) var(--radius-m) 0 0;
+  font-family: var(--font-mono); font-size: var(--fs-ui-s); color: var(--text-faint);
+}
+.fm-copy { margin-inline-start: auto; width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--radius-s); color: var(--text-faint); cursor: pointer; }
+.fm-copy:hover { background: var(--bg-hover); color: var(--text-normal); }
+.fm-copy svg { width: 13px; height: 13px; }
+.fm-sample pre {
+  margin: 0; padding: 11px 13px; overflow: auto; user-select: text;
+  background: var(--base-00); border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-m) var(--radius-m);
+  font-family: var(--font-mono); font-size: 12.5px; line-height: 1.62; color: var(--text-muted);
+}
+
+/* ---- welcome -------------------------------------------------------------*/
+/* One screen, centred, four things. It has to be readable in the time somebody
+   gives a screen they did not ask for. */
+.wl-wrap { display: grid; place-items: start center; padding: 44px 20px 60px; }
+.wl { width: min(46rem, 100%); }
+.wl h1 { margin: 0 0 6px; font-size: 32px; font-weight: 300; letter-spacing: -.02em; }
+.wl-lede { margin: 0 0 26px; font-size: var(--fs-ui-l); line-height: 1.6; color: var(--text-muted); }
+.wl-steps { display: flex; flex-direction: column; gap: 2px; }
+.wl-step {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  padding: 14px 16px; border-radius: var(--radius-l); background: var(--bg-secondary);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.wl-mark {
+  width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--accent-fade); color: var(--accent-2);
+}
+.wl-mark svg { width: 16px; height: 16px; }
+.wl-text h2 { margin: 0 0 3px; font-size: var(--fs-ui-m); font-weight: 650; }
+.wl-text p { margin: 0; font-size: var(--fs-ui-s); line-height: 1.6; color: var(--text-muted); }
+.wl-acts { display: flex; gap: 8px; margin-top: 22px; }
+.wl-note { margin-top: 14px; font-size: var(--fs-ui-s); }
+@media (max-width: 560px) {
+  .wl-step { grid-template-columns: auto minmax(0, 1fr); }
+  .wl-step .btn { grid-column: 2; justify-self: start; }
+}
+/* Long addresses in the formats document wrap rather than push the page. */
+.fm-sec p { overflow-wrap: anywhere; }
+/* The example beside a palette verb, in the shortcuts list. */
+.verb-eg { display: block; margin-top: 1px; font-family: var(--font-mono); font-style: normal; font-size: var(--fs-ui-s); color: var(--text-faint); }
+
+/* ---- cards ---------------------------------------------------------------*/
+/* A workspace: a band of tools, the card in the middle of whatever room there
+   is, and panels that belong to this document rather than to the app's chrome.
+   The band and the foot carry the colour of the active tab, so the studio reads
+   as one surface with the tab it hangs from. */
+.cd-wrap { display: flex; }
+.doc-full.cards { position: relative; flex: 1; min-width: 0; }
+.cd-bar {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 4px; padding: 7px 10px;
+  border-bottom: var(--divider); background: var(--bg-primary); overflow: hidden;
+}
+.cd-bar .spacer { flex: 1; min-width: 0; }
+.cd-bar-acts { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.cd-bar-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; flex: 0 0 auto; }
+.cd-tool {
+  width: 28px; height: 28px; flex: 0 0 auto; display: grid; place-items: center;
+  border-radius: var(--radius-m); color: var(--text-muted); cursor: pointer;
+  transition: background var(--speed), color var(--speed);
+}
+.cd-tool:hover { background: var(--bg-hover); color: var(--text-normal); }
+.cd-tool[aria-expanded="true"] { background: var(--accent-fade); color: var(--accent-2); }
+.cd-tool.primary { background: var(--accent); color: #fff; }
+.cd-tool.primary:hover { background: var(--accent-1); }
+.cd-tool.danger:hover { color: var(--c-red); }
+.cd-tool svg { width: 15px; height: 15px; }
+.cd-tool[hidden] { display: none; }
+.cd-more { position: relative; }
+.cd-more::after {
+  content: attr(data-count); position: absolute; top: 0; inset-inline-end: 0;
+  min-width: 13px; height: 13px; padding: 0 3px; border-radius: 99px;
+  background: var(--accent); color: #fff; box-shadow: 0 0 0 2px var(--bg-primary);
+  font-family: var(--font-ui); font-size: 9px; line-height: 13px; font-weight: 700; text-align: center;
+  pointer-events: none;
+}
+.cd-name {
+  width: clamp(110px, 20%, 240px); height: 26px; padding: 0 8px; min-width: 0;
+  background: none; border: 1px solid transparent; border-radius: var(--radius-m);
+  font-family: var(--font-ui); font-size: var(--fs-ui-m); font-weight: 600; color: var(--text-normal);
+}
+.cd-name:hover { background: var(--base-10); }
+.cd-name:focus { background: var(--base-00); border-color: var(--accent-line); outline: none; }
+.cd-readout { color: var(--text-faint); font-size: var(--fs-ui-s); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* The stage is a chequerboard, so a card with a pale ground is still visibly a
+   card against it. */
+.cd-stage {
+  flex: 1; min-height: 0; display: grid; place-items: center; padding: 20px; overflow: hidden;
+  grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr);
+  background:
+    linear-gradient(45deg, var(--base-10) 25%, transparent 25%, transparent 75%, var(--base-10) 75%) 0 0/24px 24px,
+    linear-gradient(45deg, var(--base-10) 25%, transparent 25%, transparent 75%, var(--base-10) 75%) 12px 12px/24px 24px,
+    var(--base-00);
+}
+.cd-frame {
+  position: relative; display: block; max-width: 100%; max-height: 100%;
+  min-width: 0; min-height: 0; box-shadow: var(--shadow-l); line-height: 0;
+}
+.cd-canvas { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; touch-action: none; }
+.cd-frame, .cd-canvas { border-radius: inherit; }
+
+/* What can be picked up. Quiet until it is pointed at, lit while it is held —
+   an outline round everything at once is noise, and an editor that shows
+   nothing until you guess is worse. */
+.cd-box {
+  position: absolute; cursor: move; touch-action: none;
+  outline: 1px dashed transparent; outline-offset: 2px; border-radius: 2px;
+  transition: outline-color var(--speed);
+}
+.cd-box[hidden] { display: none; }
+.cd-frame:hover .cd-box { outline-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.cd-box:hover, .cd-box.is-picked { outline: 1.5px solid var(--accent); }
+.cd-box:focus-visible { outline: 2px solid var(--accent); }
+.cd-box-reference { outline-style: dotted; }
+/* Handles appear on the frame that is held, so a card being looked at is not a
+   field of dots. */
+.cd-grip { position: absolute; width: 11px; height: 11px; display: none; }
+.cd-box.is-picked .cd-grip, .cd-box:focus-visible .cd-grip { display: block; }
+.cd-grip::after {
+  content: ""; position: absolute; inset: 2px; border-radius: 2px;
+  background: var(--bg-elevated); box-shadow: 0 0 0 1.5px var(--accent);
+}
+.cd-grip:hover::after { background: var(--accent); }
+.cd-grip-n, .cd-grip-s { left: 50%; margin-left: -5.5px; cursor: ns-resize; }
+.cd-grip-e, .cd-grip-w { top: 50%; margin-top: -5.5px; cursor: ew-resize; }
+.cd-grip-n, .cd-grip-ne, .cd-grip-nw { top: -6px; }
+.cd-grip-s, .cd-grip-se, .cd-grip-sw { bottom: -6px; }
+.cd-grip-w, .cd-grip-nw, .cd-grip-sw { left: -6px; }
+.cd-grip-e, .cd-grip-ne, .cd-grip-se { right: -6px; }
+.cd-grip-nw { cursor: nwse-resize; }
+.cd-grip-se { cursor: nwse-resize; }
+.cd-grip-ne { cursor: nesw-resize; }
+.cd-grip-sw { cursor: nesw-resize; }
+/* A guide only exists while something is lined up with it. */
+.cd-guide { position: absolute; background: var(--accent); pointer-events: none; opacity: .9; }
+.cd-guide[hidden] { display: none; }
+.cd-guide-x { top: -8px; bottom: -8px; width: 1px; }
+.cd-guide-y { left: -8px; right: -8px; height: 1px; }
+/* Advice drawn on the stage, never on the canvas: it is not part of the card. */
+.cd-safe { position: absolute; inset: 0; pointer-events: none; }
+.cd-safe[hidden] { display: none; }
+.cd-safe::before, .cd-safe::after {
+  content: ""; position: absolute; left: 0; right: 0; height: var(--safe, 0);
+  background: repeating-linear-gradient(45deg, rgba(255,255,255,.07) 0 6px, transparent 6px 12px);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.14);
+}
+.cd-safe::before { top: 0; }
+.cd-safe::after { bottom: 0; }
+
+.cd-hint {
+  flex: 0 0 auto; margin: 0; padding: 7px 12px; border-top: var(--divider);
+  color: var(--text-faint); font-size: var(--fs-ui-s); background: var(--bg-primary);
+  font-variant-numeric: tabular-nums;
+}
+.cd-hint[data-warn="true"] { color: var(--c-orange); }
+
+/* A panel of this workspace: anchored under the tool that opened it, with no
+   heading of its own — the pressed button says what it is, and Escape, the
+   button again, or a press anywhere else closes it. */
+.cd-panel {
+  position: absolute; z-index: 20; width: min(320px, 84%); max-height: 72%;
+  display: flex; flex-direction: column; padding: 0;
+}
+.cd-panel[hidden] { display: none; }
+/* Down only. A panel that scrolls sideways is a panel that should have been
+   two, so its rows wrap instead and the tools are split until they fit. */
+.cd-panel-body { padding: 7px; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 2px; }
+.cd-panel-body .set-row { padding: 8px 10px; border-radius: var(--radius-m); border-top: 0; background: var(--bg-secondary); }
+.cd-panel-body .set-row:has(.set-slider),
+.cd-panel-body .set-row:has(.rp-seg) { flex-direction: column; align-items: stretch; gap: 8px; }
+.cd-panel-body .set-row:has(.set-slider) .set-slider,
+.cd-panel-body .set-row:has(.rp-seg) .rp-seg { flex: 0 0 auto; max-width: none; width: 100%; }
+.cd-panel-body .rp-seg { flex-wrap: wrap; }
+.cd-panel-body .rp-seg button { flex: 1 1 auto; min-width: 0; }
+.cd-panel-body .rp-seg.is-iconic button { flex: 1 1 0; display: grid; place-items: center; padding: 5px 0; }
+.cd-panel-body .rp-seg.is-iconic svg { width: 15px; height: 15px; }
+.cd-note { margin: 0 0 8px; padding: 0 2px; color: var(--text-faint); font-size: var(--fs-ui-s); line-height: 1.55; }
+.cd-ref-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.cd-ref-input {
+  flex: 1; min-width: 0; height: 30px; padding: 0 10px;
+  background: var(--base-00); border: var(--divider); border-radius: var(--radius-m);
+  font-family: var(--font-mono); font-size: var(--fs-ui-m); color: var(--text-normal);
+}
+.cd-ref-input:focus { border-color: var(--accent-line); outline: none; }
+.cd-panel-foot { display: flex; gap: 4px; padding-top: 6px; border-top: var(--divider); margin-top: 4px; }
+.cd-list { display: flex; flex-direction: column; gap: 2px; }
+.cd-item {
+  display: flex; flex-direction: column; gap: 1px; text-align: start; padding: 7px 10px;
+  border-radius: var(--radius-m); cursor: pointer; color: var(--text-muted);
+}
+.cd-item:hover { background: var(--bg-hover); }
+.cd-item.is-on { background: var(--accent-fade); box-shadow: inset 2px 0 0 var(--accent); }
+.cd-item-n { font-size: var(--fs-ui-m); font-weight: 500; color: var(--text-normal); }
+.cd-item-s { font-size: var(--fs-ui-s); color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.cd-presets button { padding: 4px 8px; }

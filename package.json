@@ -1,7 +1,7 @@
 {
   "name": "lai-siangtho",
   "productName": "Lai Siangtho",
-  "version": "26.9.24",
+  "version": "26.9.27",
   "description": "Bible reading and study — web (PWA) and desktop (Electron) from one codebase",
   "author": {
     "name": "Lai Siangtho"
@@ -9,9 +9,9 @@
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/laisiangtho/lai-siangtho.git"
+    "url": "git+https://github.com/laisiangtho/lab.git"
   },
-  "homepage": "https://github.com/laisiangtho/lai-siangtho",
+  "homepage": "https://github.com/laisiangtho/lab",
   "desktopName": "org.laisiangtho.app.desktop",
   "private": true,
   "type": "module",

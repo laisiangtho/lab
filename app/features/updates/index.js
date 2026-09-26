@@ -59,10 +59,41 @@ export default {
     });
 
     ctx.shell.whenReady(() => {
+      if (ctx.records.get(KEY, null)?.auto === false) return;
       const last = Number(held?.checkedAt ?? 0);
       if (Date.now() - last < DAY) return;
       check({ quiet: true }).catch(() => { /* reported inside */ });
     });
+
+    // Updating is a setting a reader looks for in settings, so it is there:
+    // whether to look on their behalf, when it last looked, and a way to look
+    // now without going through the palette.
+    if (web || native) {
+      ctx.registry.setting({
+        id: 'updates.auto',
+        section: 'storage',
+        order: 20,
+        build: (ui) => {
+          const record = ctx.records.get(KEY, null) ?? {};
+          const when = Number(record.checkedAt ?? 0);
+          return [
+            ui.toggle({
+              name: L('set.autoUpdate'),
+              hint: L('set.autoUpdateHint'),
+              value: record.auto !== false,
+              onChange: (on) => { remember({ auto: on }); },
+            }),
+            ui.action({
+              name: L('cmd.appUpdate'),
+              hint: when ? L('set.checkedAt', { when: new Date(when).toLocaleString() }) : L('set.neverChecked'),
+              label: L('set.checkNow'),
+              glyph: 'download',
+              onClick: () => check({ quiet: false }).then(() => ui.refresh()),
+            }),
+          ];
+        },
+      });
+    }
 
     /**
      * @param {{ quiet: boolean }} options quiet: say nothing unless there is

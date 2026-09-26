@@ -89,7 +89,7 @@ export async function launch(options = {}) {
   const { chromium } = await import('playwright-core');
   const data = options.fixtures ?? fixtures();
   const server = await serve();
-  const browser = await chromium.launch({ executablePath: chromiumPath(), args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ executablePath: chromiumPath(), headless: options.headed ? false : undefined, args: ['--no-sandbox'] });
   const context = await browser.newContext({
     viewport: options.viewport ?? { width: 1440, height: 900 },
     colorScheme: 'dark',

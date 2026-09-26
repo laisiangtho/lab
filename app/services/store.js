@@ -145,17 +145,36 @@ class TranslationStore {
   }
 
   /**
-   * Walk every chapter of a translation. Used by search, which reads far more
+   * Walk the chapters of a translation. Used by search, which reads far more
    * than it keeps: a cursor avoids holding the whole translation in memory.
+   *
+   * A search limited to a few books opens one cursor per book rather than
+   * reading the whole translation and discarding most of it — the key is
+   * `[identify, book, chapter]`, so each book is one contiguous range.
+   *
    * @param {(record: {book:number,chapter:number,verses:object}) => void} visit
+   * @param {{ books?: number[] | null, while?: () => boolean }} [options]
+   *   `while` is asked between records; returning false stops the scan, which
+   *   is how a newer query abandons an older one mid-translation.
    */
-  scanChapters(identify, visit) {
+  async scanChapters(identify, visit, { books = null, while: carryOn = null } = {}) {
+    const ranges = books?.length
+      ? [...books].sort((a, b) => a - b).map((book) => IDBKeyRange.bound([identify, book], [identify, book, []]))
+      : [IDBKeyRange.bound([identify], [identify, []])];
+    for (const range of ranges) {
+      if (carryOn && !carryOn()) return;
+      await this.#scanRange(range, visit, carryOn);
+    }
+  }
+
+  #scanRange(range, visit, carryOn) {
     return new Promise((resolve, reject) => {
       const tx = this.#tx('chapters');
-      const request = tx.objectStore('chapters').openCursor(IDBKeyRange.bound([identify], [identify, []]));
+      const request = tx.objectStore('chapters').openCursor(range);
       request.onsuccess = () => {
         const cursor = request.result;
         if (!cursor) { resolve(); return; }
+        if (carryOn && !carryOn()) { resolve(); return; }
         visit(cursor.value);
         cursor.continue();
       };

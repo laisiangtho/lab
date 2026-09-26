@@ -51,9 +51,13 @@ try {
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) problems.push(m.text()); });
 
   await page.waitForSelector('#app .body-row', { timeout: 30000 });
-  // Whichever the stored state leads to: the library on a first run, the text
-  // on any later one.
-  await page.waitForSelector('.library-item, .verse', { timeout: 30000 });
+  // Whichever the stored state leads to: the greeting on a first run, the
+  // library once it has been read, the text on any later one.
+  await page.waitForSelector('.wl, .library-item, .verse', { timeout: 30000 });
+  if (await page.locator('.wl-acts .btn.primary').count()) {
+    await page.locator('.wl-acts .btn.primary').click();
+    await page.waitForSelector('.library-item, .verse', { timeout: 30000 });
+  }
   const info = await page.evaluate(() => window.lai?.appInfo());
   check('the shell rendered', await page.locator('.ribbon').count() === 1);
   check('it has something to show', await page.locator('.library-item, .verse').count() > 0);

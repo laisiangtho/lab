@@ -9,7 +9,7 @@ import { basename } from 'node:path';
 import { rendererUrl } from './window.js';
 
 /** Where releases are published; the packaging config points at the same repository. */
-const RELEASES_URL = 'https://api.github.com/repos/laisiangtho/lai-siangtho/releases/latest';
+const RELEASES_URL = 'https://api.github.com/repos/laisiangtho/lab/releases/latest';
 
 export function registerIpc() {
   handle('lai:save-file', async (event, options) => {
