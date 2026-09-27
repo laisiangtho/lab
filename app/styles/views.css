@@ -992,6 +992,9 @@ label.set-row:hover { background: var(--bg-hover); }
 }
 .cd-name:hover { background: var(--base-10); }
 .cd-name:focus { background: var(--base-00); border-color: var(--accent-line); outline: none; }
+/* Named and saved. The field commits when it is left, and says so for a moment,
+   because a field that swallows Enter in silence reads as one still waiting. */
+.cd-name.is-saved { border-color: var(--c-green); background: var(--accent-fade); }
 .cd-readout { color: var(--text-faint); font-size: var(--fs-ui-s); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* The stage is a chequerboard, so a card with a pale ground is still visibly a
@@ -1024,6 +1027,8 @@ label.set-row:hover { background: var(--bg-hover); }
 .cd-box:hover, .cd-box.is-picked { outline: 1.5px solid var(--accent); }
 .cd-box:focus-visible { outline: 2px solid var(--accent); }
 .cd-box-reference { outline-style: dotted; }
+/* Words taller than the frame holding them. */
+.cd-box[data-over="true"] { outline: 1.5px dashed var(--c-orange); }
 /* Handles appear on the frame that is held, so a card being looked at is not a
    field of dots. */
 .cd-grip { position: absolute; width: 11px; height: 11px; display: none; }
@@ -1044,6 +1049,28 @@ label.set-row:hover { background: var(--bg-hover); }
 .cd-grip-ne { cursor: nesw-resize; }
 .cd-grip-sw { cursor: nesw-resize; }
 /* A guide only exists while something is lined up with it. */
+/* The card's own edges. A picture is sized by its corner before it is sized by
+   a number, so the corner is there — quiet until the card is pointed at. */
+.cd-edge { position: absolute; opacity: 0; transition: opacity var(--speed); touch-action: none; }
+.cd-frame:hover .cd-edge { opacity: 1; }
+.cd-edge::after {
+  content: ''; position: absolute; inset: 0; margin: auto;
+  background: var(--accent); border: 1.5px solid var(--bg-primary); border-radius: 2px;
+}
+.cd-edge-e { top: 25%; bottom: 25%; right: -5px; width: 10px; cursor: ew-resize; }
+.cd-edge-e::after { width: 5px; height: 34px; max-height: 100%; }
+.cd-edge-s { left: 25%; right: 25%; bottom: -5px; height: 10px; cursor: ns-resize; }
+.cd-edge-s::after { height: 5px; width: 34px; max-width: 100%; }
+.cd-edge-se { right: -6px; bottom: -6px; width: 14px; height: 14px; cursor: nwse-resize; }
+.cd-edge-se::after { width: 11px; height: 11px; border-radius: 3px; }
+
+/* The margin, shown only while something is being placed against it. */
+.cd-margin {
+  position: absolute; pointer-events: none;
+  outline: 1px dashed color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.cd-margin[hidden] { display: none; }
+
 .cd-guide { position: absolute; background: var(--accent); pointer-events: none; opacity: .9; }
 .cd-guide[hidden] { display: none; }
 .cd-guide-x { top: -8px; bottom: -8px; width: 1px; }
@@ -1065,12 +1092,20 @@ label.set-row:hover { background: var(--bg-hover); }
   font-variant-numeric: tabular-nums;
 }
 .cd-hint[data-warn="true"] { color: var(--c-orange); }
+/* The answer beside the question: a frame dragged smaller than its text is a
+   choice between a bigger frame and smaller text, and this is the second one. */
+.cd-fix {
+  margin-inline-start: 8px; padding: 2px 9px; border-radius: var(--radius-m);
+  background: var(--bg-elevated); box-shadow: 0 0 0 1px var(--border-strong);
+  color: var(--text-normal); font-size: var(--fs-ui-s); font-weight: 600; cursor: pointer;
+}
+.cd-fix:hover { background: var(--bg-hover); }
 
 /* A panel of this workspace: anchored under the tool that opened it, with no
    heading of its own — the pressed button says what it is, and Escape, the
    button again, or a press anywhere else closes it. */
 .cd-panel {
-  position: absolute; z-index: 20; width: min(320px, 84%); max-height: 72%;
+  position: absolute; z-index: 20; width: min(320px, 84%); max-height: 72%; /* replaced when it opens */
   display: flex; flex-direction: column; padding: 0;
 }
 .cd-panel[hidden] { display: none; }

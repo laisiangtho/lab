@@ -12,7 +12,7 @@ const measure = (text, size = 1) => text.length * size;
 test('a template keeps what it understands and mends what it does not', () => {
   const t = parseTemplate({
     name: '  Sunday  ', width: 99999, padding: -10, background: 'plaid',
-    from: 'red', to: '#112233', align: 'middle', size: 40, watermark: false,
+    from: 'red', to: '#112233', align: 'middle', size: 40, watermark: false, grow: 'sideways',
   });
   assert.equal(t.name, 'Sunday');
   assert.equal(t.width, 4096, 'clamped, not refused');
@@ -24,6 +24,8 @@ test('a template keeps what it understands and mends what it does not', () => {
   assert.equal(t.size, 40);
   assert.equal(t.watermark, false);
   assert.equal(t.numbers, true, 'what was not said keeps its default');
+  assert.equal(t.grow, 'scale');
+  assert.equal(parseTemplate({ grow: 'keep' }).grow, 'keep');
 });
 
 test('the shelf always has something on it', () => {
@@ -66,25 +68,57 @@ test('a template travels as a file, and a foreign file is not one', () => {
   assert.equal(readTemplateFile(null), null);
 });
 
-test('a frame is where it was put, in fractions of the card', () => {
-  const template = parseTemplate({ width: 1000, height: 1000, box: { x: 0.1, y: 0.2, w: 0.5, h: 0.4 } });
+test('a frame is where it was put, in fractions of the card inside its margin', () => {
+  const template = parseTemplate({
+    width: 1000, height: 1000, padding: 100, space: 'inner',
+    box: { x: 0, y: 0.25, w: 1, h: 0.5 },
+  });
   const out = layoutCard({ template, pieces: 'a b c d e f'.split(/(?<= )/), measure });
+  // 0 and 1 are the margin: the frame fills the width inside it and starts a
+  // quarter of the way down the room, not of the card.
   assert.deepEqual(
     { x: out.box.x, y: out.box.y, w: out.box.width, h: out.box.height },
-    { x: 100, y: 200, w: 500, h: 400 },
+    { x: 100, y: 300, w: 800, h: 400 },
   );
   // The words take what they take, inside the frame they were given.
-  assert.equal(out.text.width, 500);
+  assert.equal(out.text.width, 800);
   assert.ok(out.text.height <= out.box.height + 1);
+});
+
+test('the margin is a measurement: widen it and the frames come in with it', () => {
+  const pieces = 'a b c d e f'.split(/(?<= )/);
+  const near = parseTemplate({ width: 1000, height: 1000, padding: 50, space: 'inner', box: { x: 0, y: 0, w: 1, h: 0.5 } });
+  const far = parseTemplate({ ...near, padding: 200 });
+  const a = layoutCard({ template: near, pieces, measure });
+  const b = layoutCard({ template: far, pieces, measure });
+  assert.equal(a.box.x, 50);
+  assert.equal(b.box.x, 200, 'the frame moved in with the margin');
+  assert.ok(b.box.width < a.box.width, 'and lost the room the margin took');
+  // A margin too big for the card is clamped rather than turning it inside out.
+  const absurd = layoutCard({ template: parseTemplate({ ...near, width: 400, height: 400, padding: 400 }), pieces, measure });
+  assert.ok(absurd.box.width > 0);
 });
 
 test('a template written before frames existed opens where its author left it', () => {
   const old = parseTemplate({ width: 1000, height: 1000, padding: 100, measure: 0.5, align: 'end', anchorY: 0 });
-  assert.ok(old.box.w > 0.39 && old.box.w < 0.41, 'half the room inside the margins');
-  assert.ok(old.box.x + old.box.w > 0.89, 'still hugging the end');
-  assert.ok(old.box.y < 0.15, 'still at the top');
+  assert.ok(old.box.w > 0.49 && old.box.w < 0.51, 'half the room inside the margins');
+  assert.ok(old.box.x + old.box.w > 0.99, 'still hugging the end');
+  assert.ok(old.box.y < 0.02, 'still at the top');
   assert.equal(parseTemplate({ reference: 'none' }).refShow, false);
   assert.equal(parseTemplate({ reference: 'free' }).refFollow, false);
+});
+
+test('a frame written against the whole card is read once into the room inside the margin', () => {
+  // Saved before the margin meant anything: fractions of the card itself.
+  const moved = parseTemplate({ width: 1000, height: 1000, padding: 100, box: { x: 0.1, y: 0.2, w: 0.5, h: 0.4 } });
+  assert.ok(Math.abs(moved.box.x - 0) < 0.02, 'x 0.1 of the card is the margin');
+  assert.ok(Math.abs(moved.box.w - 0.625) < 0.01, 'half the card is five eighths of the room');
+  // Its pixels are the pixels it always had, which is the point of converting.
+  const out = layoutCard({ template: moved, pieces: 'a b'.split(/(?<= )/), measure });
+  assert.equal(out.box.x, 100);
+  assert.equal(out.box.width, 500);
+  // And it only happens once: re-reading a converted template leaves it alone.
+  assert.deepEqual(parseTemplate(moved).box, moved.box);
 });
 
 test('a frame resizes from the edge that is pulled', () => {
@@ -110,12 +144,20 @@ test('snapping offers the card and the other frame, and says which line it took'
 });
 
 test('a frame goes back to fractions, kept inside what a card can hold', () => {
-  assert.deepEqual(frameToTemplate({ x: 100, y: 200, width: 500, height: 400 }, { width: 1000, height: 1000 }),
-    { x: 0.1, y: 0.2, w: 0.5, h: 0.4 });
-  assert.equal(frameToTemplate({ x: 0, y: 0, width: 10, height: 10 }, { width: 1000, height: 1000 }).w, 0.08,
+  const card = { width: 1000, height: 1000, padding: 100 };
+  assert.deepEqual(frameToTemplate({ x: 100, y: 300, width: 800, height: 400 }, card),
+    { x: 0, y: 0.25, w: 1, h: 0.5 });
+  assert.equal(frameToTemplate({ x: 0, y: 0, width: 10, height: 10 }, card).w, 0.08,
     'a frame cannot be shrunk to nothing');
-  const flat = frameToTemplate({ x: 0, y: 0, width: 500, height: 40 }, { width: 1000, height: 1000 }, true);
+  // Out past the margin is allowed — text bleeding off the edge is a design.
+  assert.ok(frameToTemplate({ x: 0, y: 0, width: 800, height: 400 }, card).x < 0);
+  const flat = frameToTemplate({ x: 100, y: 0, width: 400, height: 40 }, card, true);
   assert.equal(flat.h, undefined, 'the reference has no height of its own');
+  // A round trip through both, which is what a drag actually does.
+  const back = frameToTemplate({ x: 260, y: 420, width: 300, height: 220 }, card);
+  const again = layoutCard({ template: parseTemplate({ ...card, space: 'inner', box: back }), pieces: ['a'], measure });
+  assert.deepEqual({ x: again.box.x, y: again.box.y, w: again.box.width, h: again.box.height },
+    { x: 260, y: 420, w: 300, h: 220 });
 });
 
 test('the reference follows the text until it is moved', () => {

@@ -23,6 +23,15 @@ export const CARD_PRESETS = Object.freeze([
 export const CARD_FONTS = Object.freeze(['script', 'serif', 'sans', 'mono']);
 export const CARD_ALIGN = Object.freeze(['start', 'center', 'end']);
 export const CARD_BACKGROUNDS = Object.freeze(['theme', 'solid', 'gradient']);
+/**
+ * What happens to the frames when the card itself is resized.
+ *
+ * `scale` keeps their share of the card, so the design survives being made into
+ * a story instead of a post; `keep` keeps their measurements, so the card grows
+ * around them. Both are what somebody wants, and neither is guessable — which is
+ * why it is asked rather than assumed.
+ */
+export const CARD_GROW = Object.freeze(['scale', 'keep']);
 /** What can be picked up and moved on a card. */
 export const CARD_PARTS = Object.freeze(['text', 'reference']);
 
@@ -54,7 +63,7 @@ export const defaultTemplate = Object.freeze({
   borderInset: 48,
   font: 'script',           // script | serif | sans | mono
   /**
-   * The frames, as fractions of the card.
+   * The frames, as fractions of the content box — the card inside its margin.
    *
    * This is the part that had to be rebuilt. The first version described the
    * text by an alignment and an anchor — which is a fine way to *store* a
@@ -64,9 +73,20 @@ export const defaultTemplate = Object.freeze({
    * is put, it resizes from the edge that is pulled, and the opposite edge
    * stays where it is. `align` is now what it says — where the text sits inside
    * its own frame — rather than where the frame sits on the card.
+   *
+   * They are fractions of the *content* box rather than of the whole card so
+   * that the margin is a real measurement and not a decoration: 0 is the
+   * margin, 1 is the other margin, and widening the margin moves the text in,
+   * which is the only thing a control called "margin" can honestly mean. A
+   * frame may still run outside that range — dragging text off the edge is
+   * something people do on purpose — so the range is not a fence.
    */
-  box: Object.freeze({ x: 0.09, y: 0.18, w: 0.82, h: 0.56 }),
-  ref: Object.freeze({ x: 0.09, y: 0.78, w: 0.82 }),
+  box: Object.freeze({ x: 0, y: 0.13, w: 1, h: 0.65 }),
+  ref: Object.freeze({ x: 0, y: 0.83, w: 1 }),
+  /** Which space the frames above are measured in; see `parseTemplate`. */
+  space: 'inner',
+  /** What resizing the card does to the frames: scale | keep. */
+  grow: 'scale',
   /** The reference follows the text until it is moved, and then it is its own. */
   refFollow: true,
   refShow: true,
@@ -80,13 +100,33 @@ export const defaultTemplate = Object.freeze({
 });
 
 /**
+ * The card inside its margin: where a frame's 0 and 1 are.
+ *
+ * The margin is clamped against the card rather than trusted, because a margin
+ * of 400 on a card 320 wide would otherwise turn the content box inside out and
+ * every frame in it into a negative number.
+ *
+ * @param {{ width: number, height: number, padding: number }} t
+ * @returns {{ x: number, y: number, width: number, height: number, pad: number }}
+ */
+export function contentBox(t) {
+  const pad = Number.isFinite(t.padding)
+    ? Math.max(0, Math.min(t.padding, Math.floor(Math.min(t.width, t.height) * 0.4)))
+    : 0;
+  return { x: pad, y: pad, width: t.width - pad * 2, height: t.height - pad * 2, pad };
+}
+
+/**
  * A frame read back from storage, or worked out from how the first version
  * described the same layout — an alignment, a column width and an anchor — so a
  * template written before frames existed still opens where its author left it.
  */
 function frame(raw, fallback, source, flat = false) {
+  // Wider than 0..1 on purpose: 0..1 is the content box, and a frame is allowed
+  // to hang off it. Clamping to the box would make every drag past the margin
+  // stop dead against a fence the reader never asked for.
   const unit = (value, back) => (typeof value === 'number' && Number.isFinite(value)
-    ? Math.min(Math.max(value, 0), 1) : back);
+    ? Math.min(Math.max(value, -1), 2) : back);
   if (raw && typeof raw === 'object') {
     const box = {
       x: unit(raw.x, fallback.x),
@@ -98,23 +138,42 @@ function frame(raw, fallback, source, flat = false) {
   }
   // The old shape: `measure` was a share of the room inside the margins,
   // `anchorY` where the block's middle sat in it, `align` which side it hugged.
-  const pad = typeof source?.padding === 'number' ? source.padding : 96;
-  const width = typeof source?.width === 'number' ? source.width : 1080;
-  const height = typeof source?.height === 'number' ? source.height : 1350;
-  const inner = Math.max(0.1, (width - pad * 2) / width);
+  // That room is exactly the content box, so `measure` is already the width a
+  // frame wants and the arithmetic is mostly deletion.
   const measure = typeof source?.measure === 'number' ? Math.min(Math.max(source.measure, 0.1), 1) : null;
   if (measure === null) return fallback;
-  const w = inner * measure;
-  const margin = pad / width;
-  const x = source.align === 'center' ? (1 - w) / 2 : source.align === 'end' ? 1 - margin - w : margin;
+  const pad = typeof source.padding === 'number' ? source.padding : 96;
+  const height = typeof source.height === 'number' ? source.height : 1350;
+  const room = Math.max(1, height - pad * 2);
+  const w = measure;
+  const x = source.align === 'center' ? (1 - w) / 2 : source.align === 'end' ? 1 - w : 0;
   if (flat) {
-    const y = typeof source.refY === 'number' ? source.refY : fallback.y;
-    return Object.freeze({ x: typeof source.refX === 'number' ? margin + (inner - w) * source.refX : x, y, w });
+    const y = typeof source.refY === 'number' ? (source.refY * height - pad) / room : fallback.y;
+    return Object.freeze({ x: typeof source.refX === 'number' ? (1 - w) * source.refX : x, y, w });
   }
-  const room = 1 - (pad * 2) / height;
-  const h = Math.min(room, fallback.h);
+  const h = Math.min(1, fallback.h);
   const anchor = typeof source.anchorY === 'number' ? source.anchorY : 0.5;
-  return Object.freeze({ x, y: pad / height + (room - h) * anchor, w, h });
+  return Object.freeze({ x, y: (1 - h) * anchor, w, h });
+}
+
+/**
+ * A frame written in fractions of the whole card, in fractions of the content
+ * box instead.
+ *
+ * Templates saved before the margin meant anything are in the old space, and
+ * re-reading them in the new one would move everybody's cards. So they are
+ * converted once, on the way in, and stamped `space: 'inner'` so it happens
+ * once and not on every edit.
+ */
+function toInner(box, t, flat) {
+  const inner = contentBox(t);
+  const out = {
+    x: (box.x * t.width - inner.x) / inner.width,
+    y: (box.y * t.height - inner.y) / inner.height,
+    w: (box.w * t.width) / inner.width,
+  };
+  if (!flat) out.h = (box.h * t.height) / inner.height;
+  return out;
 }
 
 const clamp = (value, { min, max }, fallback) => (
@@ -130,7 +189,7 @@ const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fa
  */
 export function parseTemplate(raw, { id = null } = {}) {
   const source = raw && typeof raw === 'object' ? raw : {};
-  return {
+  const out = {
     ...defaultTemplate,
     id: id ?? (typeof source.id === 'string' && source.id ? source.id : defaultTemplate.id),
     name: typeof source.name === 'string' && source.name.trim() ? source.name.trim().slice(0, 60) : defaultTemplate.name,
@@ -158,11 +217,20 @@ export function parseTemplate(raw, { id = null } = {}) {
     size: Math.round(clamp(source.size, { min: 0, max: CARD_LIMITS.size.max }, defaultTemplate.size)),
     leading: clamp(source.leading, CARD_LIMITS.leading, defaultTemplate.leading),
     align: pick(source.align, CARD_ALIGN, defaultTemplate.align),
+    grow: pick(source.grow, CARD_GROW, defaultTemplate.grow),
     numberColour: source.numberColour === null || source.numberColour === undefined
       ? null : hex(source.numberColour, null),
     numbers: source.numbers !== false,
     watermark: source.watermark !== false,
+    space: 'inner',
   };
+  // An explicit frame written in the old space, measured against the whole card.
+  // `frame()` has already read it; all that is left is where its 0 and 1 were.
+  if (source.space !== 'inner') {
+    if (source.box && typeof source.box === 'object') out.box = Object.freeze(toInner(out.box, out, false));
+    if (source.ref && typeof source.ref === 'object') out.ref = Object.freeze(toInner(out.ref, out, true));
+  }
+  return out;
 }
 
 /**
@@ -292,11 +360,12 @@ export function fitText({ measure, pieces, width, height, leading, min = 18, max
  *             reference: { x, y, width, height } | null }}
  */
 export function layoutCard({ template: t, pieces, measure, leadingScale = 1, chrome = { reference: 30, meta: 24 } }) {
+  const inner = contentBox(t);
   const box = {
-    x: Math.round(t.box.x * t.width),
-    y: Math.round(t.box.y * t.height),
-    width: Math.max(40, Math.round(t.box.w * t.width)),
-    height: Math.max(30, Math.round(t.box.h * t.height)),
+    x: Math.round(inner.x + t.box.x * inner.width),
+    y: Math.round(inner.y + t.box.y * inner.height),
+    width: Math.max(40, Math.round(t.box.w * inner.width)),
+    height: Math.max(30, Math.round(t.box.h * inner.height)),
   };
   const leading = t.leading * leadingScale;
 
@@ -327,14 +396,14 @@ export function layoutCard({ template: t, pieces, measure, leadingScale = 1, chr
       follows: true,
     }
     : {
-      x: Math.round(t.ref.x * t.width),
-      y: Math.round(t.ref.y * t.height),
-      width: Math.max(40, Math.round(t.ref.w * t.width)),
+      x: Math.round(inner.x + t.ref.x * inner.width),
+      y: Math.round(inner.y + t.ref.y * inner.height),
+      width: Math.max(40, Math.round(t.ref.w * inner.width)),
       height: refHeight,
       follows: false,
     };
 
-  return { size: fitted.size, lines: fitted.lines, step, box, text, reference };
+  return { size: fitted.size, lines: fitted.lines, step, box, text, reference, inner };
 }
 
 /**
@@ -350,8 +419,9 @@ export function layoutCard({ template: t, pieces, measure, leadingScale = 1, chr
  * @returns {{ x: number[], y: number[] }}
  */
 export function snapLines(card, other = null) {
-  const x = [card.padding, card.width / 2, card.width - card.padding];
-  const y = [card.padding, card.height / 2, card.height - card.padding];
+  const inner = contentBox(card);
+  const x = [inner.x, card.width / 2, inner.x + inner.width];
+  const y = [inner.y, card.height / 2, inner.y + inner.height];
   if (other) {
     x.push(other.x, other.x + other.width / 2, other.x + other.width);
     y.push(other.y, other.y + other.height / 2, other.y + other.height);
@@ -403,13 +473,14 @@ export function resizeFrame(start, { handle, dx, dy, min = 40 }) {
 }
 
 /** A frame in card pixels, back to the fractions a template keeps. */
-export function frameToTemplate(box, { width, height }, flat = false) {
+export function frameToTemplate(box, template, flat = false) {
+  const inner = contentBox(template);
   const out = {
-    x: Math.min(Math.max(box.x / width, -0.5), 1.5),
-    y: Math.min(Math.max(box.y / height, -0.5), 1.5),
-    w: Math.min(Math.max(box.width / width, 0.08), 2),
+    x: Math.min(Math.max((box.x - inner.x) / inner.width, -1), 2),
+    y: Math.min(Math.max((box.y - inner.y) / inner.height, -1), 2),
+    w: Math.min(Math.max(box.width / inner.width, 0.08), 2),
   };
-  if (!flat) out.h = Math.min(Math.max(box.height / height, 0.06), 2);
+  if (!flat) out.h = Math.min(Math.max(box.height / inner.height, 0.06), 2);
   return out;
 }
 

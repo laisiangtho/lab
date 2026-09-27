@@ -25,18 +25,36 @@ import { L } from './i18n.js';
  */
 export function numberRow({ label, spec, unit = '', decimals = 0, value, onChange, onCommit = null }) {
   const clamp = (next) => Math.min(Math.max(Number(Number(next).toFixed(3)), spec.min), spec.max);
-  const set = (next) => onChange(clamp(next));
-  const done = (next) => (onCommit ?? onChange)(clamp(next));
 
+  /**
+   * What the control is showing. It is held here rather than read back from the
+   * caller because the caller may not have been told yet — a drag reports every
+   * step but is written down once — and because the two halves of this control
+   * are one number: a slider whose figure does not move, or a figure whose
+   * slider does not move, is two controls disagreeing in public.
+   */
+  let held = clamp(value());
+  const show = (next, except = null) => {
+    held = next;
+    if (except !== slider) slider.value = String(next);
+    if (except !== readout) readout.value = decimals ? next.toFixed(decimals) : String(Math.round(next));
+  };
+  const set = (next, except = null) => { const n = clamp(next); show(n, except); onChange(n); };
+  const done = (next, except = null) => { const n = clamp(next); show(n, except); (onCommit ?? onChange)(n); };
+
+  // Typing is committed on `change` — Enter or leaving the field — and not on
+  // every keystroke, because clamping a half-typed "10" of "108" to the minimum
+  // takes the number away mid-word.
   const readout = h('input', {
     type: 'number', min: spec.min, max: spec.max, step: spec.step, 'aria-label': label,
     onchange: (e) => done(e.target.value),
+    onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } },
   });
   const slider = h('input', {
     type: 'range', min: spec.min, max: spec.max, step: spec.step, 'aria-label': label,
-    oninput: (e) => set(e.target.value),
+    oninput: (e) => set(e.target.value, slider),
     // A range input fires `change` when the pointer is let go.
-    onchange: (e) => done(e.target.value),
+    onchange: (e) => done(e.target.value, slider),
   });
   // The sprite has no minus glyph, so the steppers are set in type; the letter
   // sizes double as the hint for what they change.
@@ -44,7 +62,7 @@ export function numberRow({ label, spec, unit = '', decimals = 0, value, onChang
     class: `rp-step rp-a${delta > 0 ? '' : ' small'}`,
     'aria-label': `${label} ${delta > 0 ? '+' : '−'}`,
     title: `${label} ${delta > 0 ? '+' : '−'}`,
-    onclick: () => done(value() + delta * spec.step),
+    onclick: () => done(held + delta * spec.step),
   }, delta > 0 ? 'A' : 'a');
 
   const element = h('div', { class: 'rp-row' },
@@ -53,13 +71,8 @@ export function numberRow({ label, spec, unit = '', decimals = 0, value, onChang
       stepper(-1), slider, stepper(1),
       h('span', { class: 'rp-num' }, readout, unit ? h('i', {}, unit) : null)));
 
-  return {
-    element,
-    update(next = value()) {
-      slider.value = String(next);
-      readout.value = decimals ? next.toFixed(decimals) : String(Math.round(next));
-    },
-  };
+  show(held);
+  return { element, update: (next = value()) => show(clamp(next)) };
 }
 
 /** A row of named choices — the same shape, for a setting that is not a number. */

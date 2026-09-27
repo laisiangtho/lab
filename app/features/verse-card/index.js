@@ -18,9 +18,9 @@
  */
 
 import {
-  buildTemplateFile, CARD_ALIGN, CARD_BACKGROUNDS, CARD_FONTS, CARD_LIMITS, CARD_PRESETS,
-  contrastRatio, defaultTemplate, frameToTemplate, layoutCard, parseCardShelf, parseTemplate,
-  readTemplateFile, resizeFrame, snapLines, snapTo,
+  buildTemplateFile, CARD_ALIGN, CARD_BACKGROUNDS, CARD_FONTS, CARD_GROW, CARD_LIMITS,
+  CARD_PRESETS, contrastRatio, defaultTemplate, frameToTemplate, layoutCard, parseCardShelf,
+  parseTemplate, readTemplateFile, resizeFrame, snapLines, snapTo,
 } from '../../core/card.js';
 import { downloadJson, pickJson } from '../../services/transfer.js';
 import { fill, h, keepPlace } from '../../shell/dom.js';
@@ -357,6 +357,8 @@ export default {
         let openPanel = null;
         /** A template held aside while something is being dragged. */
         let live = null;
+        /** The scale held still while the card itself is being resized. */
+        let frozen = null;
         /** What is picked up: 'text', 'reference', or nothing. */
         let picked = null;
         /** Templates as they were, for undo. */
@@ -421,9 +423,15 @@ export default {
          * pointer back onto the card.
          */
         function fitStage(t) {
-          const rect = stage.getBoundingClientRect();
-          const room = { w: Math.max(80, rect.width - 40), h: Math.max(80, rect.height - 40) };
-          const k = Math.min(room.w / t.width, room.h / t.height, 1);
+          // While the card's own edge is being dragged the scale is held still,
+          // so the card grows under the pointer instead of being re-fitted to
+          // the stage on every step — which would make dragging the corner
+          // outwards do visibly nothing.
+          const k = frozen ?? (() => {
+            const rect = stage.getBoundingClientRect();
+            const room = { w: Math.max(80, rect.width - 40), h: Math.max(80, rect.height - 40) };
+            return Math.min(room.w / t.width, room.h / t.height, 1);
+          })();
           canvas.style.width = `${Math.round(t.width * k)}px`;
           canvas.style.height = `${Math.round(t.height * k)}px`;
           return k;
@@ -432,8 +440,25 @@ export default {
         const scale = () => (canvas.clientWidth || 1) / (shown().width || 1);
 
         function sayHint(message = null) {
-          if (message) { hint.dataset.warn = 'false'; hint.textContent = message; return; }
+          if (message) { hint.dataset.warn = 'false'; fill(hint, message); return; }
           const t = shown();
+          // A card whose words do not fit is wrong in a way no contrast warning
+          // matters beside, so it is said first — and with the way out beside
+          // it, because a frame dragged smaller than its text is a question
+          // ("smaller frame, or smaller text?") and this is where it is asked.
+          if (plan && plan.text.height > plan.box.height + 1) {
+            hint.dataset.warn = 'true';
+            const needs = { ...plan.box, height: plan.text.height };
+            fill(hint, L('cd.overflow'),
+              h('button', {
+                class: 'cd-fix', onclick: () => change({ size: 0 }, { rebuild: true }),
+              }, L('cd.fitText')),
+              h('button', {
+                class: 'cd-fix',
+                onclick: () => change({ box: frameToTemplate(needs, current(), false) }, { rebuild: true }),
+              }, L('cd.growFrame')));
+            return;
+          }
           const ink = t.text ?? tone('--text-normal');
           // A gradient is two grounds, and the text has to survive both.
           const grounds = t.background === 'theme'
@@ -444,9 +469,9 @@ export default {
             .filter((n) => n !== null)
             .reduce((worst, n) => (worst === null ? n : Math.min(worst, n)), null);
           hint.dataset.warn = String(ratio !== null && ratio < 3);
-          hint.textContent = ratio !== null && ratio < 3
+          fill(hint, ratio !== null && ratio < 3
             ? L('cd.contrast', { ratio: ratio.toFixed(1) })
-            : L('cd.hint');
+            : L('cd.hint'));
         }
 
         // --- the frames on screen --------------------------------------------
@@ -467,7 +492,19 @@ export default {
         };
         const guides = { x: h('div', { class: 'cd-guide cd-guide-x', hidden: true }), y: h('div', { class: 'cd-guide cd-guide-y', hidden: true }) };
         const safe = h('div', { class: 'cd-safe', hidden: true, title: L('cd.safeArea') });
-        frame.append(safe, boxes.text, boxes.reference, guides.x, guides.y);
+        /** The margin, drawn while something is being moved so it can be met. */
+        const marginBox = h('div', { class: 'cd-margin', hidden: true });
+        /**
+         * The card's own edges. Width and height are on the Shape panel too, but
+         * a picture whose size can only be typed is not a picture you can size:
+         * the hand goes to the corner first, and finding nothing there is what
+         * makes an editor feel like a form.
+         */
+        const edges = ['e', 's', 'se'].map((edge) => h('span', {
+          class: `cd-edge cd-edge-${edge}`, dataset: { edge },
+          title: L('cd.resizeCard'), 'aria-hidden': 'true',
+        }));
+        frame.append(safe, marginBox, boxes.text, boxes.reference, ...edges, guides.x, guides.y);
 
         /** The frame of a part, in card pixels, as the last paint left it. */
         const frameOf = (part) => (part === 'text' ? plan?.box : plan?.reference);
@@ -485,7 +522,17 @@ export default {
             node.hidden = false;
             node.classList.toggle('is-picked', picked === part);
           }
+          // Words taller than the frame holding them: not an error — a fixed
+          // size and a small frame is a thing people ask for — but never an
+          // accident either, so it is marked rather than left to be discovered.
+          boxes.text.dataset.over = String(plan.text.height > plan.box.height + 1);
           const t = shown();
+          const inner = plan.inner;
+          Object.assign(marginBox.style, {
+            left: `${inner.x * k}px`, top: `${inner.y * k}px`,
+            width: `${inner.width * k}px`, height: `${inner.height * k}px`,
+          });
+          marginBox.hidden = !(live || picked);
           const tall = t.height / t.width >= 1.7;
           safe.hidden = !tall;
           if (tall) safe.style.setProperty('--safe', `${Math.round(t.height * 0.14 * k)}px`);
@@ -506,8 +553,66 @@ export default {
 
         // --- moving and sizing ------------------------------------------------
 
+        /**
+         * The card's own size, dragged from its edge.
+         *
+         * What happens to the frames is the template's own answer (`grow`):
+         * either they keep their share of the card and the whole design scales,
+         * or they keep their measurements and the card grows around them. Shift
+         * keeps the card's proportions.
+         */
+        function resizeCard(event, edge) {
+          event.preventDefault();
+          pick(null);
+          const from = current();
+          const k = scale();
+          frozen = k;
+          const start = { x: event.clientX, y: event.clientY };
+          const held = from.grow === 'keep'
+            ? { text: { ...plan.box }, ref: plan.reference?.follows === false ? { ...plan.reference } : null }
+            : null;
+          const ratio = from.height / from.width;
+          let moved = false;
+
+          const move = (e) => {
+            const dx = (e.clientX - start.x) / k;
+            const dy = (e.clientY - start.y) / k;
+            if (!moved && Math.max(Math.abs(dx), Math.abs(dy)) * k < 3) return;
+            moved = true;
+            let width = edge === 's' ? from.width : Math.round(from.width + dx);
+            let height = edge === 'e' ? from.height : Math.round(from.height + dy);
+            if (e.shiftKey) {
+              if (edge === 's') width = Math.round(height / ratio);
+              else height = Math.round(width * ratio);
+            }
+            const next = parseTemplate({ ...from, width, height }, { id: from.id });
+            live = !held ? next : parseTemplate({
+              ...next,
+              box: frameToTemplate(held.text, next, false),
+              ...(held.ref ? { ref: frameToTemplate(held.ref, next, true) } : {}),
+            }, { id: from.id });
+            draw();
+            sayHint(L('cd.cardAt', { w: live.width, h: live.height }));
+          };
+
+          const up = () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            frozen = null;
+            const settled = live;
+            live = null;
+            if (!moved || !settled) { draw(); return; }
+            change(settled, { rebuild: true });
+          };
+
+          window.addEventListener('pointermove', move);
+          window.addEventListener('pointerup', up);
+        }
+
         frame.addEventListener('pointerdown', (event) => {
           if (event.button !== 0 || !plan) return;
+          const edgeEl = event.target.closest('.cd-edge');
+          if (edgeEl) { resizeCard(event, edgeEl.dataset.edge); return; }
           const gripEl = event.target.closest('.cd-grip');
           const boxEl = event.target.closest('.cd-box');
           const part = gripEl?.dataset.part ?? boxEl?.dataset.part ?? null;
@@ -606,17 +711,33 @@ export default {
 
         /**
          * The keyboard does what the pointer does. Arrows nudge by a pixel of
-         * the card, ten with shift; Escape puts the frame down; Mod+Z takes back
-         * whatever the last thing was.
+         * the card, ten with shift; Escape puts down whatever is held; Mod+Z
+         * takes back whatever the last thing was.
+         *
+         * Listened for on the document rather than on this element, because a
+         * control pressed in a panel rebuilds that panel — which takes the
+         * pressed button out of the document and hands focus back to the body,
+         * and an element never hears a key pressed at its own ancestor. An
+         * element listener therefore worked right up until the reader touched a
+         * panel, and then Escape and undo quietly stopped. The guard is what the
+         * element gave for free: this workspace, or nothing in particular.
          */
-        el.addEventListener('keydown', (event) => {
+        const onKey = (event) => {
+          if (!el.isConnected) return;
+          const at = document.activeElement;
+          if (at && at !== document.body && !el.contains(at)) return;
           const mod = event.metaKey || event.ctrlKey;
           if (mod && event.key.toLowerCase() === 'z') {
             event.preventDefault();
             if (event.shiftKey) redo(); else undo();
             return;
           }
-          if (event.key === 'Escape') { if (picked) { pick(null); event.preventDefault(); } return; }
+          if (event.key === 'Escape') {
+            // The panel first, then the frame: one press, one thing put down.
+            if (!panel.hidden) { closePanel(); event.preventDefault(); return; }
+            if (picked) { pick(null); event.preventDefault(); }
+            return;
+          }
           if (!picked || !plan || !event.key.startsWith('Arrow')) return;
           const step = event.shiftKey ? 10 : 1;
           const box = { ...frameOf(picked) };
@@ -632,7 +753,8 @@ export default {
             ...(flat ? { refFollow: false } : {}),
           });
           boxes[picked].focus({ preventScroll: true });
-        });
+        };
+        document.addEventListener('keydown', onKey);
 
         // --- the panels --------------------------------------------------------
 
@@ -702,6 +824,11 @@ export default {
               number(L('cd.height'), 'height', CARD_LIMITS.height, 'px'),
               number(L('cd.padding'), 'padding', CARD_LIMITS.padding, 'px', L('cd.paddingHint')),
               number(L('cd.radius'), 'radius', CARD_LIMITS.radius, 'px'),
+              ui.choice({
+                name: L('cd.grow'), hint: L('cd.growHint'),
+                options: CARD_GROW.map((id) => [id, L(`cd.grow.${id}`)]),
+                value: current().grow, onChange: (value) => change({ grow: value }),
+              }),
               ui.action({
                 name: L('cd.fitFrames'), hint: L('cd.fitFramesHint'),
                 label: L('cd.fitFramesDo'), glyph: 'move', onClick: () => fitFrames(),
@@ -741,10 +868,11 @@ export default {
                 options: CARD_ALIGN.map((id) => [id, L(`cd.align.${id}`), `align-${id === 'center' ? 'center' : id}`]),
                 value: current().align, onChange: (value) => change({ align: value }),
               }),
-              ui.toggle({
-                name: L('cd.autoSize'), hint: L('cd.autoSizeHint'),
-                value: current().size === 0,
-                onChange: (on) => change({ size: on ? 0 : (plan?.size ?? 54) }, { rebuild: true }),
+              ui.choice({
+                name: L('cd.sizing'), hint: L('cd.autoSizeHint'),
+                options: [['auto', L('cd.fit.auto'), 'fit-box'], ['fixed', L('cd.fit.fixed'), 'updown']],
+                value: current().size === 0 ? 'auto' : 'fixed',
+                onChange: (mode) => change({ size: mode === 'auto' ? 0 : (plan?.size ?? 54) }, { rebuild: true }),
               }),
               current().size === 0 ? null : number(L('lbl.textSize'), 'size', CARD_LIMITS.size, 'px'),
               number(L('lbl.lineHeight'), 'leading', CARD_LIMITS.leading, ''),
@@ -768,15 +896,13 @@ export default {
           },
         };
 
-        /** Both frames back inside the margins — the way out of any arrangement. */
+        /**
+         * Both frames back inside the margins — the way out of any arrangement.
+         * Now that a frame is measured against the content box, "inside the
+         * margins" is 0 to 1 and this is arithmetic nobody has to check.
+         */
         function fitFrames() {
-          const t = current();
-          const margin = t.padding / t.width;
-          const marginY = t.padding / t.height;
-          change({
-            box: { x: margin, y: marginY, w: 1 - margin * 2, h: (1 - marginY * 2) * 0.72 },
-            ref: { x: margin, y: 1 - marginY - 0.08, w: 1 - margin * 2 },
-          }, { rebuild: true });
+          change({ box: { x: 0, y: 0, w: 1, h: 0.74 }, ref: { x: 0, y: 0.8, w: 1 } }, { rebuild: true });
         }
 
         /**
@@ -786,17 +912,27 @@ export default {
          * bar on a panel this small is a row of chrome saying what the pressed
          * button already says.
          */
-        function show(which, anchor = null) {
-          if (openPanel === which && !panel.hidden) { closePanel(); return; }
+        function show(which, anchor = null, { toggle = false } = {}) {
+          // Only the button that opens a panel closes it again. `show` is also
+          // how a panel is rebuilt after a change — and a rebuild that toggled
+          // would mean every preset button shut the panel it was pressed in.
+          if (toggle && openPanel === which && !panel.hidden) { closePanel(); return; }
           openPanel = which;
+          const place = panel.querySelector('.cd-panel-body')?.scrollTop ?? 0;
           fill(panel, h('div', { class: 'cd-panel-body' }, ...PANELS[which].build().filter(Boolean)));
+          panel.querySelector('.cd-panel-body').scrollTop = place;
           panel.hidden = false;
           const button = anchor ?? el.querySelector(`.cd-tool[data-panel="${which}"]`) ?? more;
           const rect = button.getBoundingClientRect();
           const host = el.getBoundingClientRect();
           const width = panel.offsetWidth;
+          const top = rect.bottom - host.top + 6;
           panel.style.left = `${Math.min(Math.max(rect.left - host.left, 8), Math.max(8, host.width - width - 8))}px`;
-          panel.style.top = `${rect.bottom - host.top + 6}px`;
+          panel.style.top = `${top}px`;
+          // All the room there is under the button, rather than a share of the
+          // workspace: a panel that stops two thirds of the way down a tall
+          // window hides its last row for no reason anyone can see.
+          panel.style.maxHeight = `${Math.max(180, host.height - top - 12)}px`;
           for (const tool of el.querySelectorAll('.cd-tool[data-panel]')) {
             tool.setAttribute('aria-expanded', String(tool.dataset.panel === which));
           }
@@ -808,11 +944,15 @@ export default {
           for (const tool of el.querySelectorAll('.cd-tool[data-panel]')) tool.setAttribute('aria-expanded', 'false');
         }
 
-        el.addEventListener('pointerdown', (e) => {
-          if (panel.hidden || panel.contains(e.target) || e.target.closest('.cd-tool')) return;
+        // Anywhere else, not only anywhere else in here: a panel left open over
+        // the sidebar while the reader works in it is a panel that has stopped
+        // belonging to anything.
+        const onDown = (e) => {
+          if (panel.hidden || !el.isConnected) return;
+          if (panel.contains(e.target) || e.target.closest?.('.cd-tool')) return;
           closePanel();
-        });
-        el.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden) closePanel(); });
+        };
+        document.addEventListener('pointerdown', onDown);
 
         /** A colour, picked with the app's own picker: live while dragging, kept on release. */
         function colourRow(name, key, resettable = false) {
@@ -895,15 +1035,41 @@ export default {
 
         function panelButton(which) {
           const entry = PANELS[which];
-          const button = iconButton(entry.icon, entry.title(), () => show(which, button));
+          const button = iconButton(entry.icon, entry.title(), () => show(which, button, { toggle: true }));
           button.dataset.panel = which;
           button.setAttribute('aria-haspopup', 'dialog');
           button.setAttribute('aria-expanded', 'false');
           return button;
         }
 
-        const name = h('input', { class: 'cd-name', 'aria-label': L('cd.name'),
-          onchange: (e) => change({ name: e.currentTarget.value }) });
+        /**
+         * The template's name.
+         *
+         * It saves as soon as it is left, which is right — but a field that
+         * keeps the caret and says nothing when Enter is pressed reads as a
+         * field still waiting to be confirmed. So Enter finishes: it commits,
+         * lets go, and the field says so for a moment. Escape puts back what was
+         * there, which is the other half of the same bargain.
+         */
+        let said = null;
+        const name = h('input', {
+          class: 'cd-name', 'aria-label': L('cd.name'), title: L('cd.nameHint'),
+          onchange: (e) => {
+            if (e.currentTarget.value.trim() === current().name) return;
+            change({ name: e.currentTarget.value });
+            name.classList.add('is-saved');
+            clearTimeout(said);
+            said = setTimeout(() => name.classList.remove('is-saved'), 1100);
+          },
+          onkeydown: (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); return; }
+            if (e.key !== 'Escape') return;
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.value = current().name;
+            e.currentTarget.blur();
+          },
+        });
 
         const tools = Object.keys(PANELS).map(panelButton);
         const more = h('button', {
@@ -955,7 +1121,9 @@ export default {
          * control in it is being dragged.
          */
         function repaint({ rebuild = false } = {}) {
-          name.value = current().name;
+          // Not while it is being typed in: a repaint that overwrites the field
+          // takes the reader's own half-finished word away from them.
+          if (document.activeElement !== name) name.value = current().name;
           if (rebuild && openPanel) show(openPanel);
           draw();
           watchStrip(toolbar, fitTools, watched);
@@ -964,7 +1132,7 @@ export default {
         const run = () => load().then(() => repaint({ rebuild: true })).catch((err) => {
           passage = null;
           hint.dataset.warn = 'true';
-          hint.textContent = err.message;
+          fill(hint, err.message);
           draw();
         });
 
@@ -975,7 +1143,14 @@ export default {
         window.addEventListener('resize', refit);
         if (typeof ResizeObserver !== 'undefined') new ResizeObserver(refit).observe(stage);
         run();
-        return () => { listeners.delete(onShelfChange); offState(); window.removeEventListener('resize', refit); };
+        return () => {
+          listeners.delete(onShelfChange);
+          offState();
+          window.removeEventListener('resize', refit);
+          document.removeEventListener('keydown', onKey);
+          document.removeEventListener('pointerdown', onDown);
+          clearTimeout(said);
+        };
       },
     });
   },

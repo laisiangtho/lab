@@ -771,17 +771,45 @@ test('the app in a browser', options, async (t) => {
     await page.waitForTimeout(400);
     assert.deepEqual(await frame(), sized, 'undo walks back through what was done');
 
+    // The card's own size is dragged from its edge, like any picture.
+    const wide = await page.locator('.cd-canvas').boundingBox();
+    const seCorner = await page.locator('.cd-edge-se').boundingBox();
+    await page.mouse.move(seCorner.x + seCorner.width / 2, seCorner.y + seCorner.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(seCorner.x + 60, seCorner.y + 40, { steps: 10 });
+    assert.match(await page.locator('.cd-hint').innerText(), /\d+ × \d+/, 'and it says how big it is getting');
+    assert.ok(await page.evaluate((was) => document.querySelector('.cd-canvas').getBoundingClientRect().width > was,
+      wide.width), 'the card grows under the pointer rather than being re-fitted away from it');
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+    const grown = await size();
+    assert.notEqual(grown, '1080x1350', `the card itself was resized (${grown})`);
+
     // The shape is behind a tool button, in a panel of this workspace.
     await page.locator('.cd-tool[data-panel="shape"]').click();
     await page.waitForSelector('.cd-panel:not([hidden])');
     await page.locator('.cd-panel .cd-presets button', { hasText: 'Slide' }).click();
     await page.waitForTimeout(500);
     assert.equal(await size(), '1600x900', 'and the card follows it');
+    // A preset is one of several things to try, so the panel it was pressed in
+    // is still open to try the next one in.
+    assert.ok(await page.evaluate(() => !document.querySelector('.cd-panel').hidden),
+      'pressing a preset does not put the panel away');
+    assert.equal(await page.locator('.cd-panel .cd-presets button[aria-pressed="true"]').innerText(), 'Slide',
+      'and the panel shows which one is on');
+
+    // The margin is a measurement: widen it and the frames come in with it.
+    const marginRow = page.locator('.cd-panel .set-row').filter({ hasText: 'Margin' });
+    const wasIn = (await frame()).x;
+    await marginRow.locator('input[type=number]').fill('240');
+    await marginRow.locator('input[type=number]').press('Enter');
+    await page.waitForTimeout(400);
+    assert.ok((await frame()).x > wasIn + 20, 'the margin moved the text in');
+    assert.equal(await marginRow.locator('input[type=range]').inputValue(), '240',
+      'and the slider went where the number said');
 
     // A slider is a slider: the card follows every step of the drag, and the
     // control is still under the pointer at the end of it.
-    await page.locator('.cd-tool[data-panel="shape"]').click();
-    await page.waitForSelector('.cd-panel:not([hidden])');
     const slider = page.locator('.cd-panel input[type=range]').first();
     const bar = await slider.boundingBox();
     await page.mouse.move(bar.x + bar.width * 0.5, bar.y + bar.height / 2);
@@ -792,14 +820,63 @@ test('the app in a browser', options, async (t) => {
       await page.waitForTimeout(90);
       widths.push(await page.evaluate(() => document.querySelector('.cd-canvas').width));
     }
+    const said = await page.locator('.cd-panel input[type=number]').first().inputValue();
     await page.mouse.up();
     await page.waitForTimeout(300);
     assert.equal(new Set(widths).size, widths.length, `the card followed each step (${widths.join(', ')})`);
     assert.ok(await page.locator('.cd-panel input[type=range]').count() > 0, 'and the panel was not rebuilt under the pointer');
+    assert.equal(Number(said), Number(await slider.inputValue()),
+      'the figure beside a slider is the slider, not a second opinion');
     assert.ok(await page.evaluate(() => {
       const body = document.querySelector('.cd-panel-body');
       return body.scrollWidth <= body.clientWidth + 1;
     }), 'a panel never scrolls sideways');
+    await page.keyboard.press('Escape');
+
+    // A segment shows what is on the moment it is pressed, whether or not the
+    // change happens to alter anything else in the panel.
+    await page.locator('.cd-tool[data-panel="type"]').click();
+    await page.waitForSelector('.cd-panel:not([hidden])');
+    const alignRow = page.locator('.cd-panel .set-row').filter({ hasText: 'Alignment' });
+    await alignRow.locator('button').nth(1).click();
+    await page.waitForTimeout(200);
+    assert.equal(await alignRow.locator('button[aria-pressed="true"]').count(), 1, 'one of them, and only one');
+    assert.equal(await alignRow.locator('button').nth(1).getAttribute('aria-pressed'), 'true',
+      'the one that was pressed');
+    const faceRow = page.locator('.cd-panel .set-row').filter({ hasText: 'Scripture typeface' });
+    await faceRow.locator('button').nth(2).click();
+    await page.waitForTimeout(200);
+    assert.equal(await faceRow.locator('button').nth(2).getAttribute('aria-pressed'), 'true');
+
+    // A frame dragged smaller than the words in it is a question — smaller
+    // frame, or smaller text? — so the card asks it where it happened, and the
+    // other answer is one press away.
+    await page.locator('.cd-panel .set-row').filter({ hasText: 'Text size' }).locator('button').nth(1).click();
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Escape');
+    await page.locator('.cd-box-text').click();
+    const foot = await page.locator('.cd-box-text .cd-grip-s').boundingBox();
+    await page.mouse.move(foot.x + foot.width / 2, foot.y + foot.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(foot.x + foot.width / 2, foot.y - 200, { steps: 10 });
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+    assert.equal(await page.locator('.cd-box-text').getAttribute('data-over'), 'true', 'the frame says the text is too big for it');
+    // Both answers are offered, because both are answers.
+    assert.deepEqual(await page.locator('.cd-hint .cd-fix').allInnerTexts(), ['Fit the text', 'Grow the frame']);
+    await page.locator('.cd-hint .cd-fix').nth(1).click();
+    await page.waitForTimeout(400);
+    assert.equal(await page.locator('.cd-box-text').getAttribute('data-over'), 'false', 'and one press settles it');
+
+    // The name saves when it is left, and Enter is how it is left.
+    await page.locator('.cd-name').fill('Sunday evening');
+    await page.locator('.cd-name').press('Enter');
+    await page.waitForTimeout(300);
+    assert.ok(await page.evaluate(() => document.activeElement !== document.querySelector('.cd-name')),
+      'Enter finishes rather than leaving the field looking unconfirmed');
+    await page.locator('.cd-tool[data-panel="templates"]').click();
+    await page.waitForSelector('.cd-panel .cd-list');
+    assert.ok((await page.locator('.cd-item.is-on').innerText()).includes('Sunday evening'), 'and the name is kept');
     await page.keyboard.press('Escape');
 
     // Which verses the card carries is the reader's to say.
@@ -808,7 +885,8 @@ test('the app in a browser', options, async (t) => {
     await page.locator('.cd-ref-input').fill('ps 23:1-3');
     await page.locator('.cd-ref-input').press('Enter');
     await page.waitForTimeout(800);
-    await page.locator('.cd-tool[data-panel="passage"]').click();
+    // Still open, and holding what it was told: a panel that puts itself away
+    // after every press is a panel nothing can be tried twice in.
     assert.equal(await page.locator('.cd-ref-input').inputValue(), 'Psalm 23:1–3', 'the card is of what was asked for');
     await page.keyboard.press('Escape');
 
@@ -818,7 +896,6 @@ test('the app in a browser', options, async (t) => {
     assert.ok(started >= 3, 'a new reader starts with finished cards, not one grey default');
     await page.locator('.cd-panel-foot .cd-tool').first().click();
     await page.waitForTimeout(400);
-    await page.locator('.cd-tool[data-panel="templates"]').click();
     await page.waitForSelector('.cd-panel .cd-list');
     assert.equal(await page.locator('.cd-item').count(), started + 1, 'one more of their own');
     await page.reload();

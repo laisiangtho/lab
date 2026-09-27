@@ -52,13 +52,20 @@ export function createRows({ refresh = () => {} } = {}) {
    */
   function choice({ name, hint, options, value, onChange }) {
     const iconic = options.every(([, , glyph]) => Boolean(glyph));
-    return row({ name, hint },
-      h('div', { class: `rp-seg${iconic ? ' is-iconic' : ''}` }, options.map(([id, text, glyph]) => h('button', {
-        'aria-pressed': String(id === value),
-        title: glyph ? text : undefined,
-        'aria-label': glyph ? text : undefined,
-        onclick: () => onChange(id),
-      }, glyph ? icon(glyph) : text))));
+    // The segment keeps its own mark. A row that waited to be rebuilt before it
+    // showed what was pressed is a row that looks broken every time the change
+    // it makes does not happen to alter the rest of the panel.
+    const buttons = options.map(([id, text, glyph]) => h('button', {
+      dataset: { value: String(id) },
+      'aria-pressed': String(id === value),
+      title: glyph ? text : undefined,
+      'aria-label': glyph ? text : undefined,
+      onclick: () => { mark(id); onChange(id); },
+    }, glyph ? icon(glyph) : text));
+    const mark = (id) => {
+      for (const button of buttons) button.setAttribute('aria-pressed', String(button.dataset.value === String(id)));
+    };
+    return row({ name, hint }, h('div', { class: `rp-seg${iconic ? ' is-iconic' : ''}` }, buttons));
   }
 
   /** One of many: a list too long to lay out as buttons. */
@@ -76,10 +83,6 @@ export function createRows({ refresh = () => {} } = {}) {
     const control = numberRow({
       label: name, spec, unit, decimals, value: () => value, onChange, onCommit,
     });
-    // The control is built empty and filled by `update`, because the panel it
-    // came from repaints without rebuilding. A row built once has to be filled
-    // once, or the reader is handed a slider with no number beside it.
-    control.update(value);
     return row({ name, hint }, h('div', { class: 'set-slider' }, control.element));
   }
 
