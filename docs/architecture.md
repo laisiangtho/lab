@@ -67,10 +67,27 @@ Measured on tedim1932, niv2011, judson1835, ddb1931, bbe1949, jwmynwt, mizo1917;
 testaments, books (84, deuterocanon included), sections and digits, and carries
 a `locale` block of interface strings. Packs are keyed by **ISO 639-3**.
 
-The two-vs-three character problem solves itself: `book.json` uses 639-1
-(`da`, `my`), but the translation files carry 639-3 in `info.language.name`
-(`dan`, `mya`, `ctd`), so the pack key comes from the translation and no
-mapping table is needed. A two-letter code names no pack and is not requested.
+The two-vs-three character problem solves itself *for packs*: `book.json` uses
+639-1 (`da`, `my`), but the translation files carry 639-3 in
+`info.language.name` (`dan`, `mya`, `ctd`), so the pack key comes from the
+translation and no mapping is needed. A two-letter code names no pack and is not
+requested.
+
+It does not solve itself for the browser. `lang="mya"` matches no `:lang(my)`
+rule, tells the line breaker nothing, and is not the tag a speech engine
+answers to — a Burmese voice calls itself `my-MM`. `core/langcode.js` is the
+one place that maps between them, and it turns out the browser already knows
+how: CLDR carries the 639-3 → 639-1 equivalences as locale aliases, and
+`Intl.Locale` applies them while canonicalising (`mya → my`, `nob → nb`,
+`cmn → zh`, `tgl → fil`). A code that stays three letters after that has no
+two-letter form, which is a fact about the language rather than a lookup that
+failed — and is very nearly the same set of languages no device ships a voice
+for. `EXTRA` in that module is for what CLDR misses and is kept deliberately
+short: a hand-maintained copy of a standard is a copy that goes wrong quietly.
+
+`parseTranslation` applies it once, so `info.language.code` is the tag
+everything downstream uses, and `info.language.iso` is kept rather than
+discarded for anything that needs to know which of the two it is holding.
 
 Every name the reader sees resolves in one order:
 
@@ -274,6 +291,8 @@ Two rules keep the rest honest. A stored id this build no longer has is dropped 
 
 - A note or a bookmark may cover a run of verses: `verse` is where it starts and `to` where it ends (null for one verse). `parsePassage` checks the order only — how many verses a chapter holds is the translation's business, so a run past the end of one edition is still a reference. `chapterIndex` expands a run so every verse it covers is tinted; a note's dot stays on the verse it starts at.
 - `toggleMark` over a run clears whatever bookmarks it overlaps rather than adding another on top, so pressing the same control twice returns the reader to where they started.
+- **Following a reference** has one set of manners, in `shell/reflink.js`, used by every surface that renders one: press to follow in place, `Ctrl`/`⌘`-press or middle-press for a new tab, and resting on it reads it where it stands. The default is untouched — a reference opens in place because that is what works on a phone and on a machine with little memory to spare — and everything added is asked for explicitly. `shell.openChapter`/`openVerse` now forward `{ newTab }` to the workspace, which had supported it all along behind a signature that dropped it, so until this batch nothing in the app could open a second tab.
+- **The peek** (`shell/peek.js`) reads the verses from the store the reader is already in, keeps the last six chapters, and offers the two ways out of itself. It is armed only where `matchMedia('(hover: hover) and (pointer: fine)')` is true: a touch device reports a hover as the moment before a tap, so a preview bound to it appears under the finger that is about to press the thing it covers.
 - `app/core/lookup.js` reads a reference out of typed text — `ps 23`, `psa 3:2-4`, the translation's own names and numerals — for the palette, the quick switcher and the books filter. Exact match first (canon and translation names, short names, published abbreviations), then prefix; a prefix that fits several books returns them all.
 
 ---
@@ -323,6 +342,83 @@ Four rules the panels follow, all learned from defects.
 
 Three things that are help rather than knobs: a new reader starts with four finished templates instead of one grey default; the foot says when the text and its ground are too close in lightness to read, measured against both stops of a gradient — the failure that actually happens, because it looks fine on the screen it was made on; and a card taller than 16:9 shows where a story app's own header and buttons will cover it, drawn on the stage and never on the canvas.
 
+## 3d-v. Reading aloud
+
+`speech` drives the device's own voices, and matches on the language rather
+than the exact tag (`core/langcode.js`), which is what makes a file saying
+`mya` and a voice saying `my-MM` the same language. Until this batch it read
+`info.language.name` — the 639-3 code — so every translation whose file carried
+a 639-1 code was matched against a tag no engine knows, and Read Aloud reported
+"no voice" on devices that had one.
+
+**A voice may be chosen across languages**, and the rules for that are in
+`core/voices.js` (pure, tested without a speech engine): `byLang` is a fact
+about the device and serves every translation in that language; `byTranslation`
+is the deliberate oddity and wins, because it was chosen in the presence of the
+alternative. Choosing the language's own voice again clears the override rather
+than leaving one behind that agrees with it.
+
+Where it lives is the design decision. It is not a setting — a setting is a
+question asked of everybody, and most readers should never wonder about this.
+It is not behind a hidden gesture either, because a power-user feature nobody
+can find twice is a feature that was not built. It is the last row of the voice
+list: invisible unless you are already looking at voices, permanent once you
+have. Reading in a crossed voice says so once when it starts, so an accent is
+never mistaken for a fault.
+
+## 3d-vi. Importing somebody else's file
+
+The library lists four ways: by language, all, offline, and **yours** — the
+translations the reader imported, which is the one group nothing else in the
+list can be narrowed down to. Its two actions are icons (add, refresh) rather
+than sentences: they take a quarter of the room and read at a glance in a
+language this build has never been translated into.
+
+A translation in one of the reader's own languages is marked and floated to the
+top. That had never once fired: the catalog names a language by its 639-3 code
+(`nob`, `fin`) and a browser asks for 639-1 (`nb`, `fi`), so the comparison was
+between two codes that can never be equal. Both sides now go through
+`core/langcode.js`. The same confusion drew a Burmese verse card in Georgia
+with Latin line spacing, because `SCRIPT_FONTS` is keyed the way a browser is.
+
+`library.importTranslation` is a second door, with its own key. The catalog
+remains the only gate on `install`; nothing about that is weakened, and what
+comes through the new door is marked as having done so (`source` on the stored
+record, `local` rather than `unlisted` in the library — both are installed and
+absent from the catalog, but one was brought in on purpose and the other has
+been dropped by its publisher, and telling somebody their own file is "no
+longer listed" reads as an accusation).
+
+**The rule that keeps `core/formats/` from becoming a swamp: an adapter
+converts, it never validates.** Each one turns a file it recognises into the
+shape this app already reads, and `parseTranslation` then checks it against
+`category.json` exactly as it checks a catalog file — same strictness, same
+versification report. So an adapter is allowed to be lenient (guess a
+delimiter, ignore an unknown marker, drop a footnote) because nothing it
+produces is trusted; what it may not do is invent a verse.
+
+| module | reads |
+| --- | --- |
+| `native` | this app's own JSON, bare or in an export envelope |
+| `usfm` | the format translations are actually worked in; notes and cross-references are counted and dropped rather than read aloud as scripture |
+| `xml` | Zefania, OSIS and USFX over `xmlread.js` — a pull reader written here because `DOMParser` belongs to a window and importing happens in a worker |
+| `csv` | book, chapter, verse, text; the delimiter is sniffed, since a comma and a tab are not a question anybody wants asked about their own file |
+| `books.js` | `GEN`, `Gen`, `1 Cor`, `Song of Solomon`, `19` → the canon's id, from the canon's own names plus the USFM and OSIS code tables. Nothing guesses: a name that matches nothing is named in the report |
+
+The worker gained one job (`import`) that differs from `install` in one step —
+where the text came from, and one conversion before the same validator.
+
+**Being asked what the file is** is not a gate and not a survey. A file's
+extension is a poor witness (`.xml` is three formats, `.txt` is any of them),
+`sniff` ranks the adapters against the contents, `describe` fills in the name,
+short name and language from the file's own first few kilobytes, and a reader
+who accepts every default never types a character. Changing the format re-reads
+the file so the boxes agree with the answer above them.
+
+URL import is deliberately not here: the web target pins `connect-src` to the
+catalog host, and widening that is a decision about the app's security posture
+rather than a step in this feature.
+
 ## 3e. Search
 
 No index is built at install time; the scan is a cursor over `chapters` in a worker.
@@ -335,6 +431,55 @@ No index is built at install time; the scan is a cursor over `chapters` in a wor
 Measured on three full-size translations: one translation 1.6 s, the same as a regular expression 0.3 s, all three 4.2 s, one book 0.17 s.
 
 ---
+
+## 3f. Five rules that came out of defects
+
+Each of these was a bug first. They are written down because in every case the
+code that broke the rule looked perfectly reasonable, and in every case the
+symptom appeared a long way from the cause.
+
+- **A listener outlives what it closes over, so something has to own it.**
+  `shell/fade.js` wired a `window` resize listener and two observers per
+  scrollable node and offered no way to remove them. A chapter pane is rebuilt
+  on every repaint — every chapter step, theme change, sidebar toggle and saved
+  note — so reading through a book left hundreds of dead chapters alive, each
+  held by its own handler, and hundreds of handlers running per resize. It is
+  now a registry: one listener and one observer of each kind for the whole app,
+  a set of the nodes they serve, and anything no longer in the document dropped
+  on the next pass. `test/fade.test.js` wires two hundred repaints and asserts
+  the set stays at one.
+
+- **A dialog's safeguard has to survive its own keyboard handling.** The
+  confirm dialog opens with the *cancel* button focused, precisely so that a
+  reader pressing Enter out of habit destroys nothing — and then a `keydown`
+  handler answered yes from anywhere and suppressed the cancel button's own
+  activation. Enter on "Erase everything" erased everything with the focus ring
+  sitting on Cancel. There is no Enter handler now; both buttons are buttons.
+
+- **Repair the state, do not render around it.** `renderPanes` filtered
+  translations that were no longer installed out of what it drew, leaving
+  `state.translation` naming a deleted file. Everything that is not that
+  function reads the state: closing the second column closed the first, and the
+  outline, the card studio, reading aloud, the exports and the status bar all
+  asked the store for a translation that had been deleted, once per repaint. It
+  now writes the repaired list back and lets the re-render follow.
+
+- **Geometry must ignore what is not on screen.** Both drag surfaces compared
+  the dragged item against every sibling's rectangle, including the ones
+  `fitStrip` had hidden — which measure zero and therefore sit to the left of
+  everything, and so were "passed" by any movement at all. A five-pixel nudge
+  sent a tab to the far end of the strip, and in the drawer layout, where only
+  the active tab is visible, every drag did.
+
+- **One record, one writer — or the writers have to agree.** `records.save`
+  replaces the whole value, and the search feature wrote its record from two
+  places: the pane and the Settings page. Each held a snapshot from when it was
+  built, so whichever wrote last silently undid the other. The settings row now
+  re-reads before patching, and the pane listens for changes it did not make.
+  The same shape of race, one layer up, is why the composer captures its
+  passage before an `await` and checks it after: a save that lands after the
+  reader has moved re-files the note they were writing onto the chapter they
+  moved to.
 
 ## 4. Catalog update flow
 

@@ -1039,6 +1039,157 @@ test('the app in a browser', options, async (t) => {
     }
   });
 
+  await t.test('a reference can be read without going to it, or opened beside what you are reading', async () => {
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Genesis 1');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.verse');
+    await page.waitForTimeout(600);
+
+    const link = page.locator('.xref').first();
+    assert.ok(await link.count(), 'the fixture carries a cross-reference');
+
+    // Resting on it reads it where it stands. Nothing is navigated: the
+    // chapter behind the popover is the one the reader was in.
+    const was = await page.locator('.crumbs').first().innerText();
+    await link.hover();
+    await page.waitForTimeout(700);
+    assert.ok(await page.evaluate(() => !document.querySelector('.peek')?.hidden), 'a peek opened');
+    assert.match(await page.locator('.peek .pk-ref').innerText(), /23:1$/, 'the reference it names');
+    assert.match(await page.locator('.peek .pk-text').innerText(), /23:1/, 'and it is the verse itself');
+    assert.equal(await page.locator('.crumbs').first().innerText(), was, 'and the reader has not moved');
+
+    // Out of the way the moment it is not wanted.
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    assert.ok(await page.evaluate(() => document.querySelector('.peek').hidden), 'Escape puts it away');
+
+    // Ctrl-press opens it in a tab of its own, leaving this one where it was.
+    const tabs = () => page.locator('.tabstrip .tab').count();
+    const before = await tabs();
+    await link.click({ modifiers: ['Control'] });
+    await page.waitForTimeout(700);
+    assert.equal(await tabs(), before + 1, 'a new tab');
+    assert.match(await page.locator('.crumbs').first().innerText(), /23/, 'showing the passage that was followed');
+    assert.ok(await page.locator('.verse.is-hit, .vblock .is-hit').count() >= 0);
+
+    // A plain press still replaces the tab, which is what small screens need.
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Exodus 1');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.xref', { timeout: 15000 });
+    await page.waitForTimeout(400);
+    const same = await tabs();
+    await page.locator('.xref').first().click();
+    await page.waitForTimeout(800);
+    assert.equal(await tabs(), same, 'and an ordinary press opens no tab at all');
+    assert.match(await page.locator('.crumbs').first().innerText(), /23/, 'in the tab it was pressed in');
+  });
+
+  await t.test('a translation of your own can be brought in, whatever it was written as', async () => {
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Library');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.library-item');
+    await page.waitForTimeout(400);
+
+    const usfm = [
+      '\\id PHM Philemon',
+      '\\h Philemon',
+      '\\c 1',
+      '\\s Greeting',
+      '\\p',
+      ...Array.from({ length: 25 }, (_, i) => `\\v ${i + 1} Philemon verse ${i + 1}, from a file somebody made.\\f + \\ft a note\\f*`),
+    ].join('\n');
+
+    const chooser = page.waitForEvent('filechooser');
+    await page.locator('.lib-act[title="Add your own"]').click();
+    await (await chooser).setFiles({ name: 'philemon.usfm', mimeType: 'text/plain', buffer: Buffer.from(usfm) });
+    await page.waitForSelector('.fd', { timeout: 10000 });
+
+    // The question is asked with the answer already in it.
+    assert.equal(await page.locator('.fd-opt[aria-pressed="true"] .fd-opt-n').innerText(), 'USFM');
+    assert.equal(await page.locator('.fd-row[data-field="identify"] input').inputValue(), 'phm',
+      'read from the file, not from its name');
+    assert.equal(await page.locator('.fd-row[data-field="name"] input').inputValue(), 'Philemon');
+
+    await page.locator('.fd-row[data-field="language"] input').fill('eng');
+    await page.locator('.fd-acts .btn.primary').click();
+    await page.waitForTimeout(3000);
+
+    const mine = page.locator('.library-item.state-local');
+    assert.equal(await mine.count(), 1, 'it is in the library');
+    const text = await mine.first().innerText();
+    assert.match(text, /Yours, imported/, 'and it is not described as dropped from the catalog');
+    assert.match(text, /USFM/, 'it says what it was made from');
+
+    // And it is a translation like any other: readable, and checked against the
+    // canon exactly as a published one is.
+    assert.match(text, /difference/, 'the canon report is the same report');
+    await page.locator('.crumb-tr').first().click().catch(() => {});
+    await page.keyboard.press('Escape');
+  });
+
+  await t.test('a language nobody spelled in two letters still reaches the browser', async () => {
+    // The live defect this batch began with. The Danish fixture carries a
+    // 639-3 code and an empty 639-1, which is the ordinary state of a real
+    // file — and `lang="dan"` means nothing to a font rule, a line breaker or
+    // a speech engine. It has to arrive as `da`.
+    await page.locator('.tabstrip .tab[data-kind="chapter"]').first().click();
+    await page.waitForSelector('.crumb-tr');
+    await switchTo('Danske');
+    const tag = await page.evaluate(() => document.querySelector('.leaf[data-role="primary"] [lang]')?.getAttribute('lang'));
+    assert.equal(tag, 'da', 'the three-letter code was mapped to the one the browser knows');
+  });
+
+  await t.test('a tab nudged by a few pixels stays where it was', async () => {
+    // Tabs that do not fit are `hidden`, so they measure zero and sit at x 0 —
+    // to the left of everything, and therefore "passed" by any rightward
+    // movement. A five-pixel nudge used to send a tab to the far end of the
+    // strip, and the new order was persisted.
+    const order = () => page.evaluate(() => [...document.querySelectorAll('.tabstrip .tab')].map((t) => t.dataset.tab));
+    const before = await order();
+    assert.ok(before.length >= 3, 'several tabs are open by now');
+
+    const first = await page.locator('.tabstrip .tab').first().boundingBox();
+    await page.mouse.move(first.x + first.width / 2, first.y + first.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(first.x + first.width / 2 + 6, first.y + first.height / 2, { steps: 4 });
+    await page.mouse.up();
+    await page.waitForTimeout(400);
+    assert.deepEqual(await order(), before, 'a nudge is not an instruction');
+  });
+
+  await t.test('Enter does not answer yes to a question about deleting things', async () => {
+    // The dialog opens with the cancel button focused precisely so that a
+    // reader pressing Enter out of habit destroys nothing. A keydown handler
+    // answered yes anyway, from anywhere, and suppressed the cancel button's
+    // own activation while doing it.
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Cards');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.doc.cards');
+    await page.waitForTimeout(700);
+
+    await page.locator('.cd-tool[data-panel="templates"]').click();
+    await page.waitForSelector('.cd-panel .cd-list');
+    const held = await page.locator('.cd-item').count();
+    await page.locator('.cd-panel-foot .cd-tool.danger').click();
+    await page.waitForSelector('.confirm', { timeout: 5000 });
+
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+    assert.equal(await page.locator('.scrim:not([hidden]) .confirm').count(), 0, 'the dialog closed');
+    await page.locator('.cd-tool[data-panel="templates"]').click().catch(() => {});
+    await page.waitForTimeout(400);
+    assert.equal(await page.locator('.cd-item').count(), held, 'and nothing was deleted by it');
+    await page.keyboard.press('Escape');
+  });
+
   await t.test('nothing failed along the way', () => {
     assert.deepEqual(app.problems, []);
     // The English fixture has no language pack, which is the ordinary case the

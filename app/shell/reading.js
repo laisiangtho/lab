@@ -15,6 +15,7 @@ import { localizeNumber } from '../core/translation.js';
 import { h } from './dom.js';
 import { icon } from './icons.js';
 import { L } from './i18n.js';
+import { wireRef } from './reflink.js';
 
 export const LAYOUTS = VERSE_LAYOUTS;
 const LAYOUT_CLASS = { paragraph: '', list: 'list', continuous: 'flow' };
@@ -108,7 +109,7 @@ export function chapterNote(p) {
           class: 'verse-note-dot', title: L('lbl.notes', { n: noteCount }), 'aria-label': L('lbl.notes', { n: noteCount }),
           onclick: (e) => p.onVerse?.(key, e.currentTarget, { extend: e.shiftKey }),
         }, icon('note')) : null),
-      verse.ref && !compare ? refsLine(verse.ref, meta, p.resolver, p.onRef) : null));
+      verse.ref && !compare ? refsLine(verse.ref, meta, p.resolver, p.onRef, p.onPeek) : null));
   }
   note.append(chapterEl);
 
@@ -135,12 +136,16 @@ function verseText(text, p) {
   }, run.text, p.strongs ? h('sup', { class: 'strongs-code' }, run.code) : null)));
 }
 
-function refsLine(text, meta, resolver, onRef) {
+function refsLine(text, meta, resolver, onRef, onPeek) {
   const parts = parseReferences(text, resolver, { digit: meta.digit });
   return h('p', { class: 'xrefs' }, parts.map((part, i) => [
     i > 0 ? ' · ' : null,
     part.refs
-      ? h('button', { class: 'xref', type: 'button', onclick: () => onRef(part.refs[0]) }, part.text)
+      ? wireRef(
+        h('button', { class: 'xref', type: 'button', title: L('peek.hint') }, part.text),
+        part.refs[0],
+        { open: (ref, options) => onRef(ref, options), peek: onPeek ?? null },
+      )
       : h('span', { class: 'xref-plain', title: `Unresolved reference: ${part.unresolved}` }, part.text),
   ]));
 }

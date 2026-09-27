@@ -156,7 +156,9 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
       bookNames: { 1: 'ကမ္ဘာဦးကျမ်း', 2: 'ထွက်မြောက်ရာကျမ်း', 19: 'ဆာလံကျမ်း', 40: 'မဿဲ' },
       digit: ['၀', '၁', '၂', '၃', '၄', '၅', '၆', '၇', '၈', '၉'],
     }),
-    ddb1931: build('ddb1931', 'Det Danske Bibel', 'Danske', 'Danish', { name: 'dan', iso: { '639-1': 'da', '639-3': 'dan' } }, pick(), (b, c, v) => pad(`Dansk ${c}:${v} tekst.`, 'og ordet gik ud over hele landet og blev hørt af alle'), {
+    // No 639-1, which is the ordinary state of a real translation file: the
+    // field exists in the schema and nobody filled it in.
+    ddb1931: build('ddb1931', 'Det Danske Bibel', 'Danske', 'Danish', { name: 'dan', iso: { '639-1': '', '639-3': 'dan' } }, pick(), (b, c, v) => pad(`Dansk ${c}:${v} tekst.`, 'og ordet gik ud over hele landet og blev hørt af alle'), {
       bookNames: { 1: 'Første Mosebog', 2: 'Anden Mosebog', 19: 'Salmernes Bog', 40: 'Matthæus' },
     }),
   };
@@ -170,7 +172,7 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
       name: t.info.name,
       shortname: t.info.shortname,
       year: t.info.year,
-      language: { text: t.info.language.text, textdirection: 'ltr', name: t.info.language.iso['639-1'] },
+      language: { text: t.info.language.text, textdirection: 'ltr', name: t.info.language.iso['639-1'] || t.info.language.iso['639-3'] },
       version: String(t.version),
       publisher: t.info.publisher,
     })),
@@ -208,7 +210,13 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
       const chapter = {};
       for (let c = 1; c <= b.chapters; c += 1) {
         const verse = {};
-        for (let v = 1; v <= b.verses[c - 1]; v += 1) verse[v] = { text: text(b, c, v) };
+        for (let v = 1; v <= b.verses[c - 1]; v += 1) {
+          verse[v] = { text: text(b, c, v) };
+          // A cross-reference on the first verse of every chapter. Real files
+          // carry these and the reading surface renders them as links, so a
+          // fixture without any cannot exercise how a reference is followed.
+          if (v === 1 && b.id !== 19) verse[v].ref = 'Ps 23:1';
+        }
         chapter[c] = { verse };
       }
       book[b.id] = { info: { name: extra.bookNames?.[b.id] ?? b.name, shortname: (extra.bookNames?.[b.id] ?? b.name).slice(0, 3), abbr: [] }, chapter };

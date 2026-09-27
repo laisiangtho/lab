@@ -1731,3 +1731,54 @@ body.drawer-dragging .sidebar{transition:none}
   .ribbon,.sidebar,.tabbar,.statusbar,.win-buttons,.vbar,.ink-bar{display:none!important}
   body{overflow:visible}
 }
+
+/* A reference read where it stands. It borrows the navpop's box and arrow —
+   the same gesture, pointing at the same kind of thing — and adds a quoted
+   passage and the two ways out of it. */
+.peek{padding:0}
+.pk-body{padding:12px 14px 6px;overflow-y:auto}
+.pk-ref{margin:0 0 8px;font-family:var(--font-ui);font-size:var(--fs-ui-s);font-weight:600;color:var(--accent-2)}
+.pk-text{margin:0;font-family:var(--font-text);font-size:var(--fs-read-s, 15px);line-height:1.62;color:var(--text-normal)}
+.pk-v{margin:0 0 6px}
+.pk-v:last-child{margin-bottom:0}
+.pk-n{margin-inline-end:5px;font-family:var(--font-ui);font-size:11px;font-weight:600;color:var(--accent);vertical-align:.25em}
+.pk-empty{margin:0;color:var(--text-faint);font-family:var(--font-ui);font-size:var(--fs-ui-s)}
+.pk-foot{display:flex;gap:4px;padding:8px 10px;border-top:var(--divider)}
+.pk-act{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 10px;
+  border-radius:var(--radius-m);background:var(--bg-secondary);color:var(--text-muted);
+  font-family:var(--font-ui);font-size:var(--fs-ui-s);font-weight:600;cursor:pointer;
+}
+.pk-act:hover{background:var(--bg-hover);color:var(--text-normal)}
+.pk-act svg{width:14px;height:14px}
+
+/* A short form: the third dialog shape, after the palette and the confirm. */
+.fd{
+  width:min(460px,calc(100vw - 32px));max-height:calc(100vh - 80px);overflow-y:auto;
+  padding:18px 20px 16px;border-radius:var(--radius-l);background:var(--bg-elevated);
+  border:1px solid var(--border);box-shadow:var(--shadow-l);
+}
+.fd-title{margin:0 0 6px;font-family:var(--font-ui);font-size:var(--fs-ui-l);font-weight:650;color:var(--text-normal)}
+.fd-lede{margin:0 0 14px;font-family:var(--font-ui);font-size:var(--fs-ui-s);line-height:1.55;color:var(--text-muted)}
+.fd-lede[hidden]{display:none}
+.fd-rows{display:flex;flex-direction:column;gap:10px}
+.fd-row{display:flex;flex-direction:column;gap:5px}
+.fd-label{display:flex;flex-direction:column;gap:2px}
+.fd-name{font-family:var(--font-ui);font-size:var(--fs-ui-m);font-weight:600;color:var(--text-normal)}
+.fd-hint{font-family:var(--font-ui);font-size:var(--fs-ui-s);line-height:1.5;color:var(--text-faint)}
+.fd-row input[type=text]{
+  height:32px;padding:0 10px;border-radius:var(--radius-m);border:1px solid var(--border);
+  background:var(--base-00);color:var(--text-normal);font-family:var(--font-ui);font-size:var(--fs-ui-m);
+}
+.fd-row input[type=text]:focus{border-color:var(--accent-line);outline:none}
+.fd-opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.fd-opt{
+  display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:8px 10px;
+  border-radius:var(--radius-m);background:var(--bg-secondary);border:1px solid transparent;
+  text-align:start;cursor:pointer;
+}
+.fd-opt:hover{background:var(--bg-hover)}
+.fd-opt[aria-pressed="true"]{background:var(--accent-fade);border-color:var(--accent-line)}
+.fd-opt-n{font-family:var(--font-ui);font-size:var(--fs-ui-m);font-weight:600;color:var(--text-normal)}
+.fd-opt-s{font-family:var(--font-ui);font-size:var(--fs-ui-s);color:var(--text-faint)}
+.fd-acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}

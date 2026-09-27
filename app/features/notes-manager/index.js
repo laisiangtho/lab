@@ -11,6 +11,7 @@ import { verseLabelOf } from '../../core/annotations.js';
 import { noteTitle, wordCount } from '../../core/markdown.js';
 import { relativeTime } from '../../core/time.js';
 import { h } from '../../shell/dom.js';
+import { wantsNewTab } from '../../shell/reflink.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
 
@@ -106,7 +107,7 @@ export default {
           return h('div', { class: 'nm-row', dataset: { note: note.id } },
             h('span', { class: 'nm-id', title: passage(note) }, passage(note)),
             h('span', { class: 'nm-title' }, noteTitle(note.text, passage(note)), h('span', { class: 'nm-sub' }, gist(note))),
-            h('span', {}, h('button', { class: 'pill', onclick: () => shell.openChapter(note.book, note.chapter) },
+            h('span', {}, h('button', { class: 'pill', onclick: (e) => shell.openChapter(note.book, note.chapter, { newTab: wantsNewTab(e) }) },
               `${shell.workspace.bookName(note.book)} ${note.chapter}`)),
             h('span', { class: 'nm-when' }, relativeTime(note.updated)),
             h('span', { class: 'nm-words' }, String(wordCount(note.text))),

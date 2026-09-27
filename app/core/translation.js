@@ -13,6 +13,7 @@
 import {
   expectArray, expectObject, expectString, fail, isPlainObject, normalizeVersion, numericKey, optionalString,
 } from './errors.js';
+import { toTag } from './langcode.js';
 
 const VERSE_KEYS = new Set(['text', 'title', 'ref', 'merge']);
 
@@ -110,11 +111,19 @@ export function parseTranslation(raw, { identify, category }) {
       language: Object.freeze({
         text: expectString(language.text, S, '$.info.language.text'),
         name: expectString(language.name, S, '$.info.language.name'),
-        // What goes in a `lang` attribute. Files name the language by its
-        // ISO 639-3 code ("mya", "ctd"); CSS and the browser's own line
-        // breaking know the two-letter code, so that one wins when the file
-        // carries it — `:lang(my)` does not match `lang="mya"`.
+        // What goes in a `lang` attribute, and what a speech engine is asked
+        // for. Files name the language by its ISO 639-3 code ("mya", "ctd");
+        // CSS and the browser's own line breaking know the two-letter code, so
+        // that one wins where the language has one — `:lang(my)` does not match
+        // `lang="mya"`, and a Burmese voice calls itself `my-MM`.
         code: languageCode(language),
+        // The pair as the file gave it, kept rather than thrown away: a
+        // consumer that needs to know which of the two it is holding cannot
+        // work it out from the answer alone.
+        iso: Object.freeze({
+          '639-1': isoPart(language, '639-1'),
+          '639-3': isoPart(language, '639-3'),
+        }),
         textdirection,
       }),
     }),
@@ -128,12 +137,26 @@ export function parseTranslation(raw, { identify, category }) {
   return { meta, chapters, diagnostics, stats };
 }
 
-/** The best BCP-47 tag the file offers: 639-1 if present, else 639-3. */
-function languageCode(language) {
+/** One half of the file's `iso` pair, or '' where it gave none. */
+function isoPart(language, key) {
   const iso = isPlainObject(language.iso) ? language.iso : {};
-  const short = typeof iso['639-1'] === 'string' ? iso['639-1'].trim() : '';
-  const long = typeof iso['639-3'] === 'string' ? iso['639-3'].trim() : '';
-  return short || long || String(language.name ?? '').trim();
+  return typeof iso[key] === 'string' ? iso[key].trim() : '';
+}
+
+/**
+ * The best tag the file supports: its own 639-1 if it gives one, otherwise the
+ * two-letter code its 639-3 stands for, otherwise the 639-3 code itself.
+ *
+ * The middle step matters more than it looks. Most translation files carry a
+ * 639-3 code and an empty 639-1 — the field exists and nobody filled it in —
+ * and without the lookup every one of them is handed to the browser as a code
+ * it has never heard of.
+ */
+function languageCode(language) {
+  const short = isoPart(language, '639-1');
+  if (short) return short;
+  const long = isoPart(language, '639-3') || String(language.name ?? '').trim();
+  return toTag(long);
 }
 
 function parseVerses(raw, S, path, stats) {

@@ -38,3 +38,33 @@ export function pickJson() {
     input.click();
   });
 }
+
+/**
+ * Ask for one file of any kind, as text.
+ *
+ * `pickJson` above parses as it reads, which is right for this app's own files
+ * and wrong for somebody else's: an import has to see the text before it can
+ * know what it is, and a file that is not JSON is not an error here — it is a
+ * USFM file, and the next step is to say so.
+ *
+ * @param {{ accept?: string }} [options]
+ * @returns {Promise<{ name: string, size: number, text: string } | null>} null when cancelled
+ */
+export function pickText({ accept = '' } = {}) {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    if (accept) input.accept = accept;
+    input.addEventListener('cancel', () => resolve(null), { once: true });
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) { resolve(null); return; }
+      try {
+        resolve({ name: file.name, size: file.size, text: await file.text() });
+      } catch (err) {
+        reject(new Error(`${file.name}: could not be read (${err.message})`));
+      }
+    }, { once: true });
+    input.click();
+  });
+}

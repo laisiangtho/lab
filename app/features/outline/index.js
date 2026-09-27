@@ -4,6 +4,7 @@
  */
 
 import { h } from '../../shell/dom.js';
+import { wantsNewTab } from '../../shell/reflink.js';
 import { L } from '../../shell/i18n.js';
 
 export default {
@@ -51,7 +52,7 @@ export default {
           body.replaceChildren(facts, ...(rows.length
             ? rows.map((row) => h('button', {
               class: `outline-row level-${row.level}`,
-              onclick: () => shell.openVerse(book, chapter, row.verse),
+              onclick: (e) => shell.openVerse(book, chapter, row.verse, { newTab: wantsNewTab(e) }),
             }, h('span', { class: 'kbd' }, String(row.verse)), ' ', row.text))
             : [h('p', { class: 'empty-hint' }, L('empty.outline'))]));
         }

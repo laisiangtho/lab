@@ -31,10 +31,16 @@ export function createConfirm() {
     onclick: (e) => { if (e.target === element) answer(false); },
   }, box);
 
+  // Escape only. Enter used to answer *yes* wherever the focus was, which
+  // quietly undid the safeguard three lines below: the dialog opens with the
+  // cancel button focused so that a reader who presses Enter out of habit has
+  // destroyed nothing — and then Enter destroyed it anyway, from a handler that
+  // also suppressed the cancel button's own activation. Both buttons are real
+  // buttons; Enter on the focused one does the right thing by itself.
   window.addEventListener('keydown', (e) => {
-    if (element.hidden) return;
-    if (e.key === 'Escape') { answer(false); e.preventDefault(); }
-    else if (e.key === 'Enter') { answer(true); e.preventDefault(); }
+    if (element.hidden || e.key !== 'Escape') return;
+    answer(false);
+    e.preventDefault();
   });
 
   function answer(value) {

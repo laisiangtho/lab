@@ -8,6 +8,7 @@
 
 import { chapterKey, dailyVerse, localDate, parseChapterKey, planChapters, planState, PLANS } from '../../core/plans.js';
 import { h } from '../../shell/dom.js';
+import { wantsNewTab } from '../../shell/reflink.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
 
@@ -78,7 +79,7 @@ export default {
           const open = state.get();
           const isOpen = open.book === p.book && open.chapter === p.chapter;
           return h('span', { class: `plan-ch${read ? ' is-read' : ''}${isOpen ? ' is-open' : ''}` },
-            h('button', { class: 'pc-open', onclick: () => shell.openChapter(p.book, p.chapter) }, ref(p.book, p.chapter)),
+            h('button', { class: 'pc-open', onclick: (e) => shell.openChapter(p.book, p.chapter, { newTab: wantsNewTab(e) }) }, ref(p.book, p.chapter)),
             h('button', {
               class: 'pc-tick',
               'aria-pressed': String(read),
@@ -97,7 +98,7 @@ export default {
             text ? h('p', { class: 'pd-text', dir: 'auto' }, text) : null,
             h('button', {
               class: 'pd-ref',
-              onclick: () => shell.openVerse(daily.book, daily.chapter, daily.verse),
+              onclick: (e) => shell.openVerse(daily.book, daily.chapter, daily.verse, { newTab: wantsNewTab(e) }),
             }, ref(daily.book, daily.chapter, daily.verse), icon('chev')));
         }
 
@@ -151,7 +152,7 @@ export default {
             daily,
             h('button', {
               class: 'plan-continue',
-              onclick: () => shell.openChapter(book, chapter),
+              onclick: (e) => shell.openChapter(book, chapter, { newTab: wantsNewTab(e) }),
             }, icon('book-open'), h('span', {}, L('plan.continue')), h('b', {}, ref(book, chapter))),
             ...(st ? [planCard(st)] : picker()));
         }

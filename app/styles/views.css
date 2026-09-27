@@ -1140,3 +1140,12 @@ label.set-row:hover { background: var(--bg-hover); }
 .cd-item-n { font-size: var(--fs-ui-m); font-weight: 500; color: var(--text-normal); }
 .cd-item-s { font-size: var(--fs-ui-s); color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .cd-presets button { padding: 4px 8px; }
+
+/* The library's two actions, as icons: add, and check again. */
+.lib-act {
+  width: 30px; height: 30px; flex: 0 0 auto; display: grid; place-items: center;
+  border-radius: var(--radius-m); background: var(--bg-secondary); color: var(--text-muted);
+  cursor: pointer; transition: background var(--speed), color var(--speed);
+}
+.lib-act:hover { background: var(--bg-hover); color: var(--text-normal); }
+.lib-act svg { width: 16px; height: 16px; }

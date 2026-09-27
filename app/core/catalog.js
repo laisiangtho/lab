@@ -114,8 +114,14 @@ export function compareCatalogs(current, candidate) {
  * Merge catalog entries with installed translations.
  * @param {ReturnType<typeof parseCatalog>} catalog
  * @param {{ identify: string, version: number }[]} installed
+ * A translation the reader imported themselves is `local`, not `unlisted`.
+ * Both are installed and absent from the catalog, but they are opposite
+ * situations: one was brought in on purpose and the other has been dropped by
+ * whoever publishes it, and telling somebody their own file is "no longer
+ * listed" reads as an accusation about a file they made.
+ *
  * @returns {{ identify: string, entry: CatalogEntry|null, installedVersion: number|null,
- *            state: 'available'|'installed'|'update'|'unlisted' }[]}
+ *            state: 'available'|'installed'|'update'|'unlisted'|'local' }[]}
  */
 export function translationStatus(catalog, installed) {
   const local = new Map(installed.map((t) => [t.identify, t]));
@@ -126,7 +132,12 @@ export function translationStatus(catalog, installed) {
     return { identify: entry.identify, entry, installedVersion: held?.version ?? null, held, state };
   });
   for (const [identify, held] of local) {
-    if (!catalog.get(identify)) rows.push({ identify, entry: null, installedVersion: held.version, held, state: 'unlisted' });
+    if (!catalog.get(identify)) {
+      rows.push({
+        identify, entry: null, installedVersion: held.version, held,
+        state: held.source ? 'local' : 'unlisted',
+      });
+    }
   }
   return rows;
 }

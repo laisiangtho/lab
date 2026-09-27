@@ -4,6 +4,7 @@
  */
 
 import { h } from '../../shell/dom.js';
+import { wantsNewTab } from '../../shell/reflink.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
 import { verseLabelOf, verseRange } from '../../core/annotations.js';
@@ -95,7 +96,7 @@ export default {
           body.replaceChildren(...rows.map(({ mark, text }) => h('div', { class: 'mark-row' },
             h('button', {
               class: 'mark-open',
-              onclick: () => shell.openVerse(mark.book, mark.chapter, mark.verse),
+              onclick: (e) => shell.openVerse(mark.book, mark.chapter, mark.verse, { newTab: wantsNewTab(e) }),
             },
               h('span', { class: 'mark-ref' },
                 `${shell.workspace.bookName(mark.book)} ${mark.chapter}:${verseLabelOf(mark, (n) => shell.workspace.number(n))}`),

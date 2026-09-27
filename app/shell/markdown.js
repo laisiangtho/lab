@@ -9,6 +9,7 @@
 import { parseBlocks, parseInline } from '../core/markdown.js';
 import { parseReferences } from '../core/reference.js';
 import { h } from './dom.js';
+import { wireRef } from './reflink.js';
 
 /**
  * @param {string} text
@@ -49,5 +50,10 @@ function inline(text, handlers) {
 function wikilink(target, handlers) {
   const ref = handlers.resolver ? parseReferences(target, handlers.resolver)[0] : null;
   if (!ref?.refs) return h('span', { class: 'wikilink is-unresolved', title: `Unresolved link: ${target}` }, target);
-  return h('button', { class: 'wikilink', onclick: () => handlers.onLink?.(ref.refs[0]) }, target);
+  // A link in a note behaves as a link in a chapter does: in place by default,
+  // in a new tab on request, and readable without leaving the note at all.
+  return wireRef(h('button', { class: 'wikilink' }, target), ref.refs[0], {
+    open: (at, options) => handlers.onLink?.(at, options),
+    peek: handlers.onPeek ?? null,
+  });
 }

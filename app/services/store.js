@@ -80,8 +80,8 @@ class TranslationStore {
   /** Installed translations, without the chapter text. */
   async list() {
     const all = await request(this.#tx('translations').objectStore('translations').getAll());
-    return all.map(({ identify, version, info, bytes, installedAt, stats, diagnostics }) => (
-      { identify, version, info, bytes, installedAt, stats: stats ?? null, diagnostics: diagnostics ?? null }));
+    return all.map(({ identify, version, info, bytes, installedAt, stats, diagnostics, source }) => (
+      { identify, version, info, bytes, installedAt, stats: stats ?? null, diagnostics: diagnostics ?? null, source: source ?? null }));
   }
 
   async getMeta(identify) {
@@ -101,10 +101,16 @@ class TranslationStore {
    * the file — its totals, and where it departs from the canon — is kept with
    * it, so the reader can be shown why a chapter is short long after the
    * install that found out.
+   * `source` marks where the file came from when it was not the catalog — the
+   * name of the format it was imported from. The library reads it to tell a
+   * translation the reader brought themselves from one that has merely been
+   * dropped from the catalog, which are different situations and were shown as
+   * the same one.
+   *
    * @param {{ meta: object, chapters: {book:number,chapter:number,verses:object}[], stats?: object, diagnostics?: object[] }} parsed
-   * @param {{ bytes: number }} info
+   * @param {{ bytes: number, source?: string|null }} info
    */
-  async install(parsed, { bytes }) {
+  async install(parsed, { bytes, source = null }) {
     const { identify } = parsed.meta;
     const found = parsed.diagnostics ?? [];
     const tx = this.#tx(['translations', 'chapters'], 'readwrite');
@@ -118,6 +124,7 @@ class TranslationStore {
       bytes,
       installedAt: new Date().toISOString(),
       stats: parsed.stats ?? null,
+      source,
       // A translation missing most of the canon produces thousands of these;
       // the count is what a reader needs, the list is what a report needs.
       diagnostics: { total: found.length, items: found.slice(0, DIAGNOSTIC_LIMIT) },

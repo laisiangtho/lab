@@ -750,6 +750,15 @@ export function createChrome(root, ctx) {
   return {
     element: app, tabStrip, panes, start, notify, setStatus, refreshThemeIcon, toggleSide, applyChrome, setChapterMode,
     closeDrawers, isDrawerLayout,
+    /**
+     * Ask every ribbon button what it is doing now.
+     *
+     * A button reports its own state through `state()`, but nothing polls: the
+     * ribbon is repainted when the reader navigates. A feature whose state
+     * changes on its own — reading aloud starting and stopping — has to say so,
+     * or the button is right only by coincidence.
+     */
+    refreshCommands: () => refreshRibbonState(),
     /** The ribbon, for the settings page: what is on it, and how to change it. */
     ribbon: {
       items: () => ribbonItems(),

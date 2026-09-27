@@ -6,7 +6,9 @@
 
 import { createChrome } from './chrome.js';
 import { createModal } from './modal.js';
+import { createFormDialog } from './formdialog.js';
 import { createNavPop } from './navpop.js';
+import { createPeek } from './peek.js';
 import { createColorPicker } from './colorpicker.js';
 import { createConfirm } from './confirm.js';
 import { createTranslationInfo } from './trinfo.js';
@@ -33,9 +35,11 @@ export function createShell(root, ctx) {
   let readingPanel = null;
   let navPop = null;
   let trInfo = null;
+  let peek = null;
   let colours = null;
   const modal = createModal();
   const confirm = createConfirm();
+  const form = createFormDialog();
   const strongsPopover = h('div', { class: 'popover', hidden: true });
 
   const ready = [];
@@ -67,20 +71,36 @@ export function createShell(root, ctx) {
       return true;
     },
     get firstRunClaimed() { return firstRunClaimed; },
-    openChapter: (book, chapter) => workspace.openChapter(book, chapter),
+    /**
+     * Follow a reference. `{ newTab }` leaves what the reader was on where it
+     * was — the options travelled no further than `workspace` until now, which
+     * is why nothing in the app could ever open a second tab.
+     */
+    openChapter: (book, chapter, options) => workspace.openChapter(book, chapter, options),
     openSwitcher,
     openPalette,
     openTranslationPicker,
     /** The one modal, for a feature that needs to offer a list of its own. */
     pick: (options) => modal.open(options),
+    /** A short form: several answers at once, or null if the reader backs out. */
+    form: (options) => form.open(options),
     /** Run a registered command by id — how one feature reaches another. */
     run(id) {
       const command = ctx.registry.commands().find((c) => c.id === id);
       if (!command) throw new Error(`shell.run: no command "${id}"`);
       return command.run();
     },
-    openVerse: (book, chapter, verse) => workspace.openVerse(book, chapter, verse),
+    openVerse: (book, chapter, verse, options) => workspace.openVerse(book, chapter, verse, options),
     selectPane: (side, id) => chrome.selectPane(side, id),
+    /**
+     * Read a reference where it stands. Every link surface routes here, and
+     * `reflink.js` decides whether the gesture that asked is one this device
+     * actually has.
+     */
+    openPeek: (anchor, ref) => peek.open(anchor, ref),
+    closePeek: () => peek.close(),
+    /** Repaint the ribbon's marks; for a feature whose state moves on its own. */
+    refreshCommands: () => chrome.refreshCommands(),
     openStrongs,
     /** The info button at the end of a crumb bar: what this translation is. */
     openTranslationInfo: (anchor, meta) => trInfo.open(anchor, meta),
@@ -129,9 +149,18 @@ export function createShell(root, ctx) {
       englishRef: (book, chapter) => workspace.englishRef(book, chapter),
     });
     trInfo = createTranslationInfo(ctx);
+    peek = createPeek(ctx, {
+      bookName: (id) => workspace.bookName(id),
+      number: (n) => workspace.number(n),
+      lang: () => workspace.lang(),
+      direction: () => (workspace.primaryDirection?.() ?? 'ltr'),
+      go: (ref, options) => (ref.verse
+        ? workspace.openVerse(ref.book, ref.chapter, ref.verse, options)
+        : workspace.openChapter(ref.book, ref.chapter, options)),
+    });
     colours = createColorPicker();
-    document.body.append(modal.element, confirm.element, verseBar.element, readingPanel.element,
-      navPop.element, trInfo.element, colours.element, strongsPopover);
+    document.body.append(modal.element, confirm.element, form.element, verseBar.element, readingPanel.element,
+      navPop.element, trInfo.element, peek.element, colours.element, strongsPopover);
     applyReading(ctx.state.get());
     chrome.start();
     wireKeys();

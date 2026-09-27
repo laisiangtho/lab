@@ -129,7 +129,10 @@ export default {
       const c = canvas.getContext('2d');
       if (!c) throw new Error(L('err.noCanvas', { what: L('cmd.verseCard') }));
 
-      const lang = passage.meta.info.language.name;
+      // The tag, not the 639-3 code the file files itself under: `SCRIPT_FONTS`
+      // is keyed the way a browser is, so a card of a Burmese translation was
+      // being drawn in Georgia with Latin line spacing.
+      const lang = passage.meta.info.language.code;
       const rtl = passage.meta.info.language.textdirection === 'rtl';
       const ink = t.text ?? tone('--text-normal');
       const accent = t.accent ?? tone('--accent');
@@ -738,7 +741,12 @@ export default {
             if (picked) { pick(null); event.preventDefault(); }
             return;
           }
+          // A modifier means the shell's own shortcut — `Mod+→` is the next
+          // chapter — and this handler runs first because it is on the
+          // document. Nudging a frame *and* moving the passage under it meant
+          // the card reloaded on a different verse and threw the nudge away.
           if (!picked || !plan || !event.key.startsWith('Arrow')) return;
+          if (event.metaKey || event.ctrlKey) return;
           const step = event.shiftKey ? 10 : 1;
           const box = { ...frameOf(picked) };
           if (event.key === 'ArrowLeft') box.x -= step;
@@ -1141,7 +1149,10 @@ export default {
         const offState = state.subscribe(() => { if (!chosen) run(); });
         const refit = () => { if (passage) { fitStage(shown()); placeHandles(); } };
         window.addEventListener('resize', refit);
-        if (typeof ResizeObserver !== 'undefined') new ResizeObserver(refit).observe(stage);
+        // Kept, so it can be disconnected: an observer nobody holds is an
+        // observer nobody can stop, and it keeps the whole studio alive.
+        const watcher = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(refit);
+        watcher?.observe(stage);
         run();
         return () => {
           listeners.delete(onShelfChange);
@@ -1149,6 +1160,7 @@ export default {
           window.removeEventListener('resize', refit);
           document.removeEventListener('keydown', onKey);
           document.removeEventListener('pointerdown', onDown);
+          watcher?.disconnect();
           clearTimeout(said);
         };
       },

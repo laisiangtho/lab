@@ -15,6 +15,7 @@
  */
 
 import { fill, h } from '../../shell/dom.js';
+import { wantsNewTab } from '../../shell/reflink.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
 
@@ -52,7 +53,11 @@ export default {
       build: (ui) => {
         const held = records.get(KEY, null) ?? {};
         const patch = (next) => {
-          records.save(KEY, { mode: 'terms', matchCase: false, translations: [], books: null, ...held, ...next })
+          // Re-read rather than reuse `held`: the pane writes the same record,
+          // and a patch built on a snapshot taken when this page was drawn
+          // would put the pane's later choices back to what they were.
+          const now = records.get(KEY, null) ?? {};
+          records.save(KEY, { mode: 'terms', matchCase: false, translations: [], books: null, ...now, ...next })
             .then(() => ui.refresh())
             .catch(() => { /* a default is not worth a message */ });
         };
@@ -130,11 +135,36 @@ export default {
         let counts = null;
         let running = false;
         let filling = null;
+        /** Which query the results on screen belong to; see `fillBook`. */
+        let generation = 0;
         /** The translations the results on screen came from. */
         let searching = [];
 
-        const remember = () => records.save(KEY, { mode: modeOf(), matchCase, translations, books })
-          .catch(() => { /* a filter is not worth a message */ });
+        /** True while this pane's own write is in flight, so it ignores it. */
+        let writing = false;
+        const remember = () => {
+          writing = true;
+          return records.save(KEY, { mode: modeOf(), matchCase, translations, books })
+            .catch(() => { /* a filter is not worth a message */ })
+            .finally(() => { writing = false; });
+        };
+
+        /**
+         * This record has two writers — this pane and the Settings page — and
+         * `records.save` replaces the whole value. Without this, changing the
+         * scope in Settings left the pane searching the old scope, and the
+         * pane's next write put the old scope back into Settings.
+         */
+        function reread() {
+          const now = records.get(KEY, null) ?? {};
+          wholeWord = now.mode === 'word';
+          regex = now.mode === 'regex';
+          matchCase = now.matchCase === true;
+          translations = Array.isArray(now.translations) ? now.translations : [];
+          books = Array.isArray(now.books) && now.books.length ? now.books : null;
+          paintModes();
+          paintScopeLabel();
+        }
 
         // --- the query -------------------------------------------------------
 
@@ -413,6 +443,7 @@ export default {
 
         async function run() {
           const query = input.value.trim();
+          generation += 1;
           found = new Map();
           shape = new Map();
           counts = null;
@@ -550,6 +581,10 @@ export default {
         async function fillBook(bookId) {
           if (running || filling !== null) return;
           filling = bookId;
+          // Which query this scan is for. Starting a new search cancels the
+          // worker job but not this function, which then resumed and poured a
+          // previous word's verses into the new word's tree.
+          const mine = generation;
           try {
             const { active } = await scope();
             const rows = [];
@@ -558,13 +593,13 @@ export default {
               options: { mode: modeOf(), matchCase },
               onBatch: (batch) => rows.push(...batch),
             });
+            if (mine !== generation) return;
             found.delete(bookId);
             collect(rows);
           } catch {
             /* the message for a bad query has already been shown */
           } finally {
-            filling = null;
-            paint();
+            if (mine === generation) { filling = null; paint(); }
           }
         }
 
@@ -580,7 +615,7 @@ export default {
           return h('button', {
             class: 'result-line',
             title: shell.workspace.englishRef(row.book, row.chapter, row.verse),
-            onclick: () => shell.openVerse(row.book, row.chapter, row.verse),
+            onclick: (e) => shell.openVerse(row.book, row.chapter, row.verse, { newTab: wantsNewTab(e) }),
           },
             h('span', { class: 'kbd' }, label),
             many ? h('span', { class: 'sr-tr' }, row.identify) : null,
@@ -595,11 +630,16 @@ export default {
         paintModes();
         paintScopeLabel();
         const offLibrary = ctx.library.on('change', () => paintScopeLabel());
+        const offRecords = records.on('change', ({ detail }) => {
+          if (writing || (detail.key !== null && detail.key !== KEY)) return;
+          reread();
+        });
         return () => {
           clearTimeout(timer);
           if (paintTimer) cancelAnimationFrame(paintTimer);
           search.cancel();
           offLibrary();
+          offRecords();
           focusInput = null;
           runQuery = null;
         };

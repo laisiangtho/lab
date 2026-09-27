@@ -10,6 +10,7 @@
 import { extractLinks, noteTitle } from '../../core/markdown.js';
 import { parseReferences } from '../../core/reference.js';
 import { h } from '../../shell/dom.js';
+import { wantsNewTab } from '../../shell/reflink.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
 
@@ -48,7 +49,7 @@ export default {
             h('div', { class: 'result-head' }, icon('link'), h('span', {}, L(titleKey)), h('span', { class: 'rh-count' }, String(notes.length))),
             notes.map((note) => h('button', {
               class: 'result-line',
-              onclick: () => shell.openVerse(note.book, note.chapter, note.verse ?? 1),
+              onclick: (e) => shell.openVerse(note.book, note.chapter, note.verse ?? 1, { newTab: wantsNewTab(e) }),
             },
               h('span', { class: 'kbd' }, `${shell.workspace.bookName(note.book)} ${note.chapter}${note.verse ? `:${note.verse}` : ''}`),
               ' ', noteTitle(note.text)))) : null);

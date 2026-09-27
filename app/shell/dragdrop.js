@@ -76,6 +76,12 @@ export function wireTabDrag(strip, api) {
       let next = from;
       rects.forEach((rect, i) => {
         if (i === from) return;
+        // A tab the strip could not fit is `hidden`, so it measures zero and
+        // sits at x 0 — which is to the left of everything and therefore
+        // "passed" by any rightward movement. Comparing against it sent a tab
+        // nudged by five pixels to the far end of the strip, and in the drawer
+        // layout, where only the active tab is ever visible, every drag did.
+        if (!rect.width) return;
         const past = centre - (rect.left + rect.width / 2);
         if (i > from && past > 0) next = Math.max(next, i);
         if (i < from && past < 0) next = Math.min(next, i);
@@ -466,8 +472,11 @@ export function wireRibbonDrag(rail, api) {
       }
       // Where it would land: the others slide by exactly one button.
       const centre = rects[from].top + rects[from].height / 2 + dy;
-      to = rects.findIndex((r, i) => (i === rects.length - 1 ? true : centre < r.bottom));
-      if (to < 0) to = rects.length - 1;
+      // Only the buttons that are actually on the rail; a hidden one measures
+      // zero and would otherwise claim every position above the first visible.
+      const seen = rects.map((r, i) => [r, i]).filter(([r, i]) => r.height || i === from);
+      const landed = seen.find(([r], n) => (n === seen.length - 1 ? true : centre < r.bottom));
+      to = landed ? landed[1] : from;
       for (const [i, b] of buttons.entries()) {
         if (b === node) continue;
         const shift = (i > from && i <= to) ? -height : (i < from && i >= to) ? height : 0;

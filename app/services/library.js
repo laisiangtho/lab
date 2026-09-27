@@ -81,6 +81,33 @@ export function createLibrary({ store, categoryRaw, config }) {
     return result;
   }
 
+  /**
+   * Install a translation the reader supplied, rather than one the catalog
+   * named.
+   *
+   * The catalog is deliberately the only gate on `install`, and this does not
+   * weaken it: it is a second door with its own key, and what comes through it
+   * is marked as having done so. Nothing else in the app is told to trust it
+   * more than a catalog translation, or less.
+   *
+   * @param {{ text: string, format: string, identify: string, info?: object,
+   *           dialect?: string, delimiter?: string }} job
+   */
+  async function importTranslation({ text, format, identify, info = {}, dialect, delimiter }) {
+    const id = String(identify ?? '').trim();
+    if (!/^[a-z0-9][a-z0-9._-]{1,31}$/i.test(id)) {
+      throw new Error(`"${identify}" cannot be a translation name — letters, digits, dots and dashes, 2 to 32 of them`);
+    }
+    const already = (await store.list()).some((row) => row.identify === id);
+    const firstInstall = (await store.list()).length === 0;
+    const result = await call({
+      type: 'import', identify: id, text, format, info, dialect, delimiter, category: categoryRaw,
+    }, id);
+    if (firstInstall) await requestPersistence();
+    emit('change');
+    return { ...result, replaced: already };
+  }
+
   async function remove(identify) {
     await store.remove(identify);
     emit('change');
@@ -122,6 +149,7 @@ export function createLibrary({ store, categoryRaw, config }) {
     checkForUpdates,
     status,
     install,
+    importTranslation,
     remove,
     get catalog() { return catalog; },
     get origin() { return origin; },

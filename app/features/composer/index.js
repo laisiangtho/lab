@@ -161,21 +161,37 @@ export default {
       if (element.dataset.mode !== 'write') {
         preview.replaceChildren(renderMarkdown(text.value, {
           resolver: shell.workspace.resolver(),
-          onLink: (ref) => shell.openVerse(ref.book, ref.chapter, ref.verse ?? 1),
+          onLink: (ref, options) => shell.openVerse(ref.book, ref.chapter, ref.verse ?? 1, options),
+          onPeek: (ref, anchor) => shell.openPeek(anchor, ref),
           onTag: (tag) => shell.openTag?.(tag),
         }));
       }
     }
 
+    /**
+     * Write the note down.
+     *
+     * The passage is captured before the write and checked after it, because a
+     * save is not instantaneous and the composer follows the reading: pressing
+     * a link in the composer's own preview blurs the textarea (which saves) and
+     * then changes the chapter (which re-points the composer) while that write
+     * is still in the database. Without the check the note that came back was
+     * filed as the one being edited *in the new chapter*, and the next
+     * keystroke rewrote a note about Psalm 23 into a note about Psalm 24 —
+     * silently, with the right passage shown above it.
+     */
     async function save() {
       if (!target) return;
+      const mine = target;
       const body = text.value.trim();
       if (!body) {
         if (editing) await annotations.deleteNote(editing.id);
-        editing = null;
+        if (mine === target) editing = null;
         return;
       }
-      editing = await annotations.saveNote({ id: editing?.id, ...target, text: body });
+      const saved = await annotations.saveNote({ id: editing?.id, ...mine, text: body });
+      if (mine !== target) return;
+      editing = saved;
       paint();
     }
 

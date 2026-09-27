@@ -409,6 +409,11 @@ export function createWorkspace(ctx, chrome) {
     return primaryMeta?.info.language.code ?? '';
   }
 
+  /** Which way that script runs, for anything quoting it outside the page. */
+  function primaryDirection() {
+    return primaryMeta?.info.language.textdirection ?? 'ltr';
+  }
+
   /** The testament as the translation names it, then as its language does. */
   function testamentLabel(id) {
     return primaryMeta?.testament?.[id]?.info?.name
@@ -540,8 +545,25 @@ export function createWorkspace(ctx, chrome) {
       return;
     }
 
-    const order = panesOf(state.get()).filter((id) => installed.some((t) => t.identify === id));
+    const open = panesOf(state.get());
+    const order = open.filter((id) => installed.some((t) => t.identify === id));
     if (!order.length) { state.set({ translation: installed[0].identify, parallel: [] }); return; }
+    /**
+     * A translation named by the state but no longer installed is repaired
+     * here, not rendered around.
+     *
+     * Filtering at paint time made the screen right and left the state wrong,
+     * and everything that is not this function reads the state: `closePane`,
+     * `setPaneTranslation` and `movePane` index into the unfiltered list, so
+     * closing the second column closed the first; and every feature that asks
+     * for `state.translation` — the outline, the card studio, reading aloud,
+     * the exports, the word count in the status bar — asked the store for a
+     * translation that had been deleted and got an exception per repaint.
+     */
+    if (order.length !== open.length) {
+      state.set({ translation: order[0], parallel: order.slice(1) });
+      return;
+    }
 
     const { book, chapter } = state.get();
     const loaded = await Promise.all(order.map(async (identify, index) => {
@@ -623,7 +645,13 @@ export function createWorkspace(ctx, chrome) {
         ctx, meta: pane.meta, resolver: pane.resolver, verses: pane.verses, book, chapter,
         compare, layout, annotations, strongs,
         primaryVerses: compare ? all[0].verses : null,
-        onRef: (ref) => state.set({ book: ref.book, chapter: ref.chapter }),
+        // A cross-reference names a verse, and used to arrive at the top of
+        // the chapter with nothing marked — the one link in the app that did
+        // not show the reader what it had brought them to.
+        onRef: (ref, options = {}) => (ref.verse
+          ? openVerse(ref.book, ref.chapter, ref.verse, options)
+          : openChapter(ref.book, ref.chapter, options)),
+        onPeek: (ref, anchor) => ctx.shell.openPeek(anchor, ref),
         onVerse: (verse, anchor, options) => ctx.shell.openVerseBar(anchor, { book, chapter, verse }, options),
         onStrongs: (code, anchor) => ctx.shell.openStrongs(code, anchor),
         onRepair: (identify) => ctx.shell.repairTranslation(identify),
@@ -775,14 +803,20 @@ export function createWorkspace(ctx, chrome) {
     setTimeout(() => line?.classList.remove('is-hit'), 1600);
   }
 
-  /** Open a passage and flash the verse once the chapter is on screen. */
-  function openVerse(book, chapter, verse) {
+  /**
+   * Open a passage and flash the verse once the chapter is on screen.
+   *
+   * `{ newTab }` is forwarded rather than dropped: a reference followed into a
+   * new tab is still a reference to a verse, and arriving at the top of the
+   * chapter instead would be the wrong place by a page.
+   */
+  function openVerse(book, chapter, verse, { newTab: wantsNew = false } = {}) {
     pendingReveal = verse;
     clearTimeout(revealTimer);
     revealTimer = setTimeout(() => { pendingReveal = null; }, 800);
     const current = state.get();
-    if (current.book === book && current.chapter === chapter && activeTab()?.kind === 'chapter') return render();
-    return openChapter(book, chapter);
+    if (!wantsNew && current.book === book && current.chapter === chapter && activeTab()?.kind === 'chapter') return render();
+    return openChapter(book, chapter, { newTab: wantsNew });
   }
 
   return {
@@ -797,6 +831,7 @@ export function createWorkspace(ctx, chrome) {
     englishTestament,
     englishRef,
     lang: primaryLang,
+    primaryDirection,
     number: localNumber,
     setDirection,
     directionOf,

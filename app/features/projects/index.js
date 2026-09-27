@@ -28,6 +28,7 @@ import {
 import { relativeTime } from '../../core/time.js';
 import { downloadJson, pickJson } from '../../services/transfer.js';
 import { fill, h, keepPlace } from '../../shell/dom.js';
+import { wantsNewTab } from '../../shell/reflink.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
 import { renderMarkdown } from '../../shell/markdown.js';
@@ -244,7 +245,10 @@ export default {
               entry.text.trim()
                 ? renderMarkdown(entry.text, {
                   resolver: shell.workspace.resolver(),
-                  onLink: (ref) => shell.openChapter(ref.book, ref.chapter),
+                  onLink: (ref, options) => (ref.verse
+                    ? shell.openVerse(ref.book, ref.chapter, ref.verse, options)
+                    : shell.openChapter(ref.book, ref.chapter, options)),
+                  onPeek: (ref, anchor) => shell.openPeek(anchor, ref),
                   onTag: () => {},
                 })
                 : h('p', { class: 'muted' }, L('proj.nothingWritten'))));
@@ -287,9 +291,9 @@ export default {
             ? h('div', { class: 'pj-entry-head' },
               h('button', {
                 class: 'pj-ref', title: L('cmd.goToPassage'),
-                onclick: () => (entry.verse
-                  ? shell.openVerse(entry.book, entry.chapter, entry.verse)
-                  : shell.openChapter(entry.book, entry.chapter)),
+                onclick: (e) => (entry.verse
+                  ? shell.openVerse(entry.book, entry.chapter, entry.verse, { newTab: wantsNewTab(e) })
+                  : shell.openChapter(entry.book, entry.chapter, { newTab: wantsNewTab(e) })),
               }, icon('book-open'), reference(entry)),
               tools)
             : h('div', { class: 'pj-entry-head' },
@@ -454,8 +458,10 @@ export default {
               h('span', { class: 'pj-item-s' }, L('proj.nPassages', { n: progress.passages }))),
             h('div', { class: 'pj-pane-list' }, project.entries.map((entry) => h('button', {
               class: `pj-pane-row pj-${entry.kind}${entry.done ? ' is-done' : ''}`,
-              onclick: () => (entry.kind === 'passage'
-                ? (entry.verse ? shell.openVerse(entry.book, entry.chapter, entry.verse) : shell.openChapter(entry.book, entry.chapter))
+              onclick: (e) => (entry.kind === 'passage'
+                ? (entry.verse
+                  ? shell.openVerse(entry.book, entry.chapter, entry.verse, { newTab: wantsNewTab(e) })
+                  : shell.openChapter(entry.book, entry.chapter, { newTab: wantsNewTab(e) }))
                 : shell.openDoc('projects')),
             },
               icon(entry.kind === 'passage' ? 'book-open' : entry.kind === 'todo' ? 'check' : 'note'),
