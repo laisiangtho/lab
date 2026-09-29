@@ -76,9 +76,8 @@ Linux formats, and why there are four:
   upgrade. The maintainer address in `electron-builder.yml` ships in both.
 - **.tar.gz** — the application folder, for anything else.
 
-Window frame: macOS and Windows draw the app's own title band with the system
-buttons over it; Linux keeps the system title bar (see
-`targets/desktop/electron/window.js`).
+Window frame: on every platform the app's own band is the title bar, with the
+window buttons drawn over its corner (see `targets/desktop/electron/window.js`).
 
 ## One-time setup: the web deploy key
 

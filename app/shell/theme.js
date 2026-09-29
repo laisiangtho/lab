@@ -44,6 +44,18 @@ export function watchSystemTheme(getPref) {
   media?.addEventListener('change', () => { if (getPref() === 'system') applyTheme('system'); });
 }
 
+/**
+ * A computed colour ("rgb(12, 12, 14)", or "rgba(…, 1)") as "#rrggbb". A colour
+ * that is not opaque has no single value to hand on, and is refused by name.
+ */
+export function cssColorToHex(value) {
+  const m = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/.exec(String(value).trim());
+  if (!m) throw new Error(`cssColorToHex: not an rgb() colour: ${value}`);
+  const alpha = m[4] === undefined ? 1 : m[4].endsWith('%') ? parseFloat(m[4]) / 100 : parseFloat(m[4]);
+  if (alpha !== 1) throw new Error(`cssColorToHex: not opaque: ${value}`);
+  return `#${[m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, '0')).join('')}`;
+}
+
 function channels(hex) {
   const v = hex.replace('#', '');
   const n = v.length === 3 ? v.split('').map((c) => c + c).join('') : v;

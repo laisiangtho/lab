@@ -26,6 +26,22 @@ export function registerIpc() {
     return { saved: true, path: filePath };
   });
 
+  /**
+   * The colours of the window-button overlay, so the corner matches the band
+   * it sits on in every theme. Only a window created with an overlay has one
+   * to colour (Windows and Linux; macOS draws its traffic lights on the band).
+   */
+  handle('lai:frame-colors', (event, colors) => {
+    const hex = /^#[0-9a-f]{6}$/i;
+    if (!hex.test(colors?.color ?? '') || !hex.test(colors?.symbolColor ?? '')) {
+      throw new Error('frame-colors: expected { color: "#rrggbb", symbolColor: "#rrggbb" }');
+    }
+    if (process.platform === 'darwin') throw new Error('frame-colors: macOS windows have no title-bar overlay');
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) throw new Error('frame-colors: the sender has no window');
+    win.setTitleBarOverlay({ color: colors.color, symbolColor: colors.symbolColor });
+  });
+
   handle('lai:open-external', async (_event, url) => {
     const u = new URL(String(url));
     if (u.protocol !== 'https:') throw new Error(`open-external: refusing non-https URL ${u.href}`);

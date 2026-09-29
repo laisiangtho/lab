@@ -7,7 +7,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 // Which window chrome the main process asked for, so the top band can leave
 // room where the system's own buttons are drawn (see electron/window.js).
-const FRAME = { darwin: 'inset', win32: 'overlay' }[process.platform] ?? null;
+const FRAME = process.platform === 'darwin' ? 'inset' : 'overlay';
 
 contextBridge.exposeInMainWorld('lai', Object.freeze({
   frame: FRAME,
@@ -16,4 +16,6 @@ contextBridge.exposeInMainWorld('lai', Object.freeze({
   openExternal: (url) => ipcRenderer.invoke('lai:open-external', url),
   appInfo: () => ipcRenderer.invoke('lai:app-info'),
   checkUpdate: () => ipcRenderer.invoke('lai:check-update'),
+  /** @param {{ color: string, symbolColor: string }} colors  '#rrggbb' each */
+  setFrameColors: (colors) => ipcRenderer.invoke('lai:frame-colors', colors),
 }));

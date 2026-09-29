@@ -23,23 +23,18 @@ const BACKGROUND = '#181818';
  *
  * The application's top row is a band of its own — tabs, navigation, the panel
  * toggles — and a system title bar above it wastes a strip of every screen on
- * a second, emptier one. So where the system will still draw its own buttons
- * over the app's band, the title bar is hidden: the traffic lights on macOS,
- * the caption buttons through the title-bar overlay on Windows. The buttons
- * stay the system's own; nothing here draws a close button of its own.
- *
- * Linux keeps its title bar. The overlay is not drawn there, and a window with
- * no way to close it is worse than a window with one row too many.
+ * a second, emptier one. So the title bar is hidden and the window buttons are
+ * drawn over the app's band: the traffic lights on macOS, and on Windows and
+ * Linux the caption buttons of the title-bar overlay (drawn on Linux since
+ * Electron 28). The buttons stay Electron's own; nothing here draws a close
+ * button of its own, so a window never ends up with no way to close it.
  *
  * The renderer is told which arrangement it got (see preload) so the band can
  * leave room in the right corner.
  */
 function frame() {
   if (process.platform === 'darwin') return { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 12, y: 12 } };
-  if (process.platform === 'win32') {
-    return { titleBarStyle: 'hidden', titleBarOverlay: { color: BACKGROUND, symbolColor: '#b8b8b8', height: 38 } };
-  }
-  return {};
+  return { titleBarStyle: 'hidden', titleBarOverlay: { color: BACKGROUND, symbolColor: '#b8b8b8', height: 38 } };
 }
 
 export function createMainWindow() {

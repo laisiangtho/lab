@@ -13,7 +13,7 @@ import { icon, mountIcons } from './icons.js';
 import { openMenu } from './menu.js';
 import { wireFades } from './fade.js';
 import { fitStrip, watchStrip } from './overflow.js';
-import { applyAccent, applyTheme, THEME_ICON, watchSystemTheme } from './theme.js';
+import { applyAccent, applyTheme, cssColorToHex, THEME_ICON, watchSystemTheme } from './theme.js';
 import { MAX_ROWS } from '../core/settings.js';
 
 /** The shortest a sidebar row may be dragged. */
@@ -537,6 +537,34 @@ export function createChrome(root, ctx) {
     const frame = ctx.platform.frame ?? null;
     if (frame === 'inset') document.body.dataset.platform = 'darwin';
     else if (frame === 'overlay') document.body.dataset.shell = 'on';
+    syncFrameColors();
+  }
+
+  /**
+   * Where the window buttons are an overlay the target can colour, the corner
+   * takes the band's own colours, and takes them again whenever the theme or
+   * the accent changes — both are written on the root element, by the
+   * settings, the theme button, a reset or the system turning dark. Without
+   * this the corner keeps the colour the window opened with.
+   */
+  function syncFrameColors() {
+    const setColors = ctx.platform.capabilities?.frameColors;
+    if (!setColors) return;
+    const probe = document.createElement('span');
+    probe.hidden = true;
+    probe.style.cssText = 'background:var(--tabstrip-bg);color:var(--text-muted)';
+    document.body.append(probe);
+    let last = '';
+    const send = () => {
+      const style = getComputedStyle(probe);
+      const colors = { color: cssColorToHex(style.backgroundColor), symbolColor: cssColorToHex(style.color) };
+      const key = `${colors.color}${colors.symbolColor}`;
+      if (key === last) return;
+      last = key;
+      Promise.resolve(setColors(colors)).catch((err) => console.error('window frame colours:', err));
+    };
+    send();
+    new MutationObserver(send).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style'] });
   }
 
   /** Chrome the reader can hide, and the widths they can drag. */
