@@ -29,6 +29,11 @@ test('the app in a browser', options, async (t) => {
     await page.waitForSelector('.crumb-tr');
   };
   const switchTo = async (name) => {
+    // Anything already open would be *closed* by the crumb press, leaving the
+    // fill and the Enter to land on a modal nobody can see. This bit the last
+    // two tests that used it from deeper in the suite.
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(150);
     await page.locator('.crumb-tr').first().click();
     await page.locator('.modal-input').fill(name);
     await page.keyboard.press('Enter');
@@ -464,7 +469,10 @@ test('the app in a browser', options, async (t) => {
     const text = await page.locator('.trinfo').innerText();
     assert.match(text, /4 books/, 'what was installed');
     assert.match(text, /6278 verses/);
-    assert.match(text, /\d+ differences/, 'and how it differs from the canon');
+    // Not "62 differences", which raises a question and answers none: what
+    // kind of difference, in words a reader can act on.
+    assert.match(text, /books missing/, 'and how it differs from the canon');
+    assert.match(text, /Against the canon/);
     await page.locator('.tri-more > summary').click();
     assert.match(await page.locator('.tri-diag').innerText(), /Leviticus is absent/);
     await page.keyboard.press('Escape');
@@ -535,6 +543,35 @@ test('the app in a browser', options, async (t) => {
     await page.waitForSelector('.composer:not([hidden])');
     await page.locator('.composer textarea').fill('A note for the export.');
     await page.waitForTimeout(900);
+
+    // The title is most of the title bar, so the window must move by it. A
+    // press that goes nowhere is still a caret; one that travels is a drag.
+    const title = page.locator('.composer .cw-title');
+    const box = await title.boundingBox();
+    const before = await page.locator('.composer').boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 - 60, box.y + box.height / 2 + 40, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    const after = await page.locator('.composer').boundingBox();
+    assert.ok(Math.round(before.x - after.x) >= 50 && Math.round(after.y - before.y) >= 30,
+      `the window followed the title (${before.x}→${after.x}, ${before.y}→${after.y})`);
+
+    // A press that goes nowhere is a caret, and once the caret is in there the
+    // mouse belongs to the text — a title being edited must not drag.
+    await title.click();
+    assert.equal(await page.evaluate(() => document.activeElement?.className), 'cw-title');
+    const parked = await page.locator('.composer').boundingBox();
+    const now = await title.boundingBox();
+    await page.mouse.move(now.x + 20, now.y + now.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(now.x + 90, now.y + now.height / 2 + 40, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    assert.equal(Math.round((await page.locator('.composer').boundingBox()).x), Math.round(parked.x),
+      'selecting the title does not move the window');
+
     await page.locator('.composer .cw-tool.danger').click();
 
     await page.keyboard.press('Control+p');
@@ -1128,7 +1165,7 @@ test('the app in a browser', options, async (t) => {
 
     // And it is a translation like any other: readable, and checked against the
     // canon exactly as a published one is.
-    assert.match(text, /difference/, 'the canon report is the same report');
+    assert.match(text, /books missing|books\b/, 'the canon report is the same report');
     await page.locator('.crumb-tr').first().click().catch(() => {});
     await page.keyboard.press('Escape');
   });
@@ -1188,6 +1225,301 @@ test('the app in a browser', options, async (t) => {
     await page.waitForTimeout(400);
     assert.equal(await page.locator('.cd-item').count(), held, 'and nothing was deleted by it');
     await page.keyboard.press('Escape');
+  });
+
+  await t.test('the read-aloud button says what it is doing, and how far along', async () => {
+    // A long chapter on purpose: the stub speaks a verse every fifth of a
+    // second, and a six-verse psalm would be finished before the test got to
+    // the pause — at which point the next press starts reading rather than
+    // pausing, and the failure reads as a bug in the button.
+    await page.locator('.tabstrip .tab[data-kind="chapter"]').first().click();
+    await page.waitForSelector('.crumb-tr');
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Genesis 1');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.verse');
+    await page.waitForTimeout(400);
+
+    // Headless Chromium has a speech engine with no voices in it, so both are
+    // stood up here — in the language actually on screen, because the app
+    // refuses to read a language it has no voice for and that refusal is
+    // behaviour the rest of the suite depends on, not a thing to work around.
+    const tag = await page.evaluate(() => document.querySelector('.leaf[data-role="primary"] [lang]')?.getAttribute('lang') ?? 'en');
+    await page.evaluate((lang) => {
+      const made = [
+        { name: 'Reader', lang, voiceURI: 'r', localService: true, default: true },
+        { name: 'Nora', lang: 'nb-NO', voiceURI: 'n', localService: true, default: false },
+      ];
+      window.speechSynthesis.getVoices = () => made;
+      let held = null;
+      window.speechSynthesis.speak = (utterance) => {
+        held = utterance;
+        // One verse per beat, so the ring has somewhere to go.
+        setTimeout(() => { if (held === utterance) utterance.onend?.(); }, 220);
+      };
+      window.speechSynthesis.cancel = () => { held = null; };
+      window.speechSynthesis.pause = () => {};
+      window.speechSynthesis.resume = () => {};
+      // The feature listens on the synthesiser, not on the window.
+      window.speechSynthesis.dispatchEvent(new Event('voiceschanged'));
+    }, tag);
+    await page.waitForTimeout(300);
+
+    const button = page.locator('.rib[data-command="speech.toggle"]');
+    if (!await button.count()) return; // not on this reader's ribbon
+    assert.equal(await button.locator('use').getAttribute('href'), '#i-audio', 'idle: the speaker');
+
+    await button.click();
+    await page.waitForTimeout(700);
+    assert.equal(await button.locator('use').getAttribute('href'), '#i-pause',
+      'speaking: the glyph is what pressing it would do next');
+    assert.match(await button.getAttribute('title'), /verse \d+ of \d+/, 'and it says where it has got to');
+    const ring = await button.evaluate((n) => ({
+      marked: n.classList.contains('has-progress'),
+      at: n.style.getPropertyValue('--progress'),
+    }));
+    assert.ok(ring.marked, 'the ring is drawn');
+    assert.match(ring.at, /^[\d.]+%$/);
+
+    // It moves. A ring set once and never again is a decoration.
+    await page.waitForTimeout(900);
+    const later = await button.evaluate((n) => n.style.getPropertyValue('--progress'));
+    assert.notEqual(later, ring.at, `the ring advances (${ring.at} → ${later})`);
+
+    await button.click();
+    await page.waitForTimeout(300);
+    assert.equal(await button.locator('use').getAttribute('href'), '#i-play', 'paused: press to carry on');
+
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Stop reading');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+    assert.equal(await button.locator('use').getAttribute('href'), '#i-audio', 'and back to the speaker when it stops');
+    assert.ok(!await button.evaluate((n) => n.classList.contains('has-progress')), 'with no ring left behind');
+  });
+
+  await t.test('the voices on this device are listed only when somebody asks', async () => {
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Voices on this device');
+    await page.waitForTimeout(300);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.vx-list', { timeout: 10000 });
+    await page.waitForTimeout(300);
+
+    const groups = await page.locator('.vx-group h2').allInnerTexts();
+    assert.ok(groups.length >= 2, `grouped by language (${groups.join(', ')})`);
+    assert.match(groups[0], /The language on screen/, 'the language being read comes first');
+    assert.equal(await page.locator('.vx-item').count(), 2);
+    assert.ok(await page.locator('.vx-try').first().count(), 'every voice can be heard');
+
+    // The filter narrows it, and nothing of it survives being closed.
+    await page.locator('.vx-tools input[type=search]').fill('nora');
+    await page.waitForTimeout(250);
+    assert.equal(await page.locator('.vx-item').count(), 1);
+    await page.locator('.tabstrip .tab[data-kind="chapter"]').first().click();
+    await page.waitForTimeout(300);
+    assert.equal(await page.locator('.vx-list').count(), 0, 'built on demand, and gone with the tab');
+  });
+
+  await t.test('a chapter can be looked at as the file any other software would read', async () => {
+    await page.locator('.tabstrip .tab[data-kind="chapter"]').first().click();
+    await page.waitForSelector('.crumb-tr');
+    await page.waitForTimeout(300);
+    await page.keyboard.press('Control+e');
+    await page.waitForSelector('textarea.source', { timeout: 10000 });
+    await page.waitForTimeout(300);
+
+    assert.match(await page.locator('.src-btn').innerText(), /Markdown/, 'it opens where it always did');
+    assert.equal(await page.locator('textarea.source').getAttribute('readonly'), null, 'and that one is editable');
+    // The text gets the whole leaf: the controls are one button in the crumb
+    // bar, and wrapping the textarea in a toolbar left it half the height.
+    const room = await page.evaluate(() => {
+      const area = document.querySelector('textarea.source');
+      const leaf = area?.closest('.leaf-scroll');
+      return leaf ? Math.round((area.getBoundingClientRect().height / leaf.getBoundingClientRect().height) * 100) : 0;
+    });
+    assert.ok(room >= 98, `the textarea fills the leaf (${room}%)`);
+    // And one scrollbar, not two: the textarea scrolls its own text, so the
+    // box around it must not have anything left to scroll.
+    const spare = await page.evaluate(() => {
+      const leaf = document.querySelector('textarea.source')?.closest('.leaf-scroll');
+      return leaf ? leaf.scrollHeight - leaf.clientHeight : -1;
+    });
+    assert.equal(spare, 0, `the leaf has nothing of its own to scroll (${spare}px over)`);
+
+    await page.locator('.src-btn').click();
+    await page.waitForTimeout(250);
+    const offered = await page.locator('.popover.menu .menu-name').allInnerTexts();
+    assert.ok(offered.includes('USFM') && offered.includes('OSIS') && offered.includes('This app’s JSON'),
+      `every writer is offered (${offered.join(', ')})`);
+
+    await page.locator('.popover.menu .menu-item', { hasText: 'USFM' }).first().click();
+    await page.waitForTimeout(600);
+    const usfm = await page.locator('textarea.source').inputValue();
+    assert.match(usfm, /^\\id [A-Z1-9]{3} /, 'the chapter, as USFM');
+    assert.match(usfm, /\n\\c \d+\n/);
+    assert.match(usfm, /\n\\v 1 /);
+    assert.equal(await page.locator('textarea.source').getAttribute('readonly'), '',
+      'and a view rather than a box that discards what is typed into it');
+
+    // The thing that never existed: a way to get the text out. Both are in the
+    // same menu as the formats, because one button is a strip of workspace.
+    await page.locator('.src-btn').click();
+    await page.waitForTimeout(200);
+    assert.ok(await page.locator('.popover.menu .menu-item', { hasText: 'Copy all of it' }).count());
+    const saving = page.waitForEvent('download');
+    await page.locator('.popover.menu .menu-item', { hasText: 'Save as a file' }).click();
+    const file = await saving;
+    assert.match(file.suggestedFilename(), /\.usfm$/);
+
+    await page.locator('.src-btn').click();
+    await page.waitForTimeout(200);
+    await page.locator('.popover.menu .menu-item', { hasText: 'Markdown' }).first().click();
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Control+e');
+    await page.waitForTimeout(400);
+  });
+
+  await t.test('a translation on this device can be written out as something else', async () => {
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Library');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.library-item');
+    await page.waitForTimeout(400);
+
+    const row = page.locator('.library-item.state-installed, .library-item.state-update').first();
+    await row.locator('.lib-act[aria-haspopup="menu"]').click();
+    await page.waitForSelector('.popover.menu');
+    await page.locator('.popover.menu .menu-item', { hasText: 'Export' }).click();
+    await page.waitForSelector('.fd', { timeout: 10000 });
+
+    const formats = await page.locator('.fd-row[data-field="format"] .fd-opt-n').allInnerTexts();
+    assert.ok(formats.length >= 6, `every writer is offered (${formats.join(', ')})`);
+    // It says what it will do before it is asked to do it.
+    assert.match(await page.locator('.fd-live').innerText(), /66 books · \d+ chapters/, 'on open');
+    // One book, as USFM: the granular case, which is what anybody actually wants.
+    await page.locator('.fd-row[data-field="format"] .fd-opt', { hasText: 'USFM' }).click();
+    // Naming books is the same question as the scope beside it, so it stands
+    // in that row and takes it over.
+    const scope = page.locator('.fd-row[data-field="scope"] .fd-opts');
+    assert.equal(await scope.getAttribute('data-free'), '0', 'nothing named yet');
+    await scope.locator('input.fd-free').fill('Psalms');
+    await page.waitForTimeout(250);
+    assert.equal(await scope.getAttribute('data-free'), '1', 'and the choices it overrules step back');
+    const live = await page.locator('.fd-live').innerText();
+    assert.match(live, /1 books? · 150 chapters/, `and again after every answer (${live})`);
+    assert.match(live, /paragraphing/, 'with what the format cannot carry');
+    // Pressing a choice is the way back: it clears what was named.
+    await scope.locator('.fd-opt', { hasText: 'All' }).first().click();
+    await page.waitForTimeout(200);
+    assert.equal(await scope.locator('input.fd-free').inputValue(), '');
+    assert.match(await page.locator('.fd-live').innerText(), /66 books/, 'and the whole translation is back');
+    await scope.locator('input.fd-free').fill('Psalms');
+    await page.waitForTimeout(250);
+    const saving = page.waitForEvent('download');
+    await page.locator('.fd-acts .btn.primary').click();
+    const file = await saving;
+    assert.match(file.suggestedFilename(), /\.usfm$/, 'one book is one file, not an archive');
+    await page.waitForTimeout(600);
+  });
+
+  await t.test('a translation as it is published — an archive, taken whole', async () => {
+    // What eBible.org hands out: the scripture, the book names, the metadata
+    // and the copyright, in one download.
+    const bundle = await page.evaluate(async () => {
+      const enc = new TextEncoder();
+      const table = (() => {
+        const t = new Uint32Array(256);
+        for (let i = 0; i < 256; i += 1) { let c = i; for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[i] = c >>> 0; }
+        return t;
+      })();
+      const crc = (b) => { let c = 0xffffffff; for (const x of b) c = table[(c ^ x) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+      const verses = Array.from({ length: 31 }, (_, i) => `<v id="${i + 1}"/>In the <w s="H7225">beginning</w> God created verse ${i + 1}.<ve/>`).join('');
+      const files = [
+        { name: 'engkjvcpb_usfx.xml', text: `<usfx><book id="GEN"><c id="1"/>${verses}</book></usfx>` },
+        { name: 'BookNames.xml', text: '<BookNames><book code="GEN" abbr="Gen" short="Genesis" long="The First Book of Moses"/></BookNames>' },
+        { name: 'engkjvcpbmetadata.xml', text: '<DBLMetadata><identification><name>KJV Cambridge Paragraph Bible</name><abbreviation>KJVCPB</abbreviation></identification><language><iso>eng</iso><name>English</name><scriptDirection>LTR</scriptDirection></language></DBLMetadata>' },
+        { name: 'copr.htm', text: '<html><body>Public domain.</body></html>' },
+        { name: 'dejavuserif.css', text: 'body{}' },
+      ];
+      const parts = []; const central = []; let offset = 0;
+      for (const file of files) {
+        const name = enc.encode(file.name); const body = enc.encode(file.text);
+        const local = new Uint8Array(30 + name.byteLength); const lv = new DataView(local.buffer);
+        lv.setUint32(0, 0x04034b50, true); lv.setUint16(4, 20, true);
+        lv.setUint32(14, crc(body), true); lv.setUint32(18, body.byteLength, true);
+        lv.setUint32(22, body.byteLength, true); lv.setUint16(26, name.byteLength, true);
+        local.set(name, 30); parts.push(local, body);
+        const head = new Uint8Array(46 + name.byteLength); const hv = new DataView(head.buffer);
+        hv.setUint32(0, 0x02014b50, true); hv.setUint32(16, crc(body), true);
+        hv.setUint32(20, body.byteLength, true); hv.setUint32(24, body.byteLength, true);
+        hv.setUint16(28, name.byteLength, true); hv.setUint32(42, offset, true);
+        head.set(name, 46); central.push(head);
+        offset += local.byteLength + body.byteLength;
+      }
+      const dir = central.reduce((n, c) => n + c.byteLength, 0);
+      const end = new Uint8Array(22); const ev = new DataView(end.buffer);
+      ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, files.length, true);
+      ev.setUint16(10, files.length, true); ev.setUint32(12, dir, true); ev.setUint32(16, offset, true);
+      const blob = new Blob([...parts, ...central, end]);
+      return [...new Uint8Array(await blob.arrayBuffer())];
+    });
+
+    const chooser = page.waitForEvent('filechooser');
+    await page.locator('.lib-act[title="Add your own"]').click();
+    await (await chooser).setFiles({
+      name: 'engkjvcpb_usfx.zip', mimeType: 'application/zip', buffer: Buffer.from(bundle),
+    });
+    await page.waitForSelector('.fd', { timeout: 15000 });
+
+    // The archive answers the questions, so the reader confirms rather than types.
+    assert.match(await page.locator('.fd-lede').innerText(), /1 scripture file/);
+    assert.match(await page.locator('.fd-lede').innerText(), /own book names/);
+    assert.equal(await page.locator('.fd-row[data-field="name"] input').inputValue(), 'KJV Cambridge Paragraph Bible');
+    assert.equal(await page.locator('.fd-row[data-field="language"] input').inputValue(), 'eng');
+    assert.equal(await page.locator('.fd-row[data-field="format"]').count(), 0, 'and it is not asked what format it is');
+
+    await page.locator('.fd-acts .btn.primary').click();
+    await page.waitForTimeout(3500);
+    assert.equal(await page.locator('.library-item.state-local').count(), 2, 'it is in the library');
+  });
+
+  await t.test('a Strong\'s number says what it means, once there is a lexicon to ask', async () => {
+    await page.route('**/lexicon/strongs-h.json', (route) => route.fulfill({
+      status: 200,
+      headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        app: 'lai-siangtho', kind: 'lexicon', schema: 1, testament: 'H',
+        entry: { 7225: { lemma: 'רֵאשִׁית', xlit: 'rêʼshîyth', strongs_def: 'the first, in place, time, order or rank' } },
+      }),
+    }));
+
+    await page.locator('.tabstrip .tab[data-kind="chapter"]').first().click();
+    await page.waitForSelector('.crumb-tr');
+    await switchTo('Danske');
+    await page.waitForSelector('.strongs', { timeout: 15000 });
+    await page.locator('.strongs').first().click();
+    await page.waitForTimeout(400);
+
+    // Not a dead end: a dead end with the way out on it.
+    const offer = page.locator('.popover:not([hidden])');
+    assert.match(await offer.innerText(), /not on this device/);
+    await page.locator('.pv-get').click();
+    await page.waitForTimeout(1500);
+    const shown = await offer.innerText();
+    assert.match(shown, /רֵאשִׁית/, 'the word itself');
+    assert.match(shown, /the first, in place/, 'and what it means');
+
+    // And the second press answers without asking the network again.
+    await page.keyboard.press('Escape');
+    await page.mouse.click(5, 5);
+    await page.waitForTimeout(200);
+    await page.locator('.strongs').first().click();
+    await page.waitForTimeout(300);
+    assert.match(await offer.innerText(), /the first, in place/, 'kept, not fetched twice');
   });
 
   await t.test('nothing failed along the way', () => {

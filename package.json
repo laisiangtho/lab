@@ -1,7 +1,7 @@
 {
   "name": "lai-siangtho",
   "productName": "Lai Siangtho",
-  "version": "26.9.27",
+  "version": "26.9.29",
   "description": "Bible reading and study — web (PWA) and desktop (Electron) from one codebase",
   "author": {
     "name": "Lai Siangtho"

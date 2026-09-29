@@ -594,6 +594,7 @@ export function createChrome(root, ctx) {
       const glyph = c.id === 'shell.theme' ? (THEME_ICON[settings.get().theme] ?? 'monitor') : (c.icon ?? 'book');
       const button = ribButton(glyph, c.title, null, true, c.id === 'shell.theme' ? 'themeBtn' : undefined);
       button.dataset.command = c.id;
+      button.dataset.glyph = glyph;
       if (c.needsChapter) button.dataset.needsChapter = '1';
       button.addEventListener('contextmenu', (e) => { e.preventDefault(); openRibbonMenu(button, c.id); });
       return button;
@@ -616,16 +617,56 @@ export function createChrome(root, ctx) {
     for (const button of ribRail.querySelectorAll('.rib[data-command]')) {
       const command = registry.commands().find((c) => c.id === button.dataset.command);
       if (!command) continue;
-      let on = false;
+      let said = false;
       try {
-        on = command.state ? Boolean(command.state()) : (command.opens ? command.opens === openDocId : false);
+        said = command.state ? command.state() : (command.opens ? command.opens === openDocId : false);
       } catch {
         // A feature that cannot answer is not a reason to lose the ribbon.
-        on = false;
+        said = false;
       }
-      button.classList.toggle('is-active', on);
-      button.setAttribute('aria-pressed', String(on));
+      paintRibButton(button, command, said);
     }
+  }
+
+  /**
+   * What one ribbon button says about itself.
+   *
+   * `state()` may answer with a plain boolean — on or off, which is what most
+   * commands have to say — or with an object, for the few that are doing
+   * something rather than merely being switched on:
+   *
+   *   on        lit or not, as before
+   *   icon      a glyph for right now: a pause bar while it is playing
+   *   title     what pressing it would do now, for the tooltip
+   *   progress  0…1, drawn as a ring round the button
+   *
+   * The richer answer exists because reading aloud is the one command whose
+   * state is a process. A button that looks identical whether it is idle,
+   * speaking or paused is a button the reader has to press to find out.
+   */
+  function paintRibButton(button, command, said) {
+    const state = said && typeof said === 'object' ? said : { on: Boolean(said) };
+    button.classList.toggle('is-active', Boolean(state.on));
+    button.setAttribute('aria-pressed', String(Boolean(state.on)));
+
+    const glyph = state.icon ?? (command.id === 'shell.theme'
+      ? (THEME_ICON[settings.get().theme] ?? 'monitor')
+      : (command.icon ?? 'book'));
+    if (button.dataset.glyph !== glyph) {
+      button.dataset.glyph = glyph;
+      fill(button, icon(glyph));
+    }
+
+    const title = state.title ?? command.title;
+    if (button.title !== title) {
+      button.title = title;
+      button.setAttribute('aria-label', title);
+    }
+
+    const done = Number.isFinite(state.progress) ? Math.min(Math.max(state.progress, 0), 1) : null;
+    button.classList.toggle('has-progress', done !== null);
+    if (done === null) button.style.removeProperty('--progress');
+    else button.style.setProperty('--progress', `${Math.round(done * 1000) / 10}%`);
   }
 
   function fitRibbon() {

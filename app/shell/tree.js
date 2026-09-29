@@ -25,7 +25,10 @@ export function createTree(ctx, { onOpen }) {
   const held = ctx.records.get(KEY, null);
   let follow = held?.follow !== false;
   /** Chapter chips carry how long the chapter is, unless the reader turns it off. */
-  let counts = held?.counts !== false;
+  // Off unless asked for. The count under each chapter number answers a
+  // question most readers are not asking, and in a script whose digits are
+  // built from stacked strokes it is two numbers competing for one box.
+  let counts = held?.counts === true;
   const remember = () => ctx.records.save(KEY, { follow, counts })
     .catch(() => { /* a preference is not worth a message */ });
   const filterInput = h('input', { id: 'filterBooks', spellcheck: 'false', placeholder: L('ph.filter') });
@@ -145,9 +148,12 @@ export function createTree(ctx, { onOpen }) {
         const chapter = i + 1;
         const verses = ctx.category.verseCount(b.id, chapter);
         const label = `${names.englishRef(b.id, chapter)} · ${L('lbl.verses', { n: verses })}`;
+        // The language reaches the chip because its numerals are the
+        // translation's own, and a script whose digits carry stacked marks
+        // needs more room than a Latin one to resolve at all.
         return h('button', {
           class: `ch-chip${isCurrent && chapter === currentChapter ? ' is-active' : ''}`,
-          title: label, 'aria-label': label,
+          title: label, 'aria-label': label, lang: names.lang(),
           onclick: () => onOpen(b.id, chapter),
         },
           h('span', { class: 'cc-n' }, names.number(chapter)),

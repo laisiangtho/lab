@@ -4,5 +4,5 @@
  * VERSION is yy.mm.dd.build — the date of the build and its number that day.
  */
 
-export const VERSION = '26.09.27.5';
-export const BUILT_AT = '2026-09-27T12:39:54.612Z';
+export const VERSION = '26.09.29.3';
+export const BUILT_AT = '2026-09-29T04:57:49.534Z';

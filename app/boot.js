@@ -20,6 +20,7 @@ import { loadAliases } from './services/aliases.js';
 import { createAnnotations } from './services/annotations.js';
 import { createLibrary, fetchJson } from './services/library.js';
 import { createLangPacks } from './services/langpacks.js';
+import { createLexicons } from './services/lexicon.js';
 import { createRecords } from './services/records.js';
 import { createSearch } from './services/search.js';
 import { createSettings } from './services/settings.js';
@@ -62,6 +63,7 @@ async function boot({ root, platform, features, config: overrides }) {
   const settings = await createSettings({ store, category });
   const annotations = await createAnnotations({ store, category });
   const records = await createRecords({ store });
+  const lexicons = createLexicons({ store, config });
   const registry = createRegistry();
   // Persisted settings seed the session; later changes flow back into them.
   const state = createState({ ...settings.get() });
@@ -79,6 +81,7 @@ async function boot({ root, platform, features, config: overrides }) {
     annotations,
     records,
     langPacks: createLangPacks({ records, config }),
+    lexicons,
     search: createSearch(),
     state,
     registry,
@@ -119,6 +122,10 @@ async function boot({ root, platform, features, config: overrides }) {
   for (const note of broken) ctx.shell.notify(L('msg.featureBroken', { what: note }), 'error');
   if (lost) ctx.shell.notify(lost, 'error');
   reportLost = (reason) => ctx.shell.notify(L('msg.storageLost', { why: reason }), 'error');
+
+  // Whatever lexicon this device already holds, read once so a Strong's number
+  // pressed in the first minute answers without a round trip.
+  lexicons.load().catch(() => { /* a lexicon is an extra, never a start-up failure */ });
 
   // The catalog is checked on every start, but only a change is worth saying:
   // "unchanged" is the answer almost every time, and nobody asked.

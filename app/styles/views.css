@@ -348,6 +348,37 @@ body.is-dragging-ui { user-select: none; cursor: grabbing; }
                "Myanmar MN", "Myanmar Sangam MN", var(--font-text);
   line-height: calc(var(--lh-text) * 1.26);
 }
+/* The chapter grid, in a script that is not Latin.
+   A chip is two numbers stacked in 30 pixels: the chapter at 11px and its
+   verse count at 8px. Burmese digits are built from closed loops and stacked
+   strokes — ၉ inside 8 pixels is a grey smudge, and the two lines collide in a
+   box sized for digits half as tall. So the chip grows, both numbers grow, and
+   the grid gives each one more width, because the same digits are wider too. */
+.tree-children.grid:has(.ch-chip:is(:lang(my), :lang(mya))) {
+  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+}
+.ch-chip:is(:lang(my), :lang(mya)) {
+  height: 42px;
+  font-family: "Myanmar Text", "Noto Sans Myanmar", "Padauk", "Myanmar MN", var(--font-ui);
+  line-height: 1.25;
+}
+.ch-chip:is(:lang(my), :lang(mya)) .cc-n { font-size: 14px; }
+.ch-chip:is(:lang(my), :lang(mya)) .cc-v { font-size: 11px; opacity: .7; }
+
+/* Scripts that are taller than Latin without being Burmese: enough room to
+   read the count, without the extra width that Burmese loops need. */
+.ch-chip:is(:lang(th), :lang(tha), :lang(km), :lang(khm), :lang(lo), :lang(lao),
+            :lang(bn), :lang(ben), :lang(hi), :lang(hin), :lang(ta), :lang(tam),
+            :lang(am), :lang(amh), :lang(ti), :lang(tir)) {
+  height: 38px;
+}
+.ch-chip:is(:lang(th), :lang(tha), :lang(km), :lang(khm), :lang(lo), :lang(lao),
+            :lang(bn), :lang(ben), :lang(hi), :lang(hin), :lang(ta), :lang(tam),
+            :lang(am), :lang(amh), :lang(ti), :lang(tir)) .cc-n { font-size: 13px; }
+.ch-chip:is(:lang(th), :lang(tha), :lang(km), :lang(khm), :lang(lo), :lang(lao),
+            :lang(bn), :lang(ben), :lang(hi), :lang(hin), :lang(ta), :lang(tam),
+            :lang(am), :lang(amh), :lang(ti), :lang(tir)) .cc-v { font-size: 10px; opacity: .7; }
+
 :is(.chapter, .pd-text, .note):is(:lang(ar), :lang(ara), :lang(fa), :lang(ur)) {
   font-family: "Noto Naskh Arabic", "Amiri", "Geeza Pro", "Traditional Arabic", var(--font-text);
   font-size: calc(var(--fs-text) * 1.12);
@@ -413,10 +444,23 @@ body.is-dragging-tab .sidebar[data-empty="true"] .side-body::after {
 .leaf-head .tr-btn svg { width: 14px; height: 14px; }
 
 /* ---- what a translation is -----------------------------------------------*/
-.trinfo { width: min(360px, calc(100vw - 20px)); padding: 14px 16px; }
-/* A licence can run to a paragraph; the popover scrolls rather than growing
-   past the window. */
-.tri-body { max-height: min(62vh, 520px); overflow: auto; }
+.trinfo { padding: 14px 16px; }
+/* A licence can run to several paragraphs — the KJV Cambridge Paragraph Bible's
+   is five — so the box does not scroll to hold it: the licence gets a block of
+   its own, clamped to six lines with a press for the rest, and the popover is
+   wide enough that a long line is a line rather than a column of two words.
+   What is left over still scrolls, with a faded edge rather than a bar. */
+.trinfo { width: min(420px, calc(100vw - 20px)); }
+.tri-body { max-height: min(62vh, 520px); overflow-y: auto; scrollbar-width: none; }
+.tri-body::-webkit-scrollbar { width: 0; }
+.tri-block { margin-top: 12px; }
+.tri-term { font-size: var(--fs-ui-s); color: var(--text-faint); }
+.tri-long {
+  margin: 2px 0 0; font-size: var(--fs-ui-s); line-height: 1.55; color: var(--text-muted);
+  display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden;
+}
+.tri-long.is-open { display: block; overflow: visible; }
+.tri-long-more { margin-top: 4px; font-size: var(--fs-ui-s); }
 .tri-name { font-size: var(--fs-ui-l); font-weight: 650; color: var(--text-normal); }
 .tri-sub { font-size: var(--fs-ui-s); color: var(--text-faint); margin-top: 2px; }
 .tri-desc { margin: 10px 0 0; color: var(--text-muted); font-size: var(--fs-ui-m); line-height: 1.55; }
@@ -1149,3 +1193,52 @@ label.set-row:hover { background: var(--bg-hover); }
 }
 .lib-act:hover { background: var(--bg-hover); color: var(--text-normal); }
 .lib-act svg { width: 16px; height: 16px; }
+
+/* ---- the voices on this device -------------------------------------------*/
+/* Built when it is opened and thrown away when it is closed: a hundred rows of
+   names nobody recognises has no business being on the settings page. */
+.vx-doc { padding: 0; }
+.vx { padding: 22px 26px 30px; }
+.vx-tools { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.vx-tools .field { flex: 1 1 220px; max-width: 320px; }
+.vx-group { margin-top: 22px; }
+.vx-group h2 {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 6px;
+  font-family: var(--font-ui); font-size: var(--fs-ui-m); font-weight: 600; color: var(--text-muted);
+}
+.vx-n {
+  min-width: 18px; padding: 0 5px; border-radius: 99px; background: var(--base-10);
+  font-size: var(--fs-ui-s); font-weight: 600; color: var(--text-faint); text-align: center;
+}
+.vx-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.vx-item {
+  display: flex; align-items: center; gap: 10px; padding: 7px 10px;
+  border-radius: var(--radius-m); border-top: var(--divider);
+}
+.vx-item:first-child { border-top: 0; }
+.vx-item:hover { background: var(--bg-hover); }
+.vx-item.is-playing { background: var(--accent-fade); }
+.vx-try {
+  width: 26px; height: 26px; flex: 0 0 auto; display: grid; place-items: center;
+  border-radius: 99px; background: var(--bg-secondary); color: var(--text-muted); cursor: pointer;
+}
+.vx-try:hover { background: var(--accent); color: #fff; }
+.vx-try svg { width: 13px; height: 13px; }
+.vx-item.is-playing .vx-try { background: var(--accent); color: #fff; }
+.vx-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-ui); font-size: var(--fs-ui-m); color: var(--text-normal); }
+.vx-tag { flex: 0 0 auto; font-family: var(--font-ui); font-size: var(--fs-ui-s);
+  color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+/* ---- source view ---------------------------------------------------------*/
+/* The format, the copy and the save are one button in the crumb bar, so the
+   text gets the whole leaf. A toolbar over it was a strip of workspace spent on
+   three controls, and wrapping the textarea in a flex column inside a scroller
+   left it half the height it had. */
+.src-btn { width: auto; gap: 5px; padding: 0 7px; }
+.src-btn-n { font-family: var(--font-ui); font-size: var(--fs-ui-s); font-weight: 600; }
+@media (max-width: 720px) { .src-btn-n { display: none; } }
+
+.tri-why {
+  margin: 8px 0 10px; font-size: var(--fs-ui-s); line-height: 1.55; color: var(--text-faint);
+}

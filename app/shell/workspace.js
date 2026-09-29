@@ -11,6 +11,7 @@
  */
 
 import { alignChapter } from '../core/align.js';
+import { SOURCE_FORMATS } from '../core/settings.js';
 import { createResolver } from '../core/reference.js';
 import { fromMarkdown, toMarkdown } from '../core/source.js';
 import { localizeNumber } from '../core/translation.js';
@@ -18,6 +19,9 @@ import { h } from './dom.js';
 import { wirePaneDrag, wireTabDrag } from './dragdrop.js';
 import { createFloats } from './floats.js';
 import { wireFades } from './fade.js';
+import { bookCodes } from '../core/formats/books.js';
+import { write, writerById } from '../core/formats/write.js';
+import { saveText } from '../services/transfer.js';
 import { icon } from './icons.js';
 import { L } from './i18n.js';
 import { openMenu } from './menu.js';
@@ -667,6 +671,14 @@ export function createWorkspace(ctx, chrome) {
             onclick: () => ctx.shell.openTranslationPicker(pane.index),
           }, pane.meta.info.shortname))
           : crumbs(pane, book, chapter),
+        // In source mode the format, the copy and the save sit here rather than
+        // in a band of their own over the text: the text is the point, and a
+        // toolbar is a strip of workspace spent on three controls.
+        mode === 'source' && !compare ? h('button', {
+          class: 'tr-btn src-btn', 'aria-haspopup': 'menu',
+          title: L('src.pick'), 'aria-label': L('src.pick'),
+          onclick: (e) => openSourceMenu(e.currentTarget, book, chapter, pane),
+        }, icon('code'), h('span', { class: 'src-btn-n' }, L(`src.fmt.${state.get().sourceFormat ?? 'markdown'}`))) : null,
         h('button', {
           class: 'tr-btn', title: L('cmd.translationInfo'), 'aria-label': L('cmd.translationInfo'),
           onclick: (e) => ctx.shell.openTranslationInfo(e.currentTarget, pane.meta),
@@ -679,13 +691,39 @@ export function createWorkspace(ctx, chrome) {
   }
 
   /** Source mode: the chapter as Markdown; only the notes may be edited. */
+  /**
+   * The chapter as a file.
+   *
+   * It used to be Markdown and only Markdown, in a textarea with no way to copy
+   * what was in it. It is now whichever format the reader asks for — which is
+   * the same set of writers the library exports with, so this doubles as the
+   * demonstration of what this app does when it reads somebody else's file: the
+   * same chapter, as USFM, as OSIS, as our own JSON, side by side with the
+   * reading.
+   *
+   * **Markdown is the only editable one**, and that is deliberate rather than
+   * unfinished. The round trip works because `## Notes` is a boundary the
+   * reader's own material sits below; USFM and OSIS have no such line, and a
+   * textarea that silently discards what is typed into it is worse than one
+   * that says it is a view.
+   */
   function sourceView(pane, { book, chapter }) {
+    const format = state.get().sourceFormat ?? 'markdown';
     const notes = ctx.annotations.forChapter(book, chapter).notes;
-    const original = toMarkdown({
-      meta: pane.meta, verses: pane.verses, book, chapter, bookName: bookLabel(book), notes,
+    const editable = format === 'markdown';
+
+    const original = editable
+      ? toMarkdown({ meta: pane.meta, verses: pane.verses, book, chapter, bookName: bookLabel(book), notes })
+      : writeChapter(format, pane, book, chapter);
+
+    const area = h('textarea', {
+      class: 'source scroll', spellcheck: 'false', dir: 'auto',
+      readonly: editable ? undefined : '',
+      'aria-label': L('src.area', { format: L(`src.fmt.${format}`) }),
     });
-    const area = h('textarea', { class: 'source scroll', spellcheck: 'false', dir: 'auto' });
     area.value = original;
+    if (!editable) return area;
+
     area.addEventListener('blur', async () => {
       if (area.value === original) return;
       try {
@@ -698,6 +736,70 @@ export function createWorkspace(ctx, chrome) {
       }
     });
     return area;
+  }
+
+  /**
+   * Which format to look at this chapter in, and the two things anybody looking
+   * at a file wants to do with it.
+   *
+   * Both used to be in a toolbar over the text. One button in the crumb bar
+   * says which format is showing *and* opens everything else, which is a strip
+   * of workspace given back.
+   */
+  function openSourceMenu(anchor, book, chapter, pane) {
+    const now = state.get().sourceFormat ?? 'markdown';
+    const area = () => anchor.closest('.leaf')?.querySelector('textarea.source');
+    const stem = `${String(book).padStart(2, '0')}-${bookCodes(book).usfm || book}-${pane.meta.identify}-${chapter}`;
+    openMenu(anchor, [
+      ...SOURCE_FORMATS.map((id) => ({
+        id,
+        title: L(`src.fmt.${id}`),
+        sub: id === 'markdown' ? L('src.editableShort') : L('src.readonlyShort'),
+        icon: id === now ? 'check' : 'code',
+        active: id === now,
+        run: () => state.set({ sourceFormat: id }),
+      })),
+      {
+        id: 'copy',
+        title: L('src.copy'),
+        icon: 'copy',
+        run: async () => {
+          const node = area();
+          if (!node) return;
+          try {
+            await navigator.clipboard.writeText(node.value);
+            chrome.notify(L('msg.copied', { what: L(`src.fmt.${now}`) }));
+          } catch {
+            chrome.notify(L('src.noClipboard'), 'error');
+          }
+        },
+      },
+      {
+        id: 'save',
+        title: L('src.save'),
+        icon: 'download',
+        run: () => {
+          const node = area();
+          if (node) saveText(`${stem}.${extensionOf(now)}`, node.value);
+        },
+      },
+    ]);
+  }
+
+  const extensionOf = (format) => (writerById(format)?.ext ?? 'txt');
+
+  /** One chapter, through the same writers the library exports with. */
+  function writeChapter(format, pane, book, chapter) {
+    try {
+      const files = write(format, {
+        meta: pane.meta,
+        chapters: [{ book, chapter, verses: pane.verses ?? {} }],
+        bookName: () => bookLabel(book),
+      });
+      return files.map((file) => file.text).join('\n');
+    } catch (err) {
+      return `${err.message}\n`;
+    }
   }
 
   function emptyLeaf(message, action, run) {

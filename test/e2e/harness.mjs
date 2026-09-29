@@ -158,7 +158,10 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
     }),
     // No 639-1, which is the ordinary state of a real translation file: the
     // field exists in the schema and nobody filled it in.
-    ddb1931: build('ddb1931', 'Det Danske Bibel', 'Danske', 'Danish', { name: 'dan', iso: { '639-1': '', '639-3': 'dan' } }, pick(), (b, c, v) => pad(`Dansk ${c}:${v} tekst.`, 'og ordet gik ud over hele landet og blev hørt af alle'), {
+    // One verse carries a Strong's number, the way an import from a tagged
+    // edition leaves them: the reading surface has to turn `{H7225}` into a
+    // word somebody can press, and nothing else in the fixtures exercises that.
+    ddb1931: build('ddb1931', 'Det Danske Bibel', 'Danske', 'Danish', { name: 'dan', iso: { '639-1': '', '639-3': 'dan' } }, pick(), (b, c, v) => pad(`Dansk ${c}:${v} tekst${v === 1 ? '{H7225}' : ''}.`, 'og ordet gik ud over hele landet og blev hørt af alle'), {
       bookNames: { 1: 'Første Mosebog', 2: 'Anden Mosebog', 19: 'Salmernes Bog', 40: 'Matthæus' },
     }),
   };

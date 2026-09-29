@@ -219,27 +219,53 @@ export default {
       queueSave();
     });
 
+    /**
+     * The title bar moves the window — including the title field itself.
+     *
+     * The field is most of the bar, so refusing to drag from it leaves two
+     * thin strips to grab by. It can be both: a press that goes nowhere is a
+     * caret, and a press that travels is a drag. Only once the pointer has
+     * moved a few pixels does the window start following, and a title already
+     * being edited is left alone so text can still be selected with the mouse.
+     */
     function wireDrag() {
       const bar = element.querySelector('.cw-bar');
+      const SLOP = 4;
       bar.addEventListener('pointerdown', (e) => {
-        if (e.target.closest('button, input') || element.dataset.max === '1') return;
-        e.preventDefault();
+        if (e.target.closest('button') || element.dataset.max === '1') return;
+        const onField = e.target === title;
+        if (onField && document.activeElement === title) return;
+        if (!onField) e.preventDefault();
         const rect = element.getBoundingClientRect();
         const from = { x: e.clientX, y: e.clientY, left: rect.left, top: rect.top };
-        bar.setPointerCapture(e.pointerId);
-        bar.classList.add('is-dragging');
+        let dragging = !onField;
+        if (dragging) { bar.setPointerCapture(e.pointerId); bar.classList.add('is-dragging'); }
+
         const move = (ev) => {
+          if (!dragging) {
+            if (Math.abs(ev.clientX - from.x) < SLOP && Math.abs(ev.clientY - from.y) < SLOP) return;
+            dragging = true;
+            // The press was on its way to the caret; it is a drag instead.
+            title.blur();
+            window.getSelection()?.removeAllRanges();
+            bar.setPointerCapture(ev.pointerId);
+            bar.classList.add('is-dragging');
+          }
           element.style.left = `${Math.min(Math.max(from.left + ev.clientX - from.x, 0), window.innerWidth - 120)}px`;
           element.style.top = `${Math.min(Math.max(from.top + ev.clientY - from.y, 0), window.innerHeight - 60)}px`;
         };
         const up = () => {
           bar.classList.remove('is-dragging');
-          bar.removeEventListener('pointermove', move);
-          bar.removeEventListener('pointerup', up);
-          remember({ left: element.offsetLeft, top: element.offsetTop });
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
+          window.removeEventListener('pointercancel', up);
+          if (dragging) remember({ left: element.offsetLeft, top: element.offsetTop });
         };
-        bar.addEventListener('pointermove', move);
-        bar.addEventListener('pointerup', up);
+        // On the window, because until the drag arms there is no capture, and
+        // a fast hand leaves the bar before the fourth pixel.
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', up);
       });
     }
 

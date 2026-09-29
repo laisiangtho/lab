@@ -81,6 +81,7 @@ export function createNavPop(ctx, { bookName, lang, number, english, englishRef 
       grid.replaceChildren(...Array.from({ length: book.chapters }, (_, i) => i + 1).map((n) => h('button', {
         class: `ch-chip${present.has(n) ? ' has-text' : ''}${n === at.chapter ? ' is-active' : ''}`,
         title: englishRef(at.book, n), 'aria-label': englishRef(at.book, n),
+        lang: lang(),
         tabindex: n === at.chapter || (!at.chapter && n === 1) ? '0' : '-1',
         onclick: () => { const go = onPick; close(); go?.(at.book, n); },
       }, number(n))));

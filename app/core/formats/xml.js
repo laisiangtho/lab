@@ -24,15 +24,25 @@ import { localName, readXml } from './xmlread.js';
 const NOTES = new Set(['note', 'f', 'x', 'ef', 'fe', 'rq', 'catchword', 'reftext', 'ref', 'xt', 'fr', 'ft', 'fv', 'fq']);
 /** Elements that are neither text nor structure — titles handled separately. */
 const TITLES = new Set(['title', 's', 'ms', 'd', 'caption']);
+/**
+ * USX says with a `style` attribute what USFX says with an element name, so a
+ * `<para>` is a heading, a cross-reference line, or the text itself depending
+ * on what it is styled as.
+ */
+const PARA_TITLE = /^(s\d?|ms\d?|mt\d?|d|sr|sp)$/;
+const PARA_NOTE = /^(r|rq|ip|iot|io\d?|ili\d?|im|ie|is\d?|rem|lit)$/;
 
 /**
  * Which dialect a document is, by what it contains.
- * @returns {'zefania'|'osis'|'usfx'|null}
+ * @returns {'zefania'|'osis'|'usfx'|'usx'|null}
  */
 export function sniffXml(source) {
   const head = String(source ?? '').slice(0, 4000).toLowerCase();
   if (head.includes('<xmlbible') || head.includes('<biblebook')) return 'zefania';
   if (head.includes('<osis') || head.includes('osisid')) return 'osis';
+  // USX before USFX: both carry `<book>`, and USX is the one with a `code`
+  // attribute and `<para style=…>` around everything.
+  if (head.includes('<usx') || /<book\s+code=/.test(head)) return 'usx';
   if (head.includes('<usfx') || /<book\s+id=/.test(head)) return 'usfx';
   return null;
 }
@@ -58,6 +68,8 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
   let muted = 0;
   let title = '';
   let capturing = null;
+  /** Strong's numbers waiting for their word to finish. */
+  const tagged = [];
 
   const put = (text) => {
     if (muted) return;
@@ -71,16 +83,30 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
     place[verse] = place[verse] ? { ...place[verse], text: place[verse].text + clean } : { text: clean };
   };
 
-  const openVerse = (n) => {
+  /**
+   * @param {number} n the verse
+   * @param {number|null} to the last verse a range covers, which this app
+   *        records as a `merge` — without it every merged verse in a real
+   *        edition is reported as a chapter that disagrees with the canon.
+   */
+  const openVerse = (n, to = null) => {
     if (book === null || chapter === null || !Number.isFinite(n) || n < 1) return;
     verse = n;
     out[book].chapter[chapter].verse[verse] ??= { text: '' };
+    if (to && to > n) out[book].chapter[chapter].verse[verse].merge = String(to);
     report.verses += 1;
     if (title) {
       out[book].chapter[chapter].verse[verse].title = title.replace(/\s+/g, ' ').trim();
       title = '';
       report.titles += 1;
     }
+  };
+
+  /** "3-4" → [3, 4]; "3" → [3, null]. */
+  const spanOf = (value) => {
+    const found = /^\s*(\d+)\s*(?:[-–]\s*(\d+))?/.exec(String(value ?? ''));
+    if (!found) return [NaN, null];
+    return [Number.parseInt(found[1], 10), found[2] ? Number.parseInt(found[2], 10) : null];
   };
 
   const openChapter = (n) => {
@@ -108,12 +134,36 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
     if (event.kind === 'close') {
       if (NOTES.has(tag) && muted) muted -= 1;
       else if (TITLES.has(tag) && capturing !== null) { title = capturing; capturing = null; }
-      else if (kind === 'osis' && tag === 'verse') verse = null;
+      else if (tag === 'para') {
+        if (capturing !== null) { title = capturing; capturing = null; }
+        else if (muted) muted -= 1;
+      } else if (tag === 'w' || tag === 'char') {
+        // The word has just been written; its number follows it.
+        const code = tagged.pop();
+        if (code) put(code);
+      } else if (kind === 'osis' && tag === 'verse') verse = null;
       return;
     }
 
     if (NOTES.has(tag)) { if (!event.empty) muted += 1; return; }
     if (TITLES.has(tag)) { if (!event.empty) capturing = ''; return; }
+    // A word carrying a Strong's number, in either dialect's spelling of it.
+    // The number is kept inline, in the notation `core/strongs.js` reads.
+    if (tag === 'w' || (tag === 'char' && String(event.attrs.style ?? '').toLowerCase() === 'w')) {
+      const code = strongsOf(event.attrs);
+      if (event.empty) { if (code) put(code); return; }
+      tagged.push(code);
+      return;
+    }
+    // USX carries the whole text inside `<para>`, and what a paragraph *is* is
+    // in its style: a heading, an introduction nobody wants in a verse, or the
+    // scripture itself.
+    if (tag === 'para') {
+      const style = String(event.attrs.style ?? '').toLowerCase();
+      if (PARA_TITLE.test(style)) { if (!event.empty) capturing = ''; return; }
+      if (PARA_NOTE.test(style)) { if (!event.empty) muted += 1; return; }
+      return;
+    }
     if (muted) return;
 
     const attrs = event.attrs;
@@ -123,14 +173,20 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
         openBook(books.idFor(attrs.bnumber ?? attrs.bname ?? attrs.bsname));
         break;
       case 'chapter':
-        // OSIS uses the same element name with an osisID; Zefania numbers it.
+        // OSIS uses the same element name with an osisID, Zefania numbers it
+        // `cnumber`, and USX `number`.
         if (attrs.cnumber) openChapter(Number.parseInt(attrs.cnumber, 10));
+        else if (attrs.number) openChapter(Number.parseInt(attrs.number, 10));
         else if (attrs.osisid) openChapter(numberAfter(attrs.osisid, 1));
         else if (attrs.n) openChapter(Number.parseInt(attrs.n, 10));
         break;
       case 'vers':
       case 'verse': {
-        if (attrs.vnumber) { openVerse(Number.parseInt(attrs.vnumber, 10)); break; }
+        if (attrs.vnumber) { openVerse(...spanOf(attrs.vnumber)); break; }
+        // USX: a milestone with a number opens, one with an `eid` closes. The
+        // number may be a range ("3-4"), and the first of it is the verse.
+        if (attrs.number) { openVerse(...spanOf(attrs.number)); break; }
+        if (attrs.eid && !attrs.sid) { verse = null; break; }
         const id = attrs.osisid ?? attrs.osisref ?? '';
         if (id) {
           // A milestone `<verse eID=…/>` closes rather than opens.
@@ -141,7 +197,7 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
           if (c && c !== chapter) openChapter(c);
           openVerse(numberAfter(id, 2));
         } else if (attrs.n || attrs.id) {
-          openVerse(Number.parseInt(attrs.n ?? attrs.id, 10));
+          openVerse(...spanOf(attrs.n ?? attrs.id));
         }
         break;
       }
@@ -157,7 +213,7 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
         openChapter(Number.parseInt(attrs.id ?? attrs.n ?? '', 10));
         break;
       case 'v':
-        openVerse(Number.parseInt(attrs.id ?? attrs.n ?? '', 10));
+        openVerse(...spanOf(attrs.id ?? attrs.n ?? ''));
         break;
       case 've':
         verse = null;
@@ -184,6 +240,20 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
   delete report.seen;
   if (!report.books) throw new Error(`${name}: no books could be read from this file`);
   return { raw: { book: out, info }, report };
+}
+
+/**
+ * The Strong's number on a tagged word, however the dialect spells it.
+ *
+ * USFX puts it in `s`, USX in `strong`, and OSIS in a `lemma` of the form
+ * `strong:H7225`. A word with several is written with several.
+ */
+function strongsOf(attrs) {
+  const raw = attrs.s ?? attrs.strong ?? attrs.lemma ?? '';
+  const codes = String(raw).split(/[,\s]+/)
+    .map((part) => /(?:strong:)?([HG]?\d+[a-z]?)$/i.exec(part.trim())?.[1] ?? '')
+    .filter(Boolean);
+  return codes.map((code) => `{${code.toUpperCase()}}`).join('');
 }
 
 /** The nth number in a dotted OSIS id: "Gen.1.1" → 1 is the chapter. */

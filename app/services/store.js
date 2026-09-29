@@ -16,7 +16,7 @@
  */
 
 const DB_NAME = 'lai-siangtho';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const DIAGNOSTIC_LIMIT = 400;
 
 /**
@@ -38,6 +38,9 @@ export async function openStore({ name = DB_NAME, onLost = null } = {}) {
       if (!d.objectStoreNames.contains('notes')) d.createObjectStore('notes', { keyPath: 'id' }); // added in v3
       if (!d.objectStoreNames.contains('marks')) d.createObjectStore('marks', { keyPath: 'id' }); // added in v3
       if (!d.objectStoreNames.contains('records')) d.createObjectStore('records', { keyPath: 'id' }); // added in v4
+      // A lexicon is megabytes, so it gets a store of its own rather than a
+      // place in `records`, which is read whole at startup. Added in v5.
+      if (!d.objectStoreNames.contains('lexicon')) d.createObjectStore('lexicon', { keyPath: 'id' });
     };
     req.onblocked = () => reject(new Error('Another window of this app is open with an older version of its storage. Close the other windows and reload.'));
     req.onsuccess = () => resolve(req.result);
@@ -127,8 +130,44 @@ class TranslationStore {
       source,
       // A translation missing most of the canon produces thousands of these;
       // the count is what a reader needs, the list is what a report needs.
-      diagnostics: { total: found.length, items: found.slice(0, DIAGNOSTIC_LIMIT) },
+      //
+      // The counts are kept *by kind*, because "50 differences" told a reader
+      // nothing they could act on: a missing book and a chapter one verse short
+      // are not the same news, and the list is capped, so the breakdown cannot
+      // be recovered from it afterwards.
+      diagnostics: {
+        total: found.length,
+        missing: found.filter((d) => d.type === 'missing-book').length,
+        short: found.filter((d) => d.type === 'versification').length,
+        extra: found.filter((d) => d.type === 'extra-chapter').length,
+        items: found.slice(0, DIAGNOSTIC_LIMIT),
+      },
     });
+    await done(tx);
+  }
+
+  /** A lexicon this device has already fetched, or null. */
+  async getLexicon(id) {
+    const row = await request(this.#tx('lexicon').objectStore('lexicon').get(id));
+    return row?.entries ?? null;
+  }
+
+  async putLexicon(id, entries, meta = {}) {
+    const tx = this.#tx('lexicon', 'readwrite');
+    tx.objectStore('lexicon').put({ id, entries, ...meta, fetchedAt: new Date().toISOString() });
+    await done(tx);
+  }
+
+  /** What is held, for the settings page: which lexicons, and how big. */
+  async lexicons() {
+    const all = await request(this.#tx('lexicon').objectStore('lexicon').getAll());
+    return all.map(({ id, entries, bytes, fetchedAt }) => (
+      { id, count: Object.keys(entries ?? {}).length, bytes: bytes ?? 0, fetchedAt }));
+  }
+
+  async removeLexicon(id) {
+    const tx = this.#tx('lexicon', 'readwrite');
+    tx.objectStore('lexicon').delete(id);
     await done(tx);
   }
 

@@ -38,8 +38,7 @@ const KEEP = 6;
  */
 export function createPeek(ctx, { bookName, number, lang, direction, go }) {
   const body = h('div', { class: 'pk-body' });
-  const foot = h('div', { class: 'pk-foot' });
-  const element = h('div', { class: 'navpop peek', role: 'dialog', hidden: true }, body, foot);
+  const element = h('div', { class: 'navpop peek', role: 'dialog', hidden: true }, body);
   let anchor = null;
   let showing = null;
   /** The last few chapters read, newest last. */
@@ -98,22 +97,25 @@ export function createPeek(ctx, { bookName, number, lang, direction, go }) {
       .filter((n) => n >= from1 && (to === null ? n < from1 + 4 : n <= to))
       .sort((a, b) => a - b);
 
+    // The two ways out sit on the reference line rather than in a row of their
+    // own: a popover over a paragraph should cover as little of it as it can,
+    // and a foot with two buttons in it was a fifth of the box spent on chrome.
+    const act = (glyph, title, options) => h('button', {
+      class: 'pk-act', title, 'aria-label': title,
+      onclick: () => { close(); go(ref, options); },
+    }, icon(glyph));
+
     fill(body,
-      h('p', { class: 'pk-ref' }, label),
+      h('p', { class: 'pk-ref' },
+        h('span', { class: 'pk-ref-n' }, label),
+        act('arrow-right', L('peek.open'), {}),
+        act('add-pane', L('peek.newTab'), { newTab: true })),
       numbers.length
         ? h('div', { class: 'pk-text', lang: lang(), dir: direction() },
           numbers.map((n) => h('p', { class: 'pk-v' },
             h('span', { class: 'pk-n' }, number(n)),
             verses[n].text)))
         : h('p', { class: 'pk-empty' }, L('peek.nothing')));
-
-    fill(foot,
-      h('button', {
-        class: 'pk-act', onclick: () => { close(); go(ref, {}); },
-      }, icon('arrow-right'), L('peek.open')),
-      h('button', {
-        class: 'pk-act', onclick: () => { close(); go(ref, { newTab: true }); },
-      }, icon('add-pane'), L('peek.newTab')));
 
     element.hidden = false;
     place();

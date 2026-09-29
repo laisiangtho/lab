@@ -62,7 +62,9 @@ export function createTranslationInfo(ctx) {
     const row = (term, value) => { if (value) facts.append(h('dt', {}, term), h('dd', {}, value)); };
     row(L('lbl.language'), [info.language.text, pack ? pack.code : info.language.name].filter(Boolean).join(' · '));
     row(L('lbl.publisher'), info.publisher);
-    row(L('lbl.copyright'), info.copyright);
+    // Not in the facts grid: a KJV licence runs to several paragraphs, and in a
+    // narrow right-hand column it turns the popover into a scrolling wall.
+    const licence = info.copyright;
     row(L('lbl.version'), entry && entry.version !== meta.version
       ? L('lbl.versionBehind', { held: meta.version, listed: entry.version })
       : String(meta.version));
@@ -81,8 +83,15 @@ export function createTranslationInfo(ctx) {
     // counted differently — and a reader who finds a chapter short deserves to
     // see that it is the edition, not a fault in the download.
     const found = installed?.diagnostics ?? null;
-    if (found) row(L('lbl.differences'), found.total === 0 ? L('lbl.matchesCanon') : L('lbl.differs', { n: found.total }));
+    if (found) {
+      row(L('lbl.differences'), found.total === 0 ? L('lbl.matchesCanon') : [
+        found.missing ? L('lbl.booksMissing', { n: found.missing }) : '',
+        found.short ? L('lbl.chaptersShort', { n: found.short }) : '',
+        found.extra ? L('lbl.chaptersExtra', { n: found.extra }) : '',
+      ].filter(Boolean).join(' · ') || L('lbl.differs', { n: found.total }));
+    }
     if (facts.children.length) out.push(facts);
+    if (licence) out.push(longBlock(L('lbl.copyright'), licence));
     if (found?.total) out.push(diagnostics(meta, found));
 
     out.push(direction(meta));
@@ -118,6 +127,28 @@ export function createTranslationInfo(ctx) {
         option('rtl', 'RTL')));
   }
 
+  /**
+   * A paragraph somebody wrote for lawyers, shown without letting it take the
+   * whole box: six lines, then a press for the rest.
+   */
+  function longBlock(term, value) {
+    const text = h('p', { class: 'tri-long' }, value);
+    const more = h('button', {
+      class: 'link-btn tri-long-more',
+      onclick: (e) => {
+        const open = text.classList.toggle('is-open');
+        e.currentTarget.textContent = L(open ? 'lbl.showLess' : 'lbl.showAll');
+        place();
+      },
+    }, L('lbl.showAll'));
+    const block = h('div', { class: 'tri-block' }, h('div', { class: 'tri-term' }, term), text);
+    // Only offer the press when there is something behind it.
+    requestAnimationFrame(() => {
+      if (text.scrollHeight > text.clientHeight + 2) block.append(more);
+    });
+    return block;
+  }
+
   /** The list of departures from the canon, folded away, and the whole of it as a file. */
   function diagnostics(meta, found) {
     const shown = found.items.slice(0, 12);
@@ -125,6 +156,9 @@ export function createTranslationInfo(ctx) {
     if (found.total > shown.length) list.append(h('li', { class: 'is-more' }, L('diag.more', { n: found.total - shown.length })));
     return h('details', { class: 'tri-more' },
       h('summary', {}, L('lbl.showReport')),
+      // What the canon is, said once, where somebody is looking at a number
+      // they did not expect.
+      h('p', { class: 'tri-why' }, L('lbl.canonWhat')),
       list,
       h('button', { class: 'btn', onclick: () => saveReport(meta, found) }, icon('download'), L('cmd.saveReport')));
   }

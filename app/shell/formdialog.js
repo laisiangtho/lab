@@ -57,7 +57,13 @@ export function createFormDialog() {
    */
   function open(options) {
     fields = options.fields ?? [];
-    values = Object.fromEntries(fields.map((f) => [f.id, f.value ?? '']));
+    values = {};
+    for (const field of fields) {
+      values[field.id] = field.value ?? '';
+      // A choice may carry a second answer on the same line; it holds its own
+      // value, and the row it shares tells nothing about it.
+      if (field.free) values[field.free.id] = field.free.value ?? '';
+    }
     onChange = options.onChange ?? null;
     title.textContent = options.title;
     lede.textContent = options.lede ?? '';
@@ -67,29 +73,40 @@ export function createFormDialog() {
     confirmButton.onclick = () => finish({ ...values });
     cancelButton.onclick = () => finish(null);
     paint();
+    // Once on open, so a live line says something before anything is pressed.
+    onChange?.({ ...values }, set);
     element.hidden = false;
     // The first thing that can be typed in, or the button, so the dialog is
-    // usable from the keyboard the moment it appears.
-    (rows.querySelector('input[type="text"]') ?? confirmButton).focus();
+    // usable from the keyboard the moment it appears. Not a field beside a row
+    // of choices — that one is the exception to them, and opening on it says
+    // the choices are the afterthought.
+    (rows.querySelector('input[type="text"]:not(.fd-free)') ?? confirmButton).focus();
     return new Promise((resolve) => { settle = resolve; });
   }
 
   /** Change a field's value from outside — what `onChange` uses to prefill. */
   function set(id, value) {
     values[id] = value;
-    const input = rows.querySelector(`[data-field="${id}"] input[type="text"]`);
+    const note = rows.querySelector(`p.fd-live[data-field="${id}"]`);
+    if (note) { note.textContent = value; return; }
+    const input = rows.querySelector(`input[data-field="${id}"], [data-field="${id}"] input[type="text"]`);
     if (input && input.value !== value) input.value = value;
   }
 
   function paint() {
     fill(rows, fields.map((field) => {
+      // A line the dialog writes to itself as the answers change: what you
+      // will get, before you press the button that gets it.
+      if (field.type === 'note') {
+        return h('p', { class: 'fd-live', dataset: { field: field.id } }, values[field.id] ?? '');
+      }
       const control = field.type === 'choice'
         ? choice(field)
         : h('input', {
           type: 'text', spellcheck: 'false', value: values[field.id] ?? '',
           placeholder: field.placeholder ?? '',
           'aria-label': field.label,
-          oninput: (e) => { values[field.id] = e.currentTarget.value; },
+          oninput: (e) => { values[field.id] = e.currentTarget.value; onChange?.({ ...values }, set); },
         });
       return h('label', { class: 'fd-row', dataset: { field: field.id } },
         h('span', { class: 'fd-label' },
@@ -99,7 +116,20 @@ export function createFormDialog() {
     }));
   }
 
+  /**
+   * A row of choices, and optionally a field for an answer none of them covers.
+   *
+   * `free` is that field: a second value on the same line, for the case where
+   * the options are the usual answers rather than all of them. Naming
+   * something is more specific than picking a segment, so typing takes the
+   * group over — the buttons step back rather than disappear, and pressing one
+   * clears what was typed.
+   */
   function choice(field) {
+    const free = field.free ?? null;
+    const group = h('div', { class: 'fd-opts' });
+    let typed = null;
+
     const buttons = (field.options ?? []).map((option) => h('button', {
       type: 'button',
       class: 'fd-opt',
@@ -108,11 +138,28 @@ export function createFormDialog() {
       onclick: () => {
         values[field.id] = option.id;
         for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.value === option.id));
+        if (typed) { typed.value = ''; values[free.id] = ''; group.dataset.free = '0'; }
         onChange?.({ ...values }, set);
       },
     }, h('span', { class: 'fd-opt-n' }, option.label),
       option.sub ? h('span', { class: 'fd-opt-s' }, option.sub) : null));
-    return h('div', { class: 'fd-opts' }, buttons);
+
+    group.append(...buttons);
+    if (free) {
+      typed = h('input', {
+        type: 'text', class: 'fd-free', spellcheck: 'false', dataset: { field: free.id },
+        value: values[free.id] ?? '', placeholder: free.placeholder ?? '',
+        'aria-label': free.label ?? field.label,
+        oninput: (e) => {
+          values[free.id] = e.currentTarget.value;
+          group.dataset.free = e.currentTarget.value.trim() ? '1' : '0';
+          onChange?.({ ...values }, set);
+        },
+      });
+      group.dataset.free = String(values[free.id] ?? '').trim() ? '1' : '0';
+      group.append(typed);
+    }
+    return group;
   }
 
   return { element, open, close: () => finish(null) };

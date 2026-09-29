@@ -108,6 +108,35 @@ export function createLibrary({ store, categoryRaw, config }) {
     return { ...result, replaced: already };
   }
 
+  /**
+   * A translation as it is published: a folder of files rather than one file.
+   * The caller has unpacked the archive; this is the same door as `import`,
+   * with more than one thing coming through it.
+   *
+   * @param {{ files: {name:string,text:string}[], identify: string, info?: object }} job
+   */
+  async function importPack({ files, identify, info = {} }) {
+    const id = String(identify ?? '').trim();
+    if (!/^[a-z0-9][a-z0-9._-]{1,31}$/i.test(id)) {
+      throw new Error(`"${identify}" cannot be a translation name — letters, digits, dots and dashes, 2 to 32 of them`);
+    }
+    const firstInstall = (await store.list()).length === 0;
+    const result = await call({ type: 'pack', identify: id, files, info, category: categoryRaw }, id);
+    if (firstInstall) await requestPersistence();
+    emit('change');
+    return result;
+  }
+
+  /**
+   * Write a translation out in another format.
+   *
+   * @param {{ identify: string, format: string, books?: number[] }} job
+   * @returns {Promise<{ files: { name: string, text: string }[], count: number }>}
+   */
+  async function exportTranslation({ identify, format, books = null }) {
+    return call({ type: 'export', identify, format, books, category: categoryRaw }, identify);
+  }
+
   async function remove(identify) {
     await store.remove(identify);
     emit('change');
@@ -150,6 +179,8 @@ export function createLibrary({ store, categoryRaw, config }) {
     status,
     install,
     importTranslation,
+    importPack,
+    exportTranslation,
     remove,
     get catalog() { return catalog; },
     get origin() { return origin; },

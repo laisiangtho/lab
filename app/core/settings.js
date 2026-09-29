@@ -28,6 +28,15 @@ export const READING = Object.freeze({
   ui: { min: 11, max: 17, step: 1, default: 13 },           // px
 });
 export const MODES = Object.freeze(['reading', 'source']);
+/**
+ * Which format the source view shows a chapter in.
+ *
+ * Markdown is the one that can be edited — the notes under `## Notes` round
+ * trip back into the reader's own material — and the rest are a window on what
+ * this app would write if asked, which is also the honest demonstration of what
+ * it does when it reads somebody else's file.
+ */
+export const SOURCE_FORMATS = Object.freeze(['markdown', 'native', 'usfm', 'usx', 'osis', 'zefania', 'csv']);
 
 /** Typefaces the scripture can be set in. The interface keeps its own. */
 export const READING_FONTS = Object.freeze(['serif', 'sans', 'mono']);
@@ -78,6 +87,7 @@ export const defaultSettings = Object.freeze({
   uiSize: READING.ui.default,
   /** Reading surface or its source text. */
   mode: 'reading',
+  sourceFormat: 'markdown',
   /** Typeface for the scripture itself. */
   readingFont: 'serif',
   /** Reopen last session's tabs, or start on the last passage alone. */
@@ -216,6 +226,7 @@ export function parseSettings(raw, { source, category }) {
     readingMeasure: clamp(raw.readingMeasure, READING.measure, defaultSettings.readingMeasure),
     uiSize: clamp(raw.uiSize, READING.ui, defaultSettings.uiSize),
     mode, strongs: flag('strongs'),
+    sourceFormat: SOURCE_FORMATS.includes(raw.sourceFormat) ? raw.sourceFormat : defaultSettings.sourceFormat,
     readingFont: READING_FONTS.includes(raw.readingFont) ? raw.readingFont : defaultSettings.readingFont,
     restoreTabs: flag('restoreTabs'), motion: flag('motion'),
     ribbonItems: commandList(raw.ribbonItems, source, '$.ribbonItems'),

@@ -4,10 +4,14 @@
  */
 
 import { describe, FORMATS, sniff, slug } from '../../core/formats/index.js';
+import { classify, readMetadata } from '../../core/formats/pack.js';
+import { describeLoss, WRITERS } from '../../core/formats/write.js';
 import { twoLetter } from '../../core/langcode.js';
-import { pickText } from '../../services/transfer.js';
+import { pickFile, saveText } from '../../services/transfer.js';
+import { makeZip, openZip } from '../../services/zip.js';
 import { fill, formatBytes, h, keepPlace } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
+import { openMenu } from '../../shell/menu.js';
 import { L } from '../../shell/i18n.js';
 import { requestPersistence, storageStatus } from '../../services/store.js';
 
@@ -18,7 +22,7 @@ const KEY = 'library';
 export default {
   id: 'library',
   setup(ctx) {
-    const { library, records, registry, shell } = ctx;
+    const { category, library, records, registry, shell } = ctx;
     const progress = new Map(); // identify -> text
     // The page repaints itself while it is open; an import can be started from
     // the command palette with the page shut, and then there is nothing to
@@ -105,8 +109,11 @@ export default {
      * to; a spreadsheet of verses knows neither.
      */
     async function importFile() {
-      const file = await pickText({ accept: '.json,.usfm,.sfm,.usfx,.osis,.xml,.zef,.csv,.tsv,.txt,text/*' });
+      const file = await pickFile({
+        accept: '.zip,.json,.usfm,.sfm,.usfx,.usx,.osis,.xml,.zef,.csv,.tsv,.txt,text/*,application/zip',
+      });
       if (!file) return;
+      if (/\.zip$/i.test(file.name) || isZip(file.bytes)) { await importArchive(file); return; }
 
       const guesses = sniff(file.text, file.name);
       if (!guesses.length) {
@@ -171,6 +178,239 @@ export default {
         progress.delete(identify);
         repaint();
       }
+    }
+
+    /**
+     * A published bundle, as a zip.
+     *
+     * This is how a translation actually arrives — `engkjvcpb_usfx.zip` from
+     * eBible.org is the scripture, the translation's own book names, its
+     * metadata and its copyright notice, in one download. Taking the whole
+     * archive means the import knows what the translation is called and what it
+     * calls Genesis, instead of asking a reader who would have to go and look.
+     */
+    async function importArchive(file) {
+      let entries = [];
+      try {
+        entries = openZip(file.bytes);
+      } catch (err) {
+        shell.notify(`${file.name}: ${err.message}`, 'error');
+        return;
+      }
+      // Only the text files: a bundle carries fonts and signatures too, and
+      // inflating a 4 MB font to look at it would be work for nothing.
+      const wanted = entries.filter((entry) => entry.size > 0 && entry.size < 80 * 1024 * 1024
+        && !/\.(?:ttf|otf|woff2?|png|jpe?g|gif|pdf|zip|epub|mobi)$/i.test(entry.name));
+      const files = [];
+      for (const entry of wanted) {
+        try {
+          files.push({ name: entry.name.split('/').pop(), text: await entry.text() });
+        } catch {
+          // One unreadable member is not a reason to refuse the archive; the
+          // assembler reports what it did not use.
+        }
+      }
+      if (!files.length) { shell.notify(L('imp.emptyZip', { file: file.name }), 'error'); return; }
+
+      const found = packDescribe(files, file.name);
+      const answers = await shell.form({
+        title: L('imp.packTitle'),
+        lede: L('imp.packLede', {
+          file: file.name,
+          size: formatBytes(file.size),
+          n: entries.length,
+          what: found.summary,
+        }),
+        confirm: L('imp.do'),
+        fields: [
+          { id: 'name', label: L('imp.name'), value: found.name, placeholder: L('imp.namePh') },
+          { id: 'identify', label: L('imp.identify'), hint: L('imp.identifyHint'), value: found.identify },
+          { id: 'language', label: L('imp.language'), hint: L('imp.languageHint'), value: found.language },
+        ],
+      });
+      if (!answers) return;
+
+      const identify = slug(answers.identify || answers.name || file.name);
+      progress.set(identify, L('lib.starting'));
+      repaint();
+      try {
+        const result = await library.importPack({
+          files,
+          identify,
+          info: { name: answers.name, language: answers.language, source: file.name },
+        });
+        const report = result.report ?? {};
+        const notes = [
+          `${L('lbl.books', { n: result.stats.books })}, ${L('lbl.verses', { n: result.stats.verses })}`,
+          report.strongs ? L('imp.withStrongs', { n: report.strongs }) : '',
+          report.named ? L('imp.withNames', { n: report.named }) : '',
+          result.diagnostics.length ? L('lbl.differs', { n: result.diagnostics.length }) : '',
+        ].filter(Boolean).join(' · ');
+        shell.notify(L('imp.done', { name: answers.name || identify, notes }), 'ok');
+      } catch (err) {
+        shell.notify(`${file.name}: ${err.message}`, 'error');
+      } finally {
+        progress.delete(identify);
+        repaint();
+      }
+    }
+
+    /**
+     * What is in this archive, for the dialog — read from the bundle's own
+     * metadata where it has any, so the reader confirms rather than types.
+     */
+    function packDescribe(files, archiveName) {
+      // The same question the assembler asks, asked the same way: this was
+      // counting the copyright notice as a scripture file.
+      const { meta, names, scripture } = classify(files);
+      const declared = meta ? readMetadata(meta.text) : {};
+      const kind = scripture.length ? sniff(scripture[0].text, scripture[0].name)[0].id : null;
+      return {
+        name: declared.name ?? '',
+        identify: slug(declared.identify || declared.shortname || archiveName),
+        language: declared.language ?? '',
+        summary: scripture.length
+          ? L('imp.packFound', {
+            n: scripture.length,
+            format: kind ? L(`imp.fmt.${kind}`) : '?',
+            named: names ? L('imp.packNames') : '',
+          })
+          : L('imp.packNothing'),
+      };
+    }
+
+    /** A zip begins "PK\u0003\u0004", whatever it has been renamed to. */
+    const isZip = (bytes) => bytes?.length > 4 && bytes[0] === 0x50 && bytes[1] === 0x4b
+      && bytes[2] === 0x03 && bytes[3] === 0x04;
+
+    /**
+     * Write a translation out, in a format somebody else's software reads.
+     *
+     * This is the other half of the import, and it is the same machinery run
+     * backwards: `core/formats/write.js` emits, and the reader chooses what and
+     * how much. The scope exists because "convert my Bible" is rarely the
+     * question — it is usually one book for a lesson, or the New Testament for
+     * a phone app that cannot hold more.
+     *
+     * What a format cannot carry is stated before the button, not after the
+     * download: a converter that implies a round trip through this app is
+     * lossless would be lying.
+     */
+    async function exportTranslation(identify) {
+      const held = (await ctx.store.list()).find((row) => row.identify === identify);
+      if (!held) { shell.notify(L('exp.notHeld'), 'error'); return; }
+      const name = held.info?.name ?? identify;
+
+      /** What the answers so far add up to, in one line. */
+      const summary = (values) => {
+        const books = booksFor(values, []);
+        const list = books ?? category.books.map((book) => book.id);
+        const chapters = list.reduce((n, id) => n + (category.hasBook(id) ? category.book(id).chapters : 0), 0);
+        const writer = WRITERS.find((w) => w.id === values.format);
+        if (!list.length) return L('exp.summaryNone', { what: String(values.book ?? '').trim() });
+        return [
+          L('exp.summary', {
+            books: list.length,
+            chapters,
+            files: writer?.single ? L('exp.oneFile') : L('exp.filesMany', { n: list.length }),
+          }),
+          ...describeLoss(values.format),
+        ].join(' ');
+      };
+
+      const answers = await shell.form({
+        title: L('exp.title', { name }),
+        confirm: L('exp.do'),
+        fields: [
+          {
+            id: 'format',
+            label: L('exp.format'),
+            type: 'choice',
+            value: 'native',
+            options: WRITERS.map((writer) => ({ id: writer.id, label: L(`src.fmt.${writer.id}`) })),
+          },
+          {
+            id: 'scope',
+            label: L('exp.scope'),
+            hint: L('exp.scopeHint'),
+            type: 'choice',
+            value: 'all',
+            options: [
+              { id: 'all', label: L('exp.all') },
+              ...category.testaments.map((t) => ({ id: `t${t.id}`, label: t.name })),
+            ],
+            // Naming books is the same question, answered more precisely, so
+            // it belongs on the same line rather than under a choice that
+            // exists only to point at it.
+            free: { id: 'book', label: L('exp.book'), placeholder: L('exp.bookPlaceholder') },
+          },
+          { id: 'live', type: 'note', value: '' },
+        ],
+        // The live line is written on open and after every answer, so nobody
+        // presses Export to find out what Export would do.
+        onChange: (values, set) => set('live', summary(values)),
+      });
+      if (!answers) return;
+
+      const wanted = booksFor(answers, []);
+      if (wanted && !wanted.length) { shell.notify(L('exp.noBooks', { what: answers.book }), 'error'); return; }
+
+      progress.set(identify, L('exp.working'));
+      repaint();
+      try {
+        const { files } = await library.exportTranslation({ identify, format: answers.format, books: wanted });
+        if (!files.length) { shell.notify(L('exp.nothing'), 'error'); return; }
+        const stem = `${identify}-${answers.format}`;
+        if (files.length === 1) saveText(files[0].name, files[0].text);
+        else saveText(`${stem}.zip`, makeZip(files));
+        shell.notify(files.length === 1
+          ? L('exp.done', { name: files[0].name })
+          : L('exp.doneMany', { n: files.length, name: `${stem}.zip` }), 'ok');
+      } catch (err) {
+        shell.notify(`${name}: ${err.message}`, 'error');
+      } finally {
+        progress.delete(identify);
+        repaint();
+      }
+    }
+
+    /**
+     * Which books an answer means. A typed name wins over the chosen scope,
+     * because somebody who typed "Psalms" has been more specific than the
+     * segment above it.
+     */
+    function booksFor(answers, held) {
+      const typed = String(answers.book ?? '').trim();
+      if (typed) {
+        const found = typed.split(/[,;]+/).map((part) => lookupBook(part.trim())).filter(Boolean);
+        return found.length ? [...new Set(found)] : [];
+      }
+      if (answers.scope === 'all') return null;
+      const [kind, id] = [answers.scope[0], Number(answers.scope.slice(1))];
+      const inScope = category.books
+        .filter((book) => (kind === 't' ? book.testament === id : book.section === id))
+        .map((book) => book.id);
+      return held.length ? inScope.filter((book) => held.includes(book)) : inScope;
+    }
+
+    /**
+     * A book by whatever the reader called it.
+     *
+     * Exact first, then prefix — because the canon calls book 19 "Psalm" and
+     * almost everybody types "Psalms", and refusing that is being right in a
+     * way that helps nobody.
+     */
+    function lookupBook(text) {
+      if (!text) return null;
+      const found = shell.readPassage(text);
+      if (found?.book) return found.book;
+      const wanted = text.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!wanted) return null;
+      const names = (book) => [book.name, book.shortname, ...book.abbr]
+        .map((one) => String(one).toLowerCase().replace(/[^a-z0-9]/g, ''));
+      return category.books.find((book) => names(book).includes(wanted))?.id
+        ?? category.books.find((book) => names(book).some((one) => one.startsWith(wanted) || wanted.startsWith(one)))?.id
+        ?? null;
     }
 
     /** What a stored translation was imported from, named. */
@@ -377,19 +617,75 @@ export default {
               row.state === 'available' && suggested(row) ? h('span', { class: 'badge badge-hint' }, L('lib.suggested')) : null),
             h('div', { class: 'library-actions' }, busy
               ? h('span', { class: 'muted' }, busy)
-              : actions.map(([label, action]) => h('button', {
-                class: action === 'remove' ? 'btn' : 'btn primary',
-                dataset: { place: `${action}:${row.identify}` },
-                onclick: () => act(row.identify, action),
-              }, label))));
+              : [
+                // The one press most readers want, and everything else behind
+                // the menu: a row with five buttons on it is a row nobody reads.
+                ...actions.slice(0, 1).map(([label, action]) => h('button', {
+                  class: action === 'remove' ? 'btn' : 'btn primary',
+                  dataset: { place: `${action}:${row.identify}` },
+                  onclick: () => act(row.identify, action),
+                }, label)),
+                row.held ? h('button', {
+                  class: 'lib-act', title: L('lib.more'), 'aria-label': L('lib.more'),
+                  'aria-haspopup': 'menu',
+                  dataset: { place: `menu:${row.identify}` },
+                  onclick: (e) => rowMenu(e.currentTarget, row),
+                }, icon('more')) : null,
+              ]));
         }
 
-        /** The stored copy in one line: how big it is, and whether it holds the whole canon. */
+        /** Everything that can be done to one translation that is on this device. */
+    function rowMenu(anchor, row) {
+      const name = row.entry?.name ?? row.held?.info?.name ?? row.identify;
+      openMenu(anchor, [
+        {
+          id: 'export',
+          title: L('exp.cmd'),
+          icon: 'download',
+          run: () => exportTranslation(row.identify).catch((err) => shell.notify(err.message, 'error')),
+        },
+        {
+          id: 'info',
+          title: L('lib.about', { name }),
+          icon: 'info',
+          run: () => shell.openTranslationInfo(anchor, row.held),
+        },
+        ...(row.state === 'update' ? [{
+          id: 'update', title: L('lib.update'), icon: 'sync', run: () => act(row.identify, 'install'),
+        }] : []),
+        {
+          id: 'remove',
+          title: L('lib.remove'),
+          icon: 'trash',
+          run: () => act(row.identify, 'remove'),
+        },
+      ]);
+    }
+
+    /** The stored copy in one line: how big it is, and whether it holds the whole canon. */
+        /**
+         * This used to read "65 books · 50 differences", which raises two
+         * questions and answers neither: is a book missing, and different how?
+         * Both are knowable, so both are said.
+         */
         function held(record) {
+          const all = category.books.length;
+          const diag = record.diagnostics ?? {};
+          const books = record.stats
+            ? (record.stats.books === all ? L('lbl.books', { n: all }) : L('lbl.ofBooks', { n: record.stats.books, all }))
+            : null;
           return [
             record.bytes ? formatBytes(record.bytes) : null,
-            record.stats ? L('lbl.books', { n: record.stats.books }) : null,
-            record.diagnostics?.total ? L('lbl.differs', { n: record.diagnostics.total }) : null,
+            books,
+            // "4 of 66 books" already says 62 are missing; saying both is
+            // saying the same thing twice in a line that has to stay short.
+            diag.missing && !record.stats ? L('lbl.booksMissing', { n: diag.missing }) : null,
+            diag.short ? L('lbl.chaptersShort', { n: diag.short }) : null,
+            diag.extra ? L('lbl.chaptersExtra', { n: diag.extra }) : null,
+            // A record written by an older build has only the total; it still
+            // says something rather than nothing.
+            !diag.missing && !diag.short && !diag.extra && diag.total
+              ? L('lbl.differs', { n: diag.total }) : null,
           ].filter(Boolean).join(' · ');
         }
 

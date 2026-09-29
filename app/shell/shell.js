@@ -7,6 +7,7 @@
 import { createChrome } from './chrome.js';
 import { createModal } from './modal.js';
 import { createFormDialog } from './formdialog.js';
+import { lookup } from '../core/lexicon.js';
 import { createNavPop } from './navpop.js';
 import { createPeek } from './peek.js';
 import { createColorPicker } from './colorpicker.js';
@@ -357,15 +358,74 @@ export function createShell(root, ctx) {
       : L('msg.noStrongs'));
   }
 
+  /**
+   * What a Strong's number means.
+   *
+   * This printed the code and the sentence "No lexicon is installed" from the
+   * day it was written, because there was no lexicon and nowhere to get one.
+   * There is now: one file per testament in the catalog repository, fetched
+   * when a reader first presses a number and only for the testament that number
+   * belongs to. Until then the popover offers the download rather than stating
+   * a lack — a dead end with a button on it is a different thing from a dead
+   * end.
+   */
   function openStrongs(code, anchor) {
-    strongsPopover.replaceChildren(
-      h('div', { class: 'pv-code' }, code),
-      h('div', { class: 'pv-tr' }, L('msg.strongsNoLexicon')));
-    strongsPopover.hidden = false;
-    const rect = anchor.getBoundingClientRect();
-    strongsPopover.style.left = `${Math.min(rect.left, window.innerWidth - strongsPopover.offsetWidth - 12)}px`;
-    strongsPopover.style.top = `${rect.bottom + 8}px`;
-    const close = () => { strongsPopover.hidden = true; document.removeEventListener('pointerdown', close); };
+    const paint = (...children) => {
+      strongsPopover.replaceChildren(h('div', { class: 'pv-code' }, code), ...children);
+      place();
+    };
+    const place = () => {
+      strongsPopover.hidden = false;
+      const rect = anchor.getBoundingClientRect();
+      const width = strongsPopover.offsetWidth;
+      strongsPopover.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - width - 12))}px`;
+      strongsPopover.style.top = `${rect.bottom + 8}px`;
+    };
+
+    const show = () => {
+      const found = lookup(ctx.lexicons?.held ?? {}, code);
+      if (found.entry) {
+        const { entry } = found;
+        paint(
+          entry.lemma ? h('div', { class: 'pv-lemma' }, entry.lemma) : null,
+          entry.translit || entry.pronounce
+            ? h('div', { class: 'pv-say' }, [entry.translit, entry.pronounce].filter(Boolean).join(' · '))
+            : null,
+          entry.part ? h('div', { class: 'pv-part' }, entry.part) : null,
+          entry.define ? h('div', { class: 'pv-tr' }, entry.define) : null,
+          entry.kjv ? h('div', { class: 'pv-kjv' }, entry.kjv) : null);
+        return;
+      }
+      if (found.why === 'missing' || found.why === 'none') {
+        const which = found.testament || 'H';
+        paint(
+          h('div', { class: 'pv-tr' }, L('lex.notHere', { which: L(`lex.${which}`) })),
+          ctx.lexicons?.fetching(which)
+            ? h('div', { class: 'pv-say' }, L('lex.fetching'))
+            : h('button', {
+              class: 'btn primary pv-get',
+              onclick: (event) => {
+                event.currentTarget.disabled = true;
+                event.currentTarget.textContent = L('lex.fetching');
+                ctx.lexicons.install(which)
+                  .then(() => show())
+                  .catch((err) => paint(h('div', { class: 'pv-tr' }, err.message)));
+              },
+            }, L('lex.get', { which: L(`lex.${which}`) })));
+        return;
+      }
+      paint(h('div', { class: 'pv-tr' }, L(found.why === 'ambiguous' ? 'lex.ambiguous' : 'lex.absent')));
+    };
+
+    show();
+    // Anywhere but in it. The popover had nothing to press until now, so a
+    // close handler that fired on every press was harmless; the moment it grew
+    // a button, pressing that button shut the popover instead.
+    const close = (event) => {
+      if (event && strongsPopover.contains(event.target)) return;
+      strongsPopover.hidden = true;
+      document.removeEventListener('pointerdown', close);
+    };
     setTimeout(() => document.addEventListener('pointerdown', close), 0);
   }
 

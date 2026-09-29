@@ -318,6 +318,18 @@ body[data-shell="on"][data-right="shut"] .tabbar{padding-inline-end:var(--wc-w)}
 .rib svg{width:17px;height:17px}
 .rib:hover{background:var(--bg-hover);color:var(--text-normal)}
 .rib.is-active{color:var(--accent-2);background:var(--accent-fade)}
+/* A button that is doing something, rather than merely switched on.
+   The ring is one conic gradient masked to the edge, so how far along it is
+   costs a single custom property to move and nothing at all when it is idle.
+   `--progress` is a percentage of the way round. */
+.rib.has-progress::before{
+  content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;
+  background:conic-gradient(var(--accent) var(--progress,0%), transparent 0);
+  -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  mask:radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  transition:background .25s linear;
+}
+@media (prefers-reduced-motion: reduce){ .rib.has-progress::before{transition:none} }
 /* Dragging a ribbon button: it follows the pointer, the others slide by one,
    and nothing is committed until release. Carried out of the rail it is on its
    way off the ribbon, and says so by fading. */
@@ -1063,7 +1075,13 @@ body.study-in-margin .outline-study{display:none}
 .doc-filter{max-width:320px;margin:0 0 6px}
 
 /* source mode */
+/* The textarea is the whole pane and scrolls itself, so the box around it must
+   not scroll too. Left inline it would also sit on a text baseline, and the
+   few pixels of descender under it are enough to give the pane a second
+   scrollbar beside the textarea's own. */
+.leaf-scroll:has(> .source){overflow:hidden}
 .source{
+  display:block;
   width:100%;height:100%;border:0;resize:none;background:transparent;padding:34px 44px 40vh;
   font-family:var(--font-mono);font-size:14px;line-height:1.72;color:var(--base-80);
   tab-size:2;
@@ -1736,18 +1754,21 @@ body.drawer-dragging .sidebar{transition:none}
    the same gesture, pointing at the same kind of thing — and adds a quoted
    passage and the two ways out of it. */
 .peek{padding:0}
-.pk-body{padding:12px 14px 6px;overflow-y:auto}
-.pk-ref{margin:0 0 8px;font-family:var(--font-ui);font-size:var(--fs-ui-s);font-weight:600;color:var(--accent-2)}
+.pk-body{padding:10px 12px 12px;overflow-y:auto}
+.pk-ref{
+  display:flex;align-items:center;gap:4px;margin:0 0 8px;
+  font-family:var(--font-ui);font-size:var(--fs-ui-s);font-weight:600;color:var(--accent-2);
+}
+.pk-ref-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pk-text{margin:0;font-family:var(--font-text);font-size:var(--fs-read-s, 15px);line-height:1.62;color:var(--text-normal)}
 .pk-v{margin:0 0 6px}
 .pk-v:last-child{margin-bottom:0}
 .pk-n{margin-inline-end:5px;font-family:var(--font-ui);font-size:11px;font-weight:600;color:var(--accent);vertical-align:.25em}
 .pk-empty{margin:0;color:var(--text-faint);font-family:var(--font-ui);font-size:var(--fs-ui-s)}
-.pk-foot{display:flex;gap:4px;padding:8px 10px;border-top:var(--divider)}
 .pk-act{
-  flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 10px;
-  border-radius:var(--radius-m);background:var(--bg-secondary);color:var(--text-muted);
-  font-family:var(--font-ui);font-size:var(--fs-ui-s);font-weight:600;cursor:pointer;
+  width:22px;height:22px;flex:0 0 auto;display:grid;place-items:center;
+  border-radius:var(--radius-s);color:var(--text-faint);cursor:pointer;
+  transition:background var(--speed),color var(--speed);
 }
 .pk-act:hover{background:var(--bg-hover);color:var(--text-normal)}
 .pk-act svg{width:14px;height:14px}
@@ -1771,9 +1792,11 @@ body.drawer-dragging .sidebar{transition:none}
   background:var(--base-00);color:var(--text-normal);font-family:var(--font-ui);font-size:var(--fs-ui-m);
 }
 .fd-row input[type=text]:focus{border-color:var(--accent-line);outline:none}
-.fd-opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+/* As many across as fit: seven formats in two columns is a tall dialog, and a
+   dialog taller than the window is one whose button you have to hunt for. */
+.fd-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:6px}
 .fd-opt{
-  display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:8px 10px;
+  display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:6px 9px;
   border-radius:var(--radius-m);background:var(--bg-secondary);border:1px solid transparent;
   text-align:start;cursor:pointer;
 }
@@ -1781,4 +1804,31 @@ body.drawer-dragging .sidebar{transition:none}
 .fd-opt[aria-pressed="true"]{background:var(--accent-fade);border-color:var(--accent-line)}
 .fd-opt-n{font-family:var(--font-ui);font-size:var(--fs-ui-m);font-weight:600;color:var(--text-normal)}
 .fd-opt-s{font-family:var(--font-ui);font-size:var(--fs-ui-s);color:var(--text-faint)}
+/* The exception to a row of choices, standing in the row it overrules. It is
+   written in the same hand as an answer rather than a form field, and once it
+   says something the choices beside it step back — they have been overruled,
+   not switched off, so they dim rather than vanish. */
+.fd-row input.fd-free{
+  grid-column:1/-1;height:32px;padding:0 10px;border-radius:var(--radius-m);
+  border:1px dashed var(--border-strong);background:transparent;
+  color:var(--text-normal);font-family:var(--font-ui);font-size:var(--fs-ui-m);
+}
+.fd-row input.fd-free::placeholder{color:var(--text-faint)}
+.fd-row input.fd-free:focus{border-style:solid;border-color:var(--accent-line);outline:none}
+.fd-opts[data-free="1"] .fd-opt{opacity:.45}
+.fd-opts[data-free="1"] input.fd-free{border-style:solid;background:var(--accent-fade);border-color:var(--accent-line)}
 .fd-acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+
+/* A Strong's number, explained. The code, then the word, then what it means —
+   which the popover could not say until there was a lexicon to ask. */
+.pv-lemma{margin-top:4px;font-family:var(--font-text);font-size:19px;color:var(--text-normal);line-height:1.5}
+.pv-say{margin-top:2px;font-family:var(--font-ui);font-size:var(--fs-ui-s);color:var(--text-faint);font-style:italic}
+.pv-part{margin-top:4px;font-family:var(--font-ui);font-size:var(--fs-ui-s);color:var(--accent-2)}
+.pv-kjv{margin-top:6px;padding-top:6px;border-top:var(--divider);font-family:var(--font-ui);font-size:var(--fs-ui-s);color:var(--text-faint);line-height:1.5}
+.pv-get{margin-top:8px;width:100%;justify-content:center}
+/* What the answers above add up to, written as they change. */
+.fd-live{
+  margin:2px 0 0;padding:9px 11px;border-radius:var(--radius-m);
+  background:var(--bg-secondary);color:var(--text-muted);
+  font-family:var(--font-ui);font-size:var(--fs-ui-s);line-height:1.55;
+}

@@ -75,12 +75,18 @@ export function createRegistry() {
     /**
      * @param {{ id: string, title: string, run(): unknown, keys?: string, icon?: string,
      *           ribbon?: boolean, bar?: boolean, needsChapter?: boolean,
-     *           opens?: string, state?: () => boolean }} c
+     *           opens?: string,
+     *           state?: () => boolean | { on?: boolean, icon?: string, title?: string, progress?: number } }} c
      *        `opens` names the document this command brings up, and `state`
      *        answers whether what it does is currently on. Either one makes its
      *        button say so rather than looking the same whatever is happening —
      *        a button that opens the Library should be lit while the Library is
      *        the tab in front of the reader.
+     *        `state` may also answer with an object, for a command whose state
+     *        is a process rather than a switch: `icon` swaps the glyph (a pause
+     *        bar while it speaks), `title` says what pressing it would do now,
+     *        and `progress` (0…1) draws a ring round the button. A feature
+     *        whose state moves on its own calls `shell.refreshCommands()`.
      *        `needsChapter` marks a command that only means something with a
      *        chapter open; the shell shows its button but does not let it be
      *        pressed while a document tab is active.

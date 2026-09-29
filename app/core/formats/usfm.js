@@ -43,6 +43,8 @@ export function fromUsfm(source, { category, source: name = 'file' }) {
   let chapter = null;
   let verse = null;
   let pending = '';
+  /** The last verse a range covers, for the verse being read now. */
+  let spanTo = null;
   let idLine = '';
   let heading = '';
 
@@ -54,6 +56,7 @@ export function fromUsfm(source, { category, source: name = 'file' }) {
     place[verse] = place[verse]
       ? { ...place[verse], text: `${place[verse].text} ${clean}`.trim() }
       : { text: clean };
+    if (spanTo && spanTo > verse) place[verse].merge = String(spanTo);
     if (heading) {
       place[verse].title = heading;
       heading = '';
@@ -102,13 +105,18 @@ export function fromUsfm(source, { category, source: name = 'file' }) {
     }
 
     if (base === 'v') {
-      const n = Number.parseInt(token.rest, 10);
+      const found = /^\s*(\d+)\s*(?:[-–]\s*(\d+))?\s*/.exec(token.rest);
+      const n = found ? Number.parseInt(found[1], 10) : NaN;
       if (!Number.isFinite(n) || n < 1 || book === null || chapter === null) continue;
       verse = n;
+      // `\v 3-4` is one verse in this app's shape *covering* two, which is
+      // exactly what `merge` is for. Recording it is the difference between a
+      // faithful import and one that reports every merged verse in the file as
+      // a chapter that disagrees with the canon — fifty of them, on a real
+      // edition, all of them the importer's fault rather than the file's.
+      spanTo = found?.[2] ? Number.parseInt(found[2], 10) : null;
       report.verses += 1;
-      // `\v 3-4 text` — a range in the file is one verse here, and the canon
-      // check later reports the gap it leaves.
-      pending = token.rest.replace(/^\s*\d+\s*(-\s*\d+)?\s*/, '');
+      pending = token.rest.slice(found[0].length);
       continue;
     }
 
@@ -179,13 +187,39 @@ function* tokenize(source) {
     if (!marker.endsWith('*')) {
       const end = text.indexOf(`\\${base}*`, at);
       if (end !== -1) {
-        yield { kind: 'text', text: text.slice(at, end).replace(/\|[^|]*$/, '') };
+        yield { kind: 'text', text: keepStrongs(text.slice(at, end)) };
         at = end + base.length + 2;
         continue;
       }
     }
     yield { kind: 'marker', marker, rest: '' };
   }
+}
+
+/**
+ * A tagged word, with its Strong's number kept.
+ *
+ * `\\w grace|strong="G5485"\\w*` carries the one piece of word-level markup this
+ * app has any use for. It used to be thrown away wholesale — the importer
+ * dropped the attributes because it expected a `word` field that nothing in the
+ * app ever read or wrote, so a KJV published with its Strong's numbers arrived
+ * without them. The number is now kept inline, in the notation
+ * `core/strongs.js` already reads, which is the notation the reading surface
+ * already renders.
+ *
+ * `x-...` attributes, lemmas and morphology are dropped: nothing shows them.
+ */
+function keepStrongs(inner) {
+  const bar = inner.indexOf('|');
+  if (bar === -1) return inner;
+  const word = inner.slice(0, bar);
+  const attrs = inner.slice(bar + 1);
+  // `strong="G5485"` or `strong="H430,H1234"`, and the bare form `|G5485`.
+  const found = /strong\s*=\s*"([^"]+)"/i.exec(attrs)?.[1]
+    ?? (/^\s*([HG]?\d+[a-z]?)\s*$/i.exec(attrs)?.[1] ?? '');
+  if (!found) return word;
+  const codes = found.split(/[,\s]+/).filter(Boolean).map((code) => `{${code.toUpperCase()}}`);
+  return `${word}${codes.join('')}`;
 }
 
 /**

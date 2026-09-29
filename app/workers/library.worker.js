@@ -3,6 +3,8 @@
  *
  * Request   { id, type: 'install', identify, url, category }   (category = raw category.json)
  *           { id, type: 'import', identify, text, format, info, category }
+ *           { id, type: 'pack',   identify, files, info, category }
+ *           { id, type: 'export', identify, format, books, category }
  * Progress  { id, type: 'progress', phase: 'download'|'convert'|'validate'|'write', received? }
  * Result    { id, type: 'done', identify, version, stats, diagnostics, report? }
  * Failure   { id, type: 'error', message }
@@ -17,6 +19,8 @@
 
 import { parseCategory } from '../core/category.js';
 import { convert } from '../core/formats/index.js';
+import { readPack } from '../core/formats/pack.js';
+import { write } from '../core/formats/write.js';
 import { parseTranslation } from '../core/translation.js';
 import { openStore } from '../services/store.js';
 
@@ -27,10 +31,11 @@ self.addEventListener('message', async ({ data }) => {
   const { id, type } = data;
   const post = (msg) => self.postMessage({ id, ...msg });
   try {
-    if (type !== 'install' && type !== 'import') throw new Error(`library worker: unknown request type ${type}`);
+    const jobs = { install, import: importFile, pack: importPack, export: exportFiles };
+    if (!jobs[type]) throw new Error(`library worker: unknown request type ${type}`);
     storePromise ??= openStore();
     category ??= parseCategory(data.category);
-    const result = type === 'install' ? await install(data, post) : await importFile(data, post);
+    const result = await jobs[type](data, post);
     post({ type: 'done', ...result });
   } catch (err) {
     post({ type: 'error', message: err?.message ?? String(err) });
@@ -87,6 +92,60 @@ async function importFile({ identify, text, format, info, dialect, delimiter }, 
     diagnostics: parsed.diagnostics,
     report,
   };
+}
+
+/**
+ * A whole published bundle — the scripture, its book names, its metadata —
+ * assembled and then checked exactly as a single file is.
+ */
+async function importPack({ identify, files, info }, post) {
+  post({ type: 'progress', phase: 'convert' });
+  const { raw, report } = readPack(files, { category, source: info?.source ?? identify, info: { ...info, identify } });
+
+  // A bundle states its language as a bare code; the app's own shape wants the
+  // block around it.
+  const language = {
+    text: raw.info.languageText || raw.info.language || 'Unknown',
+    name: raw.info.language || 'und',
+    iso: { '639-1': '', '639-3': /^[a-z]{3}$/i.test(raw.info.language ?? '') ? raw.info.language : '' },
+    textdirection: raw.info.textdirection === 'rtl' ? 'rtl' : 'ltr',
+  };
+
+  post({ type: 'progress', phase: 'validate' });
+  const parsed = parseTranslation({ ...raw, identify, info: { ...raw.info, identify, language } },
+    { identify, category });
+
+  post({ type: 'progress', phase: 'write' });
+  const store = await storePromise;
+  const bytes = files.reduce((n, file) => n + file.text.length, 0);
+  await store.install(parsed, { bytes, source: report.format });
+  return { identify, version: parsed.meta.version, stats: parsed.stats, diagnostics: parsed.diagnostics, report };
+}
+
+/**
+ * The reverse: a translation the reader holds, written out in the format they
+ * asked for. The chapters are read here rather than on the main thread because
+ * a whole Bible is thirty thousand rows and the reader should still be able to
+ * scroll while it happens.
+ */
+async function exportFiles({ identify, format, books }, post) {
+  post({ type: 'progress', phase: 'read' });
+  const store = await storePromise;
+  const meta = await store.getMeta(identify);
+  const wanted = Array.isArray(books) && books.length ? new Set(books.map(Number)) : null;
+
+  const chapters = [];
+  await store.scanChapters(identify, (row) => {
+    if (!wanted || wanted.has(row.book)) chapters.push(row);
+  }, wanted ? { books: [...wanted] } : {});
+
+  post({ type: 'progress', phase: 'convert' });
+  const files = write(format, {
+    meta,
+    chapters,
+    bookName: (id) => meta.books?.[id]?.name ?? category.book(id).name,
+  });
+  return { identify, files, count: chapters.length };
 }
 
 async function readAll(res, onProgress) {

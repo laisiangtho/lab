@@ -120,4 +120,12 @@ function bookList(category) {
   return [];
 }
 
+/**
+ * The two standard codes for one canon book, for anything writing a file.
+ * @returns {{ usfm: string, osis: string }}
+ */
+export function bookCodes(id) {
+  return { usfm: USFM[id - 1] ?? '', osis: OSIS[id - 1] ?? '' };
+}
+
 export { USFM, OSIS };

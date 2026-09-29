@@ -273,6 +273,7 @@ Two rules keep the rest honest. A stored id this build no longer has is dropped 
 - **Interface line height**: `body { line-height: 1.5 }`, unitless. With `line-height: normal` the line box comes from the font's own ascent and descent, and the Myanmar faces ask for close to twice the Latin metrics, so a button with a Burmese label grew taller than the same button in Latin. Unitless (not `1.5em` or `150%`) because a length inherits as a fixed number of pixels, which would give nested text at another size the wrong leading. Labels clipped to one line take `padding-block: 3px; margin-block: -3px` — ink room that costs no layout height.
 - **Digits**: a number that names a chapter is written in the primary translation's own digits (`localizeNumber`) wherever it appears — tabs, breadcrumbs, the books tree, the status bar, the breadcrumb picker. A count (39 books, 30 verses) is a quantity and stays in the interface's digits.
 - **Script typography**: the reading surface carries `lang` and `dir` from the translation. Files name their language by ISO 639-3 (`mya`, `ctd`), so the parser also reads `info.language.iso["639-1"]` and prefers it — `:lang(my)` never matches `lang="mya"`, which is why Burmese was rendering with Latin line spacing. Burmese stacks marks above the consonant, below it and beside it, and marks a killed consonant with an asat, so a line carries roughly twice the ink of a Latin one: it gets `calc(var(--lh-text) * 1.26)` — a multiple of the reader's own setting rather than a fixed number, so the reading panel still moves it — plus a Myanmar face stack. Arabic gets 1.12× the size and 1.16× the height. The language also reaches the element because the browser's own line breaker needs it: Burmese writes without spaces between words.
+- **A script's numerals need room too.** The chapter grid stacks two numbers in a 30-pixel chip — the chapter at 11px, its verse count at 8px — which is generous for Latin digits and unreadable for Burmese ones, built as they are from closed loops and stacked strokes. The chips now carry the translation's `lang` like the reading surface does, and the same stylesheet that gives Burmese text its line height gives Burmese chips more height, larger numbers and a wider grid cell; a second rule covers the scripts that are taller than Latin without needing the extra width.
 - **English behind every localised control**: any control whose visible text comes from the translation — tabs, breadcrumbs, the books tree, chapter chips, the chapter picker, the status bar's passage — carries the canon's English name as `title` and `aria-label`. A reader who cannot read the script can still tell what a click will open, and a screen reader announces something it can pronounce.
 - **The crumb bar** reads translation ▸ testament ▸ book ▸ chapter, and ends with one button: what this translation is (description, language, publisher, copyright, the version held against the version listed, install date and size), and from there "Download again" — because a translation file can be corrected upstream without the catalog's version changing, and an installed copy would otherwise never hear about it. A copyright line pinned above the text is read once and then read past forever, while costing a strip of every chapter; behind a button it is one press from the text it describes and absent the rest of the time.
 - **Names in the reader's language**: book names, and now testament names, come from the translation (`meta.testament[id].info.name`) wherever they are shown — tabs, breadcrumbs, the books tree, the chapter header — with the canon as fallback. Chrome that carries such a name is tagged with the script's language so it gets the same line room.
@@ -292,7 +293,7 @@ Two rules keep the rest honest. A stored id this build no longer has is dropped 
 - A note or a bookmark may cover a run of verses: `verse` is where it starts and `to` where it ends (null for one verse). `parsePassage` checks the order only — how many verses a chapter holds is the translation's business, so a run past the end of one edition is still a reference. `chapterIndex` expands a run so every verse it covers is tinted; a note's dot stays on the verse it starts at.
 - `toggleMark` over a run clears whatever bookmarks it overlaps rather than adding another on top, so pressing the same control twice returns the reader to where they started.
 - **Following a reference** has one set of manners, in `shell/reflink.js`, used by every surface that renders one: press to follow in place, `Ctrl`/`⌘`-press or middle-press for a new tab, and resting on it reads it where it stands. The default is untouched — a reference opens in place because that is what works on a phone and on a machine with little memory to spare — and everything added is asked for explicitly. `shell.openChapter`/`openVerse` now forward `{ newTab }` to the workspace, which had supported it all along behind a signature that dropped it, so until this batch nothing in the app could open a second tab.
-- **The peek** (`shell/peek.js`) reads the verses from the store the reader is already in, keeps the last six chapters, and offers the two ways out of itself. It is armed only where `matchMedia('(hover: hover) and (pointer: fine)')` is true: a touch device reports a hover as the moment before a tap, so a preview bound to it appears under the finger that is about to press the thing it covers.
+- **The peek** (`shell/peek.js`) reads the verses from the store the reader is already in, keeps the last six chapters, and puts its two ways out — open here, open in a new tab — as icons on the reference line itself. A popover over a paragraph should cover as little of it as it can, and a foot with two labelled buttons in it was a fifth of the box spent on chrome. It is armed only where `matchMedia('(hover: hover) and (pointer: fine)')` is true: a touch device reports a hover as the moment before a tap, so a preview bound to it appears under the finger that is about to press the thing it covers.
 - `app/core/lookup.js` reads a reference out of typed text — `ps 23`, `psa 3:2-4`, the translation's own names and numerals — for the palette, the quick switcher and the books filter. Exact match first (canon and translation names, short names, published abbreviations), then prefix; a prefix that fits several books returns them all.
 
 ---
@@ -358,8 +359,28 @@ is the deliberate oddity and wins, because it was chosen in the presence of the
 alternative. Choosing the language's own voice again clears the override rather
 than leaving one behind that agrees with it.
 
-Where it lives is the design decision. It is not a setting — a setting is a
-question asked of everybody, and most readers should never wonder about this.
+**The ribbon button is a process, not a switch.** `state()` may answer with a
+boolean, as most commands do, or with `{ on, icon, title, progress }` — which
+is what a command whose state is a *process* has to say. Reading aloud swaps
+its glyph to what pressing it would do next (a pause bar while it speaks), puts
+the verse it has reached in the tooltip, and reports how far through the chapter
+it is; the rail draws that as a ring round the button, one conic gradient masked
+to the edge, so advancing it costs a single custom property and nothing at all
+when idle. Nothing polls: the feature calls `shell.refreshCommands()` as each
+verse begins.
+
+**The voices on the device are a document, built when it is opened.** A desktop
+with the cloud voices installed has well over a hundred, and a list that long on
+the Settings page would be built on every visit to a page nobody came to for
+voices. So the settings row states the count — which is the answer most of the
+time — and opening it builds the list, grouped by language with the language on
+screen first, every row playable so a voice can be heard before it is chosen.
+Closing the tab stops the sample and throws the list away; nothing is fetched
+and nothing is stored.
+
+Where the *cross-language* choice lives is the other design decision. It is not
+a setting — a setting is a question asked of everybody, and most readers should
+never wonder about this.
 It is not behind a hidden gesture either, because a power-user feature nobody
 can find twice is a feature that was not built. It is the last row of the voice
 list: invisible unless you are already looking at voices, permanent once you
@@ -431,6 +452,121 @@ No index is built at install time; the scan is a cursor over `chapters` in a wor
 Measured on three full-size translations: one translation 1.6 s, the same as a regular expression 0.3 s, all three 4.2 s, one book 0.17 s.
 
 ---
+
+## 3d-vii. Writing a translation out
+
+The readers in `core/formats/` turn somebody else's file into the shape this app
+keeps; `core/formats/write.js` does the reverse. They live beside each other
+because **two** features want the same emitters — the source view shows one
+chapter as USFM, the library exports any selection as the same — and written
+twice they would be two half-correct USFM emitters that disagreed about
+footnotes.
+
+A writer is given a `selection` (the metadata and the chapters, in canon order)
+and nothing else: no store, no DOM, no network. So it is as testable as a
+reader, and the test that actually keeps them honest is the round trip — write
+it, read it back through the matching adapter, compare verse for verse. Native
+JSON, USFM, USX, OSIS, Zefania and CSV all survive that; Markdown is a document
+to read rather than a file to import, and says so.
+
+`describeLoss(format)` is shown before the button, not after the download. This
+app keeps text, a heading, a cross-reference line and a merge, because that is
+what it uses; it does not keep USFM's paragraphing, its poetry indentation or
+its footnotes. A converter that implied a round trip through here was lossless
+would be lying.
+
+**The source view** is where that machinery is visible: the same chapter as
+USFM, as OSIS, as our own JSON, beside the reading. Markdown is the only
+editable one, and that is a decision rather than an omission — the notes round
+trip works because `## Notes` is a boundary the reader's own material sits
+below, and USFM has no such line.
+
+The format, the copy and the save are **one button in the crumb bar**, which
+also shows which format is on. They were briefly a toolbar over the text, and
+that was wrong twice: it spent a strip of the workspace on three controls, and
+wrapping the textarea in a flex column inside a scrolling box left it half the
+height it had — `.source` is sized by `height: 100%`, which needs a parent whose
+height is definite. The view is the textarea again, and the controls sit beside
+the translation-info button.
+
+## 3d-viii. A translation as it is published
+
+`engkjvcpb_usfx.zip` from eBible.org is eight files, and the scripture is one of
+them. The others are what make an import feel like an installed translation:
+`BookNames.xml` is what the translation calls each book, the DBL metadata is its
+name, abbreviation, language and rights, and `copr.htm` is the copyright in
+full. Asking a reader to unpack that and hand over one file is asking them to do
+the assembly, and it throws the rest away.
+
+- `services/zip.js` reads and writes zips with no dependency: a central
+  directory is a few fixed-width fields, and `DecompressionStream('deflate-raw')`
+  does the inflating. It is in `services/` rather than `core/` because it is
+  asynchronous, and it is still tested in Node — against archives it did not
+  write, since a reader tested only against its own writer agrees with itself.
+- `core/formats/pack.js` works out what each file in a bundle is, converts the
+  scripture (merging a bundle that is one file per book), and folds in the book
+  names and the metadata. Files it does not use are named in the report rather
+  than silently dropped.
+- The import dialog asks nothing it can answer itself: the bundle's metadata
+  fills the name, the short name and the language, and there is no format
+  question because the archive settles it.
+
+## 3d-ix. Strong's numbers
+
+Two halves, and only one of them existed.
+
+**Carrying the data.** The docs said word-level markup rode along in a `word`
+field; `translation.js` rejected `word` as an unknown verse key, so a file
+carrying one could not be installed, and the USFM importer dropped
+`\w grace|strong="G5485"\w*` *because* it expected that field. A KJV published
+with its Strong's numbers arrived without them, and the only machine-readable
+source of them in the world was being discarded. They are now kept inline, as
+`grace{G5485}`, which is the notation `core/strongs.js` has always read and the
+reading surface has always rendered — from USFM, from USFX's `<w s="…">`, from
+USX's `<char style="w" strong="…">` and from OSIS's `lemma="strong:…"`.
+
+**Saying what one means.** `openStrongs` printed the code and the sentence "No
+lexicon is installed" from the day it was written, because there was no lexicon
+and nowhere to get one. There is now: `core/lexicon.js` defines the file (one
+per testament, keyed by the bare number, every field but the definition
+optional — the public-domain transcriptions come in a dozen shapes and one that
+refused a file for want of a transliteration would be a lexicon nobody could
+assemble), and `services/lexicon.js` fetches it from the catalog repository the
+way language packs are fetched. It has an object store of its own because it is
+megabytes where a language pack is forty lines, and `records` is read whole at
+startup. Nothing is fetched until a number is pressed, and only the testament
+that number belongs to: a reader of the Hebrew never downloads the Greek. Until
+then the popover *offers the download* rather than stating a lack — a dead end
+with a button on it is a different thing from a dead end.
+
+A bare number with no H or G is not guessed at when both lexicons are held: 430
+is God in Hebrew and something else in Greek.
+
+## 3e-ii. Saying what the canon report means
+
+`stats.books` is how many books a file holds; `diagnostics` is how it departs
+from `category.json` — a book absent, a chapter past the canon's count, or a
+chapter whose last covered verse is not the count the canon gives. The library
+row used to render that as **"65 books · 50 differences"**, which raises two
+questions and answers neither: is a book missing, and different how?
+
+Both are knowable, so both are said. The row reads "65 of 66 books · 49
+chapters a different length", the counts are kept *by kind* at install time
+(the item list is capped, so a breakdown cannot be recovered from it later),
+and the translation-info popover says in one paragraph what the canon is and
+that a translation may legitimately differ from it.
+
+**And some of those differences were ours.** A verse range — `\v 3-4` in USFM,
+`number="3-4"` in USX, `id="2-3"` in USFX — was read as its first verse and the
+range discarded, so every merged verse in a real edition became a chapter
+reported as short. This app already has a field for exactly that (`merge`), and
+the importers now record it. On an edition that merges fifty verses, fifty
+"differences" were the importer's fault rather than the file's.
+
+A licence gets a block of its own in that popover rather than a cell in the
+facts grid, clamped to six lines with a press for the rest: the KJV Cambridge
+Paragraph Bible's runs to five paragraphs, and in a narrow right-hand column it
+turned the box into a scrolling wall.
 
 ## 3f. Five rules that came out of defects
 

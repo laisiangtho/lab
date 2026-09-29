@@ -47,10 +47,14 @@ export function pickJson() {
  * know what it is, and a file that is not JSON is not an error here — it is a
  * USFM file, and the next step is to say so.
  *
+ * Both forms come back: the text for anything that is text, and the bytes for
+ * anything that is not — an archive is read as bytes and its members as text.
+ *
  * @param {{ accept?: string }} [options]
- * @returns {Promise<{ name: string, size: number, text: string } | null>} null when cancelled
+ * @returns {Promise<{ name: string, size: number, text: string, bytes: Uint8Array } | null>}
+ *          null when cancelled
  */
-export function pickText({ accept = '' } = {}) {
+export function pickFile({ accept = '' } = {}) {
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -60,11 +64,38 @@ export function pickText({ accept = '' } = {}) {
       const file = input.files?.[0];
       if (!file) { resolve(null); return; }
       try {
-        resolve({ name: file.name, size: file.size, text: await file.text() });
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        // A zip decoded as UTF-8 is mojibake, which is harmless: the caller
+        // looks at the bytes to decide, and never at that text.
+        resolve({ name: file.name, size: file.size, bytes, text: new TextDecoder().decode(bytes) });
       } catch (err) {
         reject(new Error(`${file.name}: could not be read (${err.message})`));
       }
     }, { once: true });
     input.click();
   });
+}
+
+/**
+ * Hand the reader a file this app just made.
+ *
+ * The platform's own save dialog where there is one (the desktop build), and a
+ * download where there is not — the same split every other export here takes.
+ *
+ * @param {string} filename
+ * @param {string|Blob} content
+ */
+export function saveText(filename, content) {
+  const blob = content instanceof Blob ? content : new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  // In the document, briefly. A detached anchor's `download` is honoured by
+  // some browsers and ignored by others, and a file that arrives called
+  // "download" with no extension is a file nobody can open.
+  link.style.display = 'none';
+  document.body.append(link);
+  link.click();
+  setTimeout(() => { link.remove(); URL.revokeObjectURL(url); }, 1000);
 }

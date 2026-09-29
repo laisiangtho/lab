@@ -88,7 +88,10 @@ test('usfm gives up its chapters, verses and headings, and keeps notes out of th
   assert.equal(gen[1].verse[3].text, 'And God said, Let there be light.');
   // Character markers are formatting, and their content is the verse.
   assert.equal(gen[2].verse[2].text, 'And on the seventh day God had ended his work.');
-  assert.equal(gen[2].verse[3].text, 'And God blessed the seventh day.', 'word tagging is dropped, the word is not');
+  // A tagged word keeps its Strong's number, in the notation the reading
+  // surface already reads. The lemma and morphology, which nothing shows, do
+  // not come with it.
+  assert.equal(gen[2].verse[3].text, 'And God blessed{H1288} the seventh day.');
   assert.equal(raw.info.identify, 'gen');
 });
 

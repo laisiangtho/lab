@@ -23,10 +23,12 @@
  * command palette — drives the same playback.
  */
 
-import { sameLanguage, toTag } from '../../core/langcode.js';
+import { languageName, sameLanguage, toTag } from '../../core/langcode.js';
 import {
   chooseVoice, forgetVoice, isCrossed, parseVoiceMemory, rememberVoice, voicesForLanguage,
 } from '../../core/voices.js';
+import { fill, h } from '../../shell/dom.js';
+import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
 
 const KEY = 'voices';
@@ -126,6 +128,8 @@ export default {
       if (speech.at >= speech.numbers.length) { stop(); shell.notify(L('msg.ended')); return; }
       const number = speech.numbers[speech.at];
       markSpoken(number);
+      // The ring advances a verse at a time; nothing polls.
+      shell.refreshCommands?.();
 
       const utterance = new SpeechSynthesisUtterance(speech.verses[number].text);
       utterance.rate = RATE;
@@ -237,14 +241,35 @@ export default {
       });
     }
 
+    /**
+     * What the ribbon button should look like right now.
+     *
+     * Reading aloud is the one command whose state is a process rather than a
+     * switch, and a button that looks the same idle, speaking and paused is a
+     * button you have to press to find out. So it answers with the glyph for
+     * what pressing it would do next, what that is in words, and how far
+     * through the chapter the voice has got — which the rail draws as a ring.
+     */
+    function buttonState() {
+      if (speech.mode === 'idle') return { on: false, icon: 'audio', title: L('cmd.read') };
+      const through = speech.numbers.length ? speech.at / speech.numbers.length : 0;
+      return {
+        on: true,
+        icon: speech.mode === 'playing' ? 'pause' : 'play',
+        title: speech.mode === 'playing'
+          ? L('cmd.readPause', { at: speech.numbers[speech.at] ?? '', of: speech.numbers.length })
+          : L('cmd.readResume'),
+        progress: through,
+      };
+    }
+
     registry.command({
       id: 'speech.toggle',
       title: L('cmd.read'),
       icon: 'audio',
       ribbon: true,
       needsChapter: true,
-      // A button that says whether it is doing the thing it offers.
-      state: () => speech.mode === 'playing',
+      state: buttonState,
       run: () => toggle().catch((err) => shell.notify(err.message, 'error')),
     });
     registry.command({ id: 'speech.stop', title: L('cmd.stopReading'), icon: 'stop', run: stop });
@@ -257,6 +282,144 @@ export default {
       // tell them apart by.
       icon: 'voice',
       run: () => pickVoice().catch((err) => shell.notify(err.message, 'error')),
+    });
+
+    /**
+     * Every voice this device has, shown only when somebody asks.
+     *
+     * A list of voices is the sort of thing that reads as generous and behaves
+     * as a tax: on a desktop with the cloud voices installed it is well over a
+     * hundred rows, each one a name nobody recognises, and building it into the
+     * Settings page would mean building it on every visit to a page nobody came
+     * to for voices. So the row states the count — which is the answer most of
+     * the time — and the list exists only while it is open.
+     *
+     * It is grouped by language, marked where it is the language on screen, and
+     * every row can be heard: a voice is a sound, and a list of names is a poor
+     * way to choose one. Nothing is fetched and nothing is kept.
+     */
+    function voicesDoc(el) {
+      loadVoices();
+      const wrap = h('div', { class: 'vx' });
+      el.append(h('section', { class: 'doc doc-full vx-doc' }, wrap));
+
+      let filter = '';
+      let sample = null;
+      let about = { identify: '', tag: '', name: '' };
+
+      const stop = () => {
+        if (!available()) return;
+        try { window.speechSynthesis.cancel(); } catch { /* nothing to cancel */ }
+        sample = null;
+      };
+
+      /** Say one line in this voice, so the reader hears what they are picking. */
+      function tryOut(voice) {
+        if (!available()) return;
+        stop();
+        const line = new SpeechSynthesisUtterance(L('vx.sample'));
+        line.voice = voice;
+        line.lang = voice.lang;
+        line.rate = RATE;
+        line.onend = () => { if (sample === voice.voiceURI) { sample = null; paint(); } };
+        sample = voice.voiceURI;
+        window.speechSynthesis.speak(line);
+        paint();
+      }
+
+      function paint() {
+        const q = filter.trim().toLowerCase();
+        const all = voices.filter((v) => !q
+          || `${v.name} ${v.lang} ${languageName(v.lang)}`.toLowerCase().includes(q));
+
+        const groups = new Map();
+        for (const voice of all) {
+          const key = toTag(voice.lang);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(voice);
+        }
+        // The language on screen first: it is the one the reader is here about.
+        const order = [...groups.entries()].sort(([a], [b]) => {
+          const mine = (code) => (about.tag && sameLanguage(code, about.tag) ? 0 : 1);
+          return mine(a) - mine(b) || languageName(a).localeCompare(languageName(b));
+        });
+
+        fill(wrap,
+          h('header', { class: 'doc-head' },
+            h('h1', { class: 'inline-title' }, L('vx.title')),
+            h('p', { class: 'muted' }, available()
+              ? L('vx.lede', { n: voices.length, langs: groups.size })
+              : L('err.noSpeech')),
+            h('div', { class: 'vx-tools' },
+              h('div', { class: 'field' }, icon('search'), h('input', {
+                type: 'search', spellcheck: 'false', value: filter,
+                placeholder: L('vx.filter'), 'aria-label': L('vx.filter'),
+                oninput: (e) => { filter = e.currentTarget.value; paint(); },
+              })),
+              h('span', { class: 'grow' }),
+              sample
+                ? h('button', { class: 'btn', onclick: () => { stop(); paint(); } }, icon('stop'), L('vx.stop'))
+                : null)),
+          order.length
+            ? order.map(([code, list]) => h('div', { class: 'vx-group' },
+              h('h2', {},
+                languageName(code) || code,
+                h('span', { class: 'vx-n' }, String(list.length)),
+                about.tag && sameLanguage(code, about.tag)
+                  ? h('span', { class: 'badge badge-hint' }, L('vx.onScreen'))
+                  : null),
+              h('ul', { class: 'vx-list' }, list.map((voice) => h('li', {
+                class: `vx-item${sample === voice.voiceURI ? ' is-playing' : ''}`,
+              },
+                h('button', {
+                  class: 'vx-try', title: L('vx.try'), 'aria-label': L('vx.try'),
+                  onclick: () => (sample === voice.voiceURI ? (stop(), paint()) : tryOut(voice)),
+                }, icon(sample === voice.voiceURI ? 'stop' : 'play')),
+                h('span', { class: 'vx-name' }, voice.name),
+                h('span', { class: 'vx-tag' }, voice.lang),
+                voice.localService
+                  ? h('span', { class: 'badge badge-ok' }, L('vx.offline'))
+                  : h('span', { class: 'badge' }, L('val.online')),
+                voice.default ? h('span', { class: 'badge badge-hint' }, L('vx.default')) : null)))))
+            : h('p', { class: 'empty-hint' }, voices.length ? L('vx.noHits', { query: filter.trim() }) : L('err.noVoices')));
+      }
+
+      subject().then((found) => { about = found; paint(); }).catch(() => paint());
+      paint();
+      const refresh = () => { loadVoices(); paint(); };
+      try { window.speechSynthesis?.addEventListener('voiceschanged', refresh); } catch { /* older engine */ }
+      return () => {
+        stop();
+        try { window.speechSynthesis?.removeEventListener('voiceschanged', refresh); } catch { /* as above */ }
+      };
+    }
+
+    registry.doc({ id: 'voices', title: L('vx.title'), icon: 'waveform', mount: voicesDoc });
+
+    registry.setting({
+      id: 'speech.voices',
+      section: 'reading',
+      order: 60,
+      build: (ui) => {
+        loadVoices();
+        return ui.action({
+          name: L('vx.title'),
+          hint: available() ? L('vx.settingHint') : L('err.noSpeech'),
+          value: available() ? String(voices.length) : '—',
+          label: L('cmd.open'),
+          glyph: 'waveform',
+          disabled: !available(),
+          onClick: () => shell.openDoc('voices'),
+        });
+      },
+    });
+
+    registry.command({
+      id: 'speech.voices',
+      title: L('vx.title'),
+      icon: 'waveform',
+      opens: 'voices',
+      run: () => shell.openDoc('voices'),
     });
 
     registry.verseAction({
