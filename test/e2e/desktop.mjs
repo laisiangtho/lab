@@ -14,13 +14,24 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const PORT = 9333;
 
-const electron = join(ROOT, 'node_modules', 'electron', 'dist', 'electron');
+// Asked of the package rather than built by hand: from Electron 44 the binary
+// is not fetched at install time but the first time the package is asked for
+// its path, and the path differs by platform (Electron.app on macOS,
+// electron.exe on Windows).
+let electron;
+try {
+  electron = createRequire(import.meta.url)('electron');
+} catch (err) {
+  console.error(`FAILED: the Electron binary could not be installed — ${err.message}`);
+  process.exit(1);
+}
 if (!existsSync(join(ROOT, 'out', 'main', 'index.js'))) {
   console.error('skipped: out/ is not built — run `npm run desktop:build` first');
   process.exit(0);
@@ -37,13 +48,17 @@ const child = spawn(electron, [ROOT, `--remote-debugging-port=${PORT}`, '--no-sa
   stdio: ['ignore', 'pipe', 'pipe'],
   env: { ...process.env, ELECTRON_ENABLE_LOGGING: '1' },
 });
+const exited = new Promise((_, fail) => {
+  child.on('error', (err) => fail(new Error(`could not start ${electron} (${err.message})`)));
+});
+exited.catch(() => {});
 const output = [];
 child.stdout.on('data', (d) => output.push(String(d)));
 child.stderr.on('data', (d) => output.push(String(d)));
 
 let failed = null;
 try {
-  const browser = await attach();
+  const browser = await Promise.race([attach(), exited]);
   const [context] = browser.contexts();
   const page = context.pages().find((p) => !p.url().startsWith('devtools:')) ?? (await context.waitForEvent('page'));
   const problems = [];
