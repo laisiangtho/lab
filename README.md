@@ -18,7 +18,7 @@ Phase 2 of the project. The Phase 1 single-file `index.html` is preserved as git
 | `npm run desktop:build` | Compile main, preload and renderer → `out/` |
 | `npm run desktop:package` | Installers for the current system → `release/` (`.dmg`/`.zip`; setup and portable `.exe`; AppImage, `.deb`, `.rpm`, `.tar.gz`) |
 | `npm test` | Unit and boundary tests (`node:test`, no framework) — about a second |
-| `npm run test:e2e` | The built web app driven in a browser: build → serve → 35 ordered checks |
+| `npm run test:e2e` | The built web app driven in a browser: build → serve → the ordered checks, then the same app across restarts (`restart.test.mjs`) |
 | `npm run test:desktop` | The packaged Electron application, started and inspected |
 | `npm run test:perf` | Timings at full size: three complete Bibles, the longest chapter, a whole-library search |
 | `npm run test:all` | `npm test` then the browser suite |

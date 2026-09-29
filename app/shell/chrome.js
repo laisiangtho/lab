@@ -406,13 +406,27 @@ export function createChrome(root, ctx) {
    * shell placed it. Now it means one of two, and the list says which: a pane
    * the reader has seen and switched off stays off, while a pane this build
    * has just added still arrives on its own.
+   *
+   * The list only means that alongside a saved arrangement. Builds up to
+   * 26.09.29.17 wrote the list on the first launch but not the arrangement it
+   * went with, so the next launch read every pane as seen-and-removed and
+   * opened with both sidebars empty and their buttons disabled. An arrangement
+   * with nothing on either side is therefore read as never arranged, and the
+   * panes are laid out afresh. The one reader that costs is someone who had
+   * switched off every pane on both sides; closing a sidebar is the setting
+   * for that, and it is kept.
+   *
+   * The arrangement and the list are then written together, in one change, so
+   * the two can no longer disagree.
    */
   function arrange() {
-    const saved = { left: settings.get().sidebarLeft, right: settings.get().sidebarRight };
+    const current = settings.get();
+    const saved = { left: current.sidebarLeft, right: current.sidebarRight };
+    const neverArranged = !saved.left.length && !saved.right.length;
     const placed = new Set([...saved.left, ...saved.right].flatMap((row) => row.views));
-    const seen = new Set(settings.get().sidebarKnown ?? []);
+    const seen = new Set(neverArranged ? [] : current.sidebarKnown ?? []);
+    const provided = new Set(registry.panes().map((p) => p.id));
     for (const side of ['left', 'right']) {
-      const provided = new Set(registry.panes().map((p) => p.id));
       const rows = saved[side]
         .map((row) => ({ views: row.views.filter((id) => provided.has(id)), active: row.active, size: row.size }))
         .filter((row) => row.views.length);
@@ -423,19 +437,23 @@ export function createChrome(root, ctx) {
       sides[side].rows = rows;
       sides[side].build(rows.flatMap((row) => row.views).map((id) => registry.panes().find((p) => p.id === id)).filter(Boolean));
     }
-    rememberOffered();
+    saveArrangement();
   }
 
   /**
-   * Every pane this build provides is now a pane the reader has been offered.
-   * Written once the arrangement is settled, so that whatever they do to it
-   * from here — including hiding something — is theirs to keep.
+   * The arrangement as it now stands, and every pane this build provides as a
+   * pane the reader has been offered, in one write — and only when either
+   * differs from what is stored, so an ordinary launch writes nothing.
    */
-  function rememberOffered() {
-    const offered = registry.panes().map((p) => p.id);
-    const seen = settings.get().sidebarKnown ?? [];
-    if (offered.length === seen.length && offered.every((id) => seen.includes(id))) return;
-    ctx.state.set({ sidebarKnown: offered });
+  function saveArrangement() {
+    const rowsOf = (side) => sides[side].rows.map((r) => ({ views: [...r.views], active: r.active, size: r.size }));
+    const next = { sidebarLeft: rowsOf('left'), sidebarRight: rowsOf('right'), sidebarKnown: registry.panes().map((p) => p.id) };
+    const current = settings.get();
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const knownSame = next.sidebarKnown.length === (current.sidebarKnown ?? []).length
+      && next.sidebarKnown.every((id) => current.sidebarKnown.includes(id));
+    if (same(next.sidebarLeft, current.sidebarLeft) && same(next.sidebarRight, current.sidebarRight) && knownSame) return;
+    ctx.state.set(next);
   }
 
   /** Which side a pane is on, or null when it is switched off. */

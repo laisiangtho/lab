@@ -209,6 +209,19 @@ pane this build has just added is unknown, so it still arrives on its own. The
 list is written once the arrangement is settled, so a feature that failed to
 register is not recorded as offered and appears when it works again.
 
+**The list and the arrangement are written together, in one change.** Up to
+26.09.29.17 the first launch wrote the list but not the arrangement it
+described — that was saved only when the reader first rearranged something —
+so the second launch found every pane known and none placed, read them all
+as switched off, and opened with both sidebars empty and their toggles
+disabled. `saveArrangement()` now writes both whenever either differs from
+what is stored. An arrangement with nothing on either side is read as never
+arranged and laid out afresh, which repairs the installs that build left
+behind; the one reader it costs is someone who had switched off every pane on
+both sides, for whom closing a sidebar is the setting to use.
+`test/e2e/restart.test.mjs` reloads between its checks, which nothing in the
+single-session suite did.
+
 Two seams needed work, and both would have failed quietly:
 
 - **`selectPane` revives.** Five features reach their own pane by name
