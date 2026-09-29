@@ -53,7 +53,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       web: ${{ steps.plan.outputs.web }}
-      desktop: ${{ steps.plan.outputs.desktop }}
+      # Off when this commit has already been released (see "Check the tag").
+      desktop: ${{ steps.plan.outputs.desktop == 'true' && steps.tag.outputs.released != 'true' }}
       version: ${{ steps.plan.outputs.version }}
       tag: ${{ steps.plan.outputs.tag }}
     steps:
@@ -78,18 +79,37 @@ jobs:
           else
             node scripts/release-plan.mjs
           fi
-      - name: Refuse a tag that already exists
+      # A tag that exists is either this release, already made — GitHub can
+      # deliver one push twice, and the second run waits in the queue until the
+      # first has published — or an earlier release whose version was never
+      # restamped. The first is nothing left to do; the second is an error.
+      - id: tag
+        name: Check the tag
         if: steps.plan.outputs.desktop == 'true'
         env:
           TAG: ${{ steps.plan.outputs.tag }}
         run: |
-          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
-            echo "::error::$TAG is already released. Stamp a new version with 'node scripts/version.mjs --apply', commit and push again."
-            exit 1
+          refs=$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}")
+          if [ -z "$refs" ]; then
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          # An annotated tag lists the tag object and, under ^{}, its commit.
+          peeled=$(printf '%s\n' "$refs" | awk '$2 ~ /\^\{\}$/ {print $1}')
+          tagged=${peeled:-$(printf '%s\n' "$refs" | awk '{print $1; exit}')}
+          if [ "$tagged" = "$GITHUB_SHA" ]; then
+            echo "::notice::$TAG is already released from this commit ($GITHUB_SHA); the desktop release is skipped."
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::error::$TAG is already released from ${tagged:0:7}, not this commit (${GITHUB_SHA:0:7}). Stamp a new version with 'node scripts/version.mjs --apply', commit and push again."
+          exit 1
 
   test:
     needs: plan
+    # Nothing left to release (a repeated run of a published desktop release)
+    # needs no test run either.
+    if: needs.plan.outputs.web == 'true' || needs.plan.outputs.desktop == 'true'
     uses: ./.github/workflows/ci.yml
     with:
       gate: true

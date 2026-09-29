@@ -30,9 +30,13 @@ What the workflow refuses, and why:
   `electron-builder.yml` are all written by `scripts/version.mjs --apply`; a
   release from files edited by hand would report one version and install
   another.
-- **A tag that already exists.** The desktop update check compares the latest
-  release's tag with the running version, so a second release under one tag
-  would be invisible to every installed copy. Restamp and push again.
+- **A tag that already exists on another commit.** The desktop update check
+  compares the latest release's tag with the running version, so a second
+  release under one tag would be invisible to every installed copy. Restamp and
+  push again. A tag on the *same* commit means that release is already made —
+  GitHub occasionally delivers one push twice, and the second run waits until
+  the first has published — so that run skips the desktop release with a notice
+  and succeeds.
 - **A missing deploy key** for a web release (below).
 
 A desktop release is a **draft** until all three installers are attached, then
