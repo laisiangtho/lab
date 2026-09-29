@@ -6,7 +6,10 @@
 #
 #   release:web      tests → web build → laisiangtho.github.io
 #   release:desktop  tests → draft release → macOS, Windows, Linux installers
-#                    → the release is published once all three are attached
+#                    → the release is published once all three are attached.
+#                    Its title is the tag (v26.09.29.11); its notes are the
+#                    commits since the previous release
+#                    (scripts/release-notes.mjs).
 #   release:all      both
 #
 # Only the first line of the head commit of a push to master is read (with a
@@ -158,8 +161,16 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       TAG: ${{ needs.plan.outputs.tag }}
-      VERSION: ${{ needs.plan.outputs.version }}
     steps:
+      # The whole history and its tags: the notes list the commits since the
+      # previous release tag, and scripts/release-notes.mjs refuses a shallow
+      # clone rather than report no changes.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       # A draft left behind by a run that failed half way is reused, so running
       # the release again finishes it rather than making a second one.
       - name: Create the draft release
@@ -170,33 +181,10 @@ jobs:
             true) echo "::notice::reusing the draft release for $TAG"; exit 0 ;;
             false) echo "::error::$TAG is already published"; exit 1 ;;
           esac
-          cat > notes.md <<'EOF'
-          ### Which file
-
-          | System | File | |
-          |---|---|---|
-          | Windows | `…-win-x64-setup.exe` | Installs, with a Start menu entry and an uninstaller |
-          | Windows | `…-win-x64-portable.exe` | One file that runs where it is put; nothing installed |
-          | macOS, Apple silicon (M1 and later) | `…-mac-arm64.dmg` | |
-          | macOS, Intel | `…-mac-x64.dmg` | |
-          | Ubuntu, Debian, Mint | `…-linux-amd64.deb` | Opens in the system's installer |
-          | Fedora, openSUSE | `…-linux-x86_64.rpm` | Opens in the system's installer |
-          | Any Linux | `…-linux-x86_64.AppImage` | One file; mark it executable and run it |
-          | Any Linux | `…-linux-x64.tar.gz` | The application folder |
-
-          Or use it in a browser, with nothing to download: https://laisiangtho.github.io/
-
-          ### First run
-
-          **Windows:** the files are not signed yet. SmartScreen will warn; choose *More info → Run anyway*.
-
-          **macOS:** the app is not notarized yet, so macOS refuses to open it the first time. After moving it to Applications, either open *System Settings → Privacy & Security* and choose *Open Anyway*, or run once in Terminal:
-
-              xattr -cr "/Applications/Lai Siangtho.app"
-
-          EOF
+          node scripts/release-notes.mjs --to "$GITHUB_SHA" > notes.md
+          cat notes.md
           gh release create "$TAG" --draft --target "$GITHUB_SHA" \
-            --title "Lai Siangtho $VERSION" --notes-file notes.md --generate-notes
+            --title "$TAG" --notes-file notes.md
 
   installers:
     needs: [plan, draft]

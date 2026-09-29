@@ -49,7 +49,11 @@ missing. If a run fails part way, running it again reuses the draft.
 | Linux | AppImage, `.deb`, `.rpm`, `.tar.gz`, `x64` | Nothing to allow. |
 
 File names carry the stamped version: `lai-siangtho-26.9.29.11-mac-arm64.dmg`.
-The release notes include a table of which file suits which system.
+The release is titled with its tag (`v26.09.29.11`). Its notes are the commits
+since the previous release tag, one line each with a short hash, leaving out
+merges and the `release:` commits, followed by a collapsed paragraph on first
+running an unsigned download (`scripts/release-notes.mjs`; run it locally to see
+the notes the next release would get).
 
 Linux formats, and why there are four:
 
