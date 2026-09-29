@@ -171,11 +171,28 @@ jobs:
             false) echo "::error::$TAG is already published"; exit 1 ;;
           esac
           cat > notes.md <<'EOF'
-          **macOS:** these builds are not notarized, so macOS reports the app as damaged when it is first opened. After moving it to Applications, run once in Terminal:
+          ### Which file
+
+          | System | File | |
+          |---|---|---|
+          | Windows | `…-win-x64-setup.exe` | Installs, with a Start menu entry and an uninstaller |
+          | Windows | `…-win-x64-portable.exe` | One file that runs where it is put; nothing installed |
+          | macOS, Apple silicon (M1 and later) | `…-mac-arm64.dmg` | |
+          | macOS, Intel | `…-mac-x64.dmg` | |
+          | Ubuntu, Debian, Mint | `…-linux-amd64.deb` | Opens in the system's installer |
+          | Fedora, openSUSE | `…-linux-x86_64.rpm` | Opens in the system's installer |
+          | Any Linux | `…-linux-x86_64.AppImage` | One file; mark it executable and run it |
+          | Any Linux | `…-linux-x64.tar.gz` | The application folder |
+
+          Or use it in a browser, with nothing to download: https://laisiangtho.github.io/
+
+          ### First run
+
+          **Windows:** the files are not signed yet. SmartScreen will warn; choose *More info → Run anyway*.
+
+          **macOS:** the app is not notarized yet, so macOS refuses to open it the first time. After moving it to Applications, either open *System Settings → Privacy & Security* and choose *Open Anyway*, or run once in Terminal:
 
               xattr -cr "/Applications/Lai Siangtho.app"
-
-          **Windows:** the installer is not signed. SmartScreen will warn; choose *More info → Run anyway*.
 
           EOF
           gh release create "$TAG" --draft --target "$GITHUB_SHA" \
@@ -192,9 +209,9 @@ jobs:
           - os: macos-latest
             files: release/*.dmg release/*.zip
           - os: windows-latest
-            files: release/*.exe
+            files: release/*-setup.exe release/*-portable.exe
           - os: ubuntu-latest
-            files: release/*.AppImage
+            files: release/*.AppImage release/*.deb release/*.rpm release/*.tar.gz
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -212,21 +229,41 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx electron-vite build
+      # rpmbuild is not on the Ubuntu image; the other Linux formats need
+      # nothing beyond what electron-builder downloads itself.
+      - name: Install rpm tooling
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
       # Published here, not by electron-builder: its publisher looks for a
       # release tagged v<semver> (v26.9.29), and the release is tagged with the
-      # full stamped version (v26.09.29.9). The file names carry the same.
+      # full stamped version (v26.09.29.9). File names come from
+      # electron-builder.yml, the same as for a local package.
       - name: Package
         env:
           # Nothing is picked up from a keychain by accident; the ad-hoc
           # identity in electron-builder.yml is the only one used.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: npx electron-builder --publish never "-c.artifactName=lai-siangtho-$VERSION-\${os}-\${arch}.\${ext}"
+        run: npx electron-builder --publish never
       - name: Attach to the draft release
+        env:
+          PATTERNS: ${{ matrix.files }}
         run: |
+          # Every pattern must match: a format that silently failed to build
+          # would otherwise be a release with a download missing.
           shopt -s nullglob
-          files=(${{ matrix.files }})
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "::error::no installers matching '${{ matrix.files }}' in release/"
+          files=()
+          missing=0
+          for pattern in $PATTERNS; do
+            # The pattern is meant to expand as a glob here.
+            # shellcheck disable=SC2206
+            matched=($pattern)
+            if [ ${#matched[@]} -eq 0 ]; then
+              echo "::error::nothing in release/ matches $pattern"
+              missing=1
+            fi
+            files+=("${matched[@]}")
+          done
+          if [ $missing -ne 0 ]; then
             ls -la release || true
             exit 1
           fi

@@ -12,8 +12,8 @@
  *   node scripts/release-plan.mjs --target desktop
  *
  * The three stamped files must agree (app/version.js, package.json,
- * electron-builder.yml): an installer carries package.json's version and
- * buildVersion, the update check compares against app/version.js, and a
+ * electron-builder.yml): an installer carries package.json's version,
+ * buildVersion and buildNumber, the update check compares against app/version.js, and a
  * release made from files that disagree is a release that reports itself
  * wrongly. A disagreement is an error naming both values.
  *
@@ -62,9 +62,12 @@ export function stampedVersion(root = ROOT) {
     throw new Error(`package.json version is ${pkg} but app/version.js is ${version} (expected ${semver}); run scripts/version.mjs --apply`);
   }
 
-  const builder = /^buildVersion:\s*"?(\d+)"?\s*$/m.exec(readFileSync(resolve(root, 'electron-builder.yml'), 'utf8'))?.[1];
-  if (builder !== String(Number(build))) {
-    throw new Error(`electron-builder.yml buildVersion is ${builder ?? 'missing'} but app/version.js is ${version} (expected ${Number(build)}); run scripts/version.mjs --apply`);
+  const builder = readFileSync(resolve(root, 'electron-builder.yml'), 'utf8');
+  for (const key of ['buildVersion', 'buildNumber']) {
+    const value = new RegExp(`^${key}:\\s*"?(\\d+)"?\\s*$`, 'm').exec(builder)?.[1];
+    if (value !== String(Number(build))) {
+      throw new Error(`electron-builder.yml ${key} is ${value ?? 'missing'} but app/version.js is ${version} (expected ${Number(build)}); run scripts/version.mjs --apply`);
+    }
   }
   return version;
 }

@@ -42,13 +42,35 @@ missing. If a run fails part way, running it again reuses the draft.
 
 ## Artifacts
 
-| Platform | Files | Signing |
+| Platform | Files | First run |
 |---|---|---|
-| macOS | `.dmg` and `.zip`, `arm64` and `x64` | Ad-hoc only. Downloaded copies are quarantined and reported as damaged until `xattr -cr "/Applications/Lai Siangtho.app"` is run; the release notes say so. |
-| Windows | NSIS `.exe`, `x64` | None. SmartScreen warns; *More info → Run anyway*. |
-| Linux | AppImage, `x64` | Not applicable. |
+| Windows | NSIS installer `…-win-x64-setup.exe` and a portable `…-win-x64-portable.exe`, both `x64` | Unsigned: SmartScreen warns; *More info → Run anyway*. |
+| macOS | `.dmg` and `.zip`, `arm64` and `x64` | Ad-hoc signed only, not notarized: refused on first open until *System Settings → Privacy & Security → Open Anyway*, or `xattr -cr "/Applications/Lai Siangtho.app"`. |
+| Linux | AppImage, `.deb`, `.rpm`, `.tar.gz`, `x64` | Nothing to allow. |
 
-File names carry the full stamped version: `lai-siangtho-26.09.29.9-mac-arm64.dmg`.
+File names carry the stamped version: `lai-siangtho-26.9.29.11-mac-arm64.dmg`.
+The release notes include a table of which file suits which system.
+
+Linux formats, and why there are four:
+
+- **AppImage** — one file for any distribution. Built with the 1.0.x AppImage
+  runtime (`toolsets.appimage` in `electron-builder.yml`), which carries its
+  own FUSE library. The default runtime needs `libfuse.so.2`, absent from
+  Ubuntu 22.04+ and Fedora, and fails there with
+  `dlopen(): error loading libfuse.so.2`. Its launcher keeps the Chromium
+  sandbox on where user namespaces work and turns it off where they do not —
+  Ubuntu 24.04+ restricts them to programs with an AppArmor profile, which an
+  AppImage cannot install.
+- **.deb / .rpm** — installed by the system's own installer, with a menu entry
+  and an uninstaller. The `.deb` installs that AppArmor profile, so the sandbox
+  stays on under Ubuntu 24.04+. The package revision is `buildNumber`, so a
+  second build on one day (`26.9.29-11` after `26.9.29-10`) installs as an
+  upgrade. The maintainer address in `electron-builder.yml` ships in both.
+- **.tar.gz** — the application folder, for anything else.
+
+Window frame: macOS and Windows draw the app's own title band with the system
+buttons over it; Linux keeps the system title bar (see
+`targets/desktop/electron/window.js`).
 
 ## One-time setup: the web deploy key
 

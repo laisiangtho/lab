@@ -16,7 +16,7 @@ Phase 2 of the project. The Phase 1 single-file `index.html` is preserved as git
 | `npm run preview` | Serve `dist/web/` locally, service worker included |
 | `npm run desktop` | Electron in dev mode (renderer hot reload) |
 | `npm run desktop:build` | Compile main, preload and renderer → `out/` |
-| `npm run desktop:package` | Installers → `release/` (`.dmg`, `.exe`, AppImage) |
+| `npm run desktop:package` | Installers for the current system → `release/` (`.dmg`/`.zip`; setup and portable `.exe`; AppImage, `.deb`, `.rpm`, `.tar.gz`) |
 | `npm test` | Unit and boundary tests (`node:test`, no framework) — about a second |
 | `npm run test:e2e` | The built web app driven in a browser: build → serve → 35 ordered checks |
 | `npm run test:desktop` | The packaged Electron application, started and inspected |

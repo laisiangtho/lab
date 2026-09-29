@@ -5,7 +5,8 @@
  *
  * npm and electron-builder need semver, which has three parts, so the date is
  * the semver version (26.9.23) and the build number goes in electron-builder's
- * `buildVersion`. app/version.js carries the full string the app displays.
+ * `buildVersion` and `buildNumber` (the package revision of a .deb or .rpm).
+ * app/version.js carries the full string the app displays.
  *
  *   node scripts/version.mjs            # report the current version
  *   node scripts/version.mjs --apply    # stamp today's date, next build number
@@ -42,8 +43,20 @@ const next = `${today}.${build}`;
 const semver = today.split('.').map(Number).join('.'); // 26.09.23 → 26.9.23
 
 if (!values.apply) {
-  console.log(`current ${current}\nnext    ${next}  (semver ${semver}, buildVersion ${build})\n\nDry run. Re-run with --apply to stamp.`);
+  console.log(`current ${current}\nnext    ${next}  (semver ${semver}, buildVersion and buildNumber ${build})\n\nDry run. Re-run with --apply to stamp.`);
   process.exit(0);
+}
+
+// Checked before anything is written, so a failure leaves all three files as
+// they were.
+let builder = readFileSync(files.builder, 'utf8');
+for (const key of ['buildVersion', 'buildNumber']) {
+  const line = new RegExp(`^${key}: .*$`, 'm');
+  if (!line.test(builder)) {
+    console.error(`electron-builder.yml has no top-level ${key} line; nothing was stamped`);
+    process.exit(1);
+  }
+  builder = builder.replace(line, `${key}: "${build}"`);
 }
 
 writeFileSync(files.version, `/**
@@ -60,7 +73,6 @@ const pkg = JSON.parse(readFileSync(files.pkg, 'utf8'));
 pkg.version = semver;
 writeFileSync(files.pkg, `${JSON.stringify(pkg, null, 2)}\n`);
 
-const builder = readFileSync(files.builder, 'utf8').replace(/^buildVersion: .*$/m, `buildVersion: "${build}"`);
 writeFileSync(files.builder, builder);
 
-console.log(`stamped ${next} (package.json ${semver}, buildVersion ${build})`);
+console.log(`stamped ${next} (package.json ${semver}, buildVersion and buildNumber ${build})`);

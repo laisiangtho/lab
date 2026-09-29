@@ -54,4 +54,9 @@ test('a stamp the three files disagree about is refused', () => {
   const ebPath = join(ebDir, 'electron-builder.yml');
   writeFileSync(ebPath, readFileSync(ebPath, 'utf8').replace(/^buildVersion: .*$/m, 'buildVersion: "999"'));
   assert.throws(() => stampedVersion(ebDir), /buildVersion is 999/);
+
+  const bnDir = copy();
+  const bnPath = join(bnDir, 'electron-builder.yml');
+  writeFileSync(bnPath, readFileSync(bnPath, 'utf8').replace(/^buildNumber: .*$/m, 'buildNumber: "999"'));
+  assert.throws(() => stampedVersion(bnDir), /buildNumber is 999/);
 });

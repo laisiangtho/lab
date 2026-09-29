@@ -1,8 +1,12 @@
 # Packaging: out/ (from `npm run desktop:build`) → release/
 appId: org.laisiangtho.app
 productName: Lai Siangtho
-# Stamped by scripts/version.mjs; the build number of the day (see app/version.js)
+# Stamped by scripts/version.mjs; the build number of the day (see app/version.js).
+# buildVersion goes into the macOS and Windows metadata; buildNumber becomes the
+# package revision of the .deb and .rpm (26.9.29-11), so a second build on the
+# same day installs as an upgrade over the first.
 buildVersion: "14"
+buildNumber: "14"
 # Releases are read by the desktop update check (targets/desktop/electron/ipc.js);
 # both point at the same repository.
 publish:
@@ -17,9 +21,9 @@ files:
   - package.json
 asar: true
 # No spaces in file names: a release asset named "Lai Siangtho 26.9.29.dmg" is
-# renamed by GitHub on upload. CI overrides this with the full stamped version
-# (see .github/workflows/release.yml); a local package uses the semver one.
-artifactName: ${name}-${version}-${os}-${arch}.${ext}
+# renamed by GitHub on upload. ${version}.${buildNumber} is the stamped version
+# (26.9.29.11), the same for a local package and a released one.
+artifactName: ${name}-${version}.${buildNumber}-${os}-${arch}.${ext}
 mac:
   # Both architectures from one machine: the app has no native modules, so the
   # Intel build is a repackaging rather than a compile.
@@ -38,17 +42,45 @@ mac:
   identity: "-"
   hardenedRuntime: false
 win:
+  # The installer adds a Start menu entry and an uninstaller; the portable build
+  # is one file that runs where it is put, for a machine where installing is not
+  # allowed or not wanted. Both keep the reader's library in the same place.
   target:
     - target: nsis
       arch: [x64]
+    - target: portable
+      arch: [x64]
   icon: assets/icon.png
+nsis:
+  artifactName: ${name}-${version}.${buildNumber}-${os}-${arch}-setup.${ext}
+portable:
+  artifactName: ${name}-${version}.${buildNumber}-${os}-${arch}-portable.${ext}
+# The 1.0.x AppImage runtime is static: it carries its own FUSE library and
+# needs only the fusermount helper every desktop distribution has. The default
+# (0.0.0) runtime needs libfuse.so.2, which Ubuntu 22.04+ and Fedora no longer
+# install, and failed there with "dlopen(): error loading libfuse.so.2". Its
+# launcher also keeps the Chromium sandbox on wherever user namespaces work and
+# turns it off only where they do not (Ubuntu 24.04+ without an AppArmor
+# profile), where the default one turned it off everywhere.
+toolsets:
+  appimage: "1.0.3"
 linux:
+  # AppImage: one file, any distribution, nothing installed.
+  # deb / rpm: installed by the system's own installer, with a menu entry, an
+  #   uninstaller and — on Ubuntu 24.04+ — the AppArmor profile that lets the
+  #   Chromium sandbox run.
+  # tar.gz: the application folder, for anything else.
   target:
     - target: AppImage
       arch: [x64]
-  # A .deb or .rpm needs a maintainer address in the package metadata, which
-  # goes out with every copy. Add `maintainer: Name <address>` here and the
-  # target alongside AppImage when there is an address to publish.
+    - target: deb
+      arch: [x64]
+    - target: rpm
+      arch: [x64]
+    - target: tar.gz
+      arch: [x64]
+  # Published inside every .deb and .rpm.
+  maintainer: Khen Solomon Lethil <khensolomon@gmail.com>
   category: Education
   icon: assets/icon.png
   # Without this the desktop environment cannot tie a running window to the
