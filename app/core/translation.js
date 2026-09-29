@@ -13,6 +13,7 @@
 import {
   expectArray, expectObject, expectString, fail, isPlainObject, normalizeVersion, numericKey, optionalString,
 } from './errors.js';
+import { chapterAgainstCanon } from './examine.js';
 import { toTag } from './langcode.js';
 
 const VERSE_KEYS = new Set(['text', 'title', 'ref', 'merge']);
@@ -84,13 +85,11 @@ export function parseTranslation(raw, { identify, category }) {
       chapters.push(Object.freeze({ book: bookId, chapter, verses }));
       stats.chapters += 1;
 
-      if (chapter > canon.chapters) {
-        diagnostics.push({ type: 'extra-chapter', book: bookId, chapter, expected: canon.chapters });
-      } else {
-        const covered = lastCoveredVerse(verses);
-        const expected = canon.verses[chapter - 1];
-        if (covered !== expected) diagnostics.push({ type: 'versification', book: bookId, chapter, expected, actual: covered });
-      }
+      // The same rule the report applies later, from the same module: an
+      // install that disagrees with an examination is two answers to one
+      // question, and the reader has no way to tell which is the true one.
+      const finding = chapterAgainstCanon(category, bookId, chapter, verses);
+      if (finding) diagnostics.push(finding);
     }
   }
 
@@ -189,12 +188,6 @@ function parseVerses(raw, S, path, stats) {
     }
   }
   return Object.freeze(out);
-}
-
-function lastCoveredVerse(verses) {
-  let max = 0;
-  for (const [key, v] of Object.entries(verses)) max = Math.max(max, v.merge ?? Number(key));
-  return max;
 }
 
 /** story[book][chapter][verse] = { text, ref } — pericope headings. */

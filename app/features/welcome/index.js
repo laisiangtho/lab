@@ -50,34 +50,43 @@ export default {
       id: 'welcome',
       title: L('doc.welcome'),
       icon: 'spark',
+      /**
+       * One column, in the middle, with one thing to press.
+       *
+       * The first version was four bordered panels, each with a heading, a
+       * paragraph and a button of its own — a page that looks like work to get
+       * through, and which asks a reader who has nothing installed to choose
+       * between four places to go. Only one of them can be first: without a
+       * translation there is nothing to search, note or read. So the page makes
+       * that the only button, and the three things worth knowing sit under it
+       * as facts rather than tasks — a line each, no buttons, nothing to
+       * finish. What is left of the rest is a quiet row of links at the foot.
+       */
       mount(el) {
-        const step = (glyph, title, body, label, run) => h('section', { class: 'wl-step' },
+        const fact = (glyph, text) => h('li', {},
           h('span', { class: 'wl-mark' }, icon(glyph)),
-          h('div', { class: 'wl-text' },
-            h('h2', {}, title),
-            h('p', {}, body)),
-          label ? h('button', { class: 'btn', onclick: run }, label) : null);
+          h('span', {}, text));
 
         const has = (id) => registry.commands().some((c) => c.id === id);
+        const link = (label, run) => h('button', { class: 'wl-link', onclick: run }, label);
 
         el.classList.add('wl-wrap');
         el.append(h('div', { class: 'wl' },
+          h('div', { class: 'wl-badge' }, h('img', { src: './icons/icon.svg', alt: '', width: 40, height: 40 })),
           h('h1', {}, L('doc.welcome.title')),
           h('p', { class: 'wl-lede' }, L('doc.welcome.lede')),
 
-          h('div', { class: 'wl-steps' },
-            step('library', L('wl.oneTitle'), L('wl.oneBody'), L('doc.library'), () => shell.openDoc('library')),
-            step('cmd', L('wl.twoTitle'), L('wl.twoBody'), L('cmd.palette'), () => shell.run('shell.palette')),
-            step('note', L('wl.threeTitle'), L('wl.threeBody'), null, null),
-            has('help.formats')
-              ? step('db', L('wl.fourTitle'), L('wl.fourBody'), L('doc.formats'), () => shell.openDoc('formats'))
-              : null),
+          h('button', { class: 'btn primary wl-go', onclick: () => shell.openDoc('library') },
+            icon('library'), L('wl.start')),
 
-          h('div', { class: 'wl-acts' },
-            h('button', { class: 'btn primary', onclick: () => shell.openDoc('library') },
-              icon('library'), L('wl.start')),
-            h('button', { class: 'btn', onclick: () => shell.openDoc('help') }, icon('help'), L('doc.help'))),
-          h('p', { class: 'wl-note muted' }, L('wl.note'))));
+          h('ul', { class: 'wl-facts' },
+            fact('download', L('wl.oneBody')),
+            fact('cmd', L('wl.twoBody')),
+            fact('note', L('wl.threeBody'))),
+
+          h('div', { class: 'wl-more' },
+            link(L('doc.help'), () => shell.openDoc('help')),
+            has('help.formats') ? link(L('doc.formats'), () => shell.openDoc('formats')) : null)));
       },
     });
   },

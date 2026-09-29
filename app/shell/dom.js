@@ -15,7 +15,7 @@ export function h(tag, attrs = {}, ...children) {
     else if (value === true) el.setAttribute(key, '');
     else el.setAttribute(key, String(value));
   }
-  append(el, children);
+  append(el, children, el.tagName === 'BUTTON' && el.classList.contains('btn'));
   return el;
 }
 
@@ -26,15 +26,26 @@ export function h(tag, attrs = {}, ...children) {
  */
 export function fill(el, ...children) {
   el.replaceChildren();
-  append(el, children);
+  append(el, children, el.tagName === 'BUTTON' && el.classList.contains('btn'));
   return el;
 }
 
-function append(el, children) {
+/**
+ * @param {boolean} label wrap plain text in a span the stylesheet can shorten.
+ *        A button's label is written as a string at every call site, and a
+ *        string beside an icon becomes an anonymous flex item — which cannot
+ *        be given an ellipsis, so in a narrow pane the words were cut through
+ *        the middle of a letter instead. Wrapping it here rather than at two
+ *        hundred call sites keeps `h('button', { class: 'btn' }, icon('x'),
+ *        'Add the passage on screen')` the way it reads.
+ */
+function append(el, children, label = false) {
   for (const child of children) {
     if (child === undefined || child === null || child === false) continue;
-    if (Array.isArray(child)) append(el, child);
-    else el.append(child instanceof Node ? child : document.createTextNode(String(child)));
+    if (Array.isArray(child)) append(el, child, label);
+    else if (child instanceof Node) el.append(child);
+    else if (label) el.append(h('span', { class: 'btn-t' }, String(child)));
+    else el.append(document.createTextNode(String(child)));
   }
 }
 

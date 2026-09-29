@@ -1100,11 +1100,26 @@ body.study-in-margin .outline-study{display:none}
 .state.error svg{color:var(--c-orange)}
 .state.error h3{color:var(--c-orange)}
 
+/* A button is one line tall and says so. Left to itself a label too long for
+   the room — which is every label in a 240 px pane — wraps onto a second line
+   that the fixed height then cuts in half, so the text reads as spilling over
+   the border. It is held to one line and cut with an ellipsis instead, and the
+   whole label stays in the tooltip. `min-width` is what lets a button in a
+   flex row shrink at all: the default is the content's own width, which is
+   exactly what has to give. */
 .btn{
   display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:var(--radius-m);
   background:var(--base-20);color:var(--text-normal);font-size:var(--fs-ui-m);
   box-shadow:inset 0 0 0 1px var(--border-strong);transition:background var(--speed);
+  min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
+/* The glyph is not the part that gives: a button cut down to half an icon
+   says nothing at all. */
+.btn svg{flex:0 0 auto}
+/* An icon beside a label is a flex item of its own, and an anonymous text item
+   cannot be given an ellipsis — so a label that must shrink is wrapped, and
+   that wrapper is the part that ellipsises. */
+.btn > .btn-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .btn:hover{background:var(--base-30)}
 .btn.primary{background:var(--accent);box-shadow:none;color:#fff;font-weight:500}
 .btn.primary:hover{background:var(--accent-1)}
@@ -1300,7 +1315,9 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
   background:var(--accent-fade);color:var(--text-muted);font-size:var(--fs-ui-m);text-align:start;
 }
 .plan-continue svg{width:15px;height:15px;color:var(--accent-2);flex:0 0 auto}
-.plan-continue span{flex:1;min-width:0}
+/* "Continue reading" and the reference it points at share one line, and the
+   reference is the part worth keeping whole: the words give way first. */
+.plan-continue span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .plan-continue b{color:var(--text-normal);font-weight:600;white-space:nowrap}
 .plan-pick{
   display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;padding:9px 11px;

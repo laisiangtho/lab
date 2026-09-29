@@ -163,6 +163,9 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
     // word somebody can press, and nothing else in the fixtures exercises that.
     ddb1931: build('ddb1931', 'Det Danske Bibel', 'Danske', 'Danish', { name: 'dan', iso: { '639-1': '', '639-3': 'dan' } }, pick(), (b, c, v) => pad(`Dansk ${c}:${v} tekst${v === 1 ? '{H7225}' : ''}.`, 'og ordet gik ud over hele landet og blev hørt af alle'), {
       bookNames: { 1: 'Første Mosebog', 2: 'Anden Mosebog', 19: 'Salmernes Bog', 40: 'Matthæus' },
+      described: { 19: 'Salmerne, samlet gennem mange århundreder.' },
+      rich: true,
+      story: { 19: { 23: { 1: { text: 'Herren er min hyrde', ref: 'Sal.23.1' } } } },
     }),
   };
 
@@ -223,6 +226,23 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
         chapter[c] = { verse };
       }
       book[b.id] = { info: { name: extra.bookNames?.[b.id] ?? b.name, shortname: (extra.bookNames?.[b.id] ?? b.name).slice(0, 3), abbr: [] }, chapter };
+      if (extra.described?.[b.id]) book[b.id].info.desc = extra.described[b.id];
+    }
+    // A published edition is not a grid of verses: it merges some, heads some
+    // with a pericope title, and describes some of its books. Nothing else in
+    // the fixtures carries any of that, so the code that counts and lists it
+    // was only ever exercised against zero.
+    if (extra.rich) {
+      const psalm = book[19]?.chapter?.[23]?.verse;
+      if (psalm) {
+        // One verse covering two, the covered one absent — which is what makes
+        // the chapter still agree with the canon.
+        psalm[3] = { ...psalm[3], merge: '4' };
+        delete psalm[4];
+        psalm[1] = { ...psalm[1], title: 'Hyrden' };
+      }
+      const exodus = book[2]?.chapter?.[3]?.verse;
+      if (exodus) exodus[2] = { ...exodus[2], title: 'Den brændende busk' };
     }
     return {
       identify,
@@ -236,6 +256,7 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
       },
       ...(extra.digit ? { digit: extra.digit } : {}),
       ...(extra.testament ? { testament: extra.testament } : {}),
+      ...(extra.story ? { story: extra.story } : {}),
       book,
     };
   }

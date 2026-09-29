@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { parseCategory } from '../../app/core/category.js';
-import { bookMatcher } from '../../app/core/formats/books.js';
+import { bookCodes, bookMatcher } from '../../app/core/formats/books.js';
 import { convert, sniff, slug } from '../../app/core/formats/index.js';
 import { fromDelimited, splitRow } from '../../app/core/formats/csv.js';
 import { fromUsfm } from '../../app/core/formats/usfm.js';
@@ -50,6 +50,33 @@ test('a book is found by its name, its abbreviation, or either standard code', (
   assert.equal(books.idFor('Book of Mormon'), null, 'no guess for a name it does not know');
   assert.equal(books.idFor(''), null);
   assert.equal(books.usfmFor(66), 'REV');
+});
+
+test('a standard code outranks an abbreviation that reads the same', () => {
+  const books = bookMatcher(category);
+  // The one that mattered: ISA is the USFM code for Isaiah, and 1 Samuel used
+  // to list "I Sa" among its abbreviations. With the canon added before the
+  // code tables, 1 Samuel claimed `isa` — so every USFM and USFX import filed
+  // Isaiah's sixty-six chapters under 1 Samuel and then reported Isaiah
+  // missing, which is what the file actually looked like from the outside.
+  assert.equal(books.idFor('ISA'), 23, 'Isaiah, not 1 Samuel');
+  assert.equal(books.idFor('Isa'), 23);
+  assert.equal(books.idFor('Isaiah'), 23);
+  assert.equal(books.idFor('1SA'), 9, 'and 1 Samuel is still reached by its own code');
+  assert.equal(books.idFor('1 Samuel'), 9);
+  assert.equal(books.idFor('1Sam'), 9, 'OSIS');
+});
+
+test('every book of the canon answers to its own code, name and short name', () => {
+  const books = bookMatcher(category);
+  const wrong = [];
+  for (const book of category.books) {
+    const { usfm, osis } = bookCodes(book.id);
+    for (const name of [usfm, osis, book.name, book.shortname]) {
+      if (books.idFor(name) !== book.id) wrong.push(`${name} → ${books.idFor(name)}, expected ${book.id}`);
+    }
+  }
+  assert.deepEqual(wrong, [], 'nothing in the canon shadows anything else');
 });
 
 // --- USFM ------------------------------------------------------------------

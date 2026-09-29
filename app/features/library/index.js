@@ -22,7 +22,7 @@ const KEY = 'library';
 export default {
   id: 'library',
   setup(ctx) {
-    const { category, library, records, registry, shell } = ctx;
+    const { category, library, records, registry, shell, state } = ctx;
     const progress = new Map(); // identify -> text
     // The page repaints itself while it is open; an import can be started from
     // the command palette with the page shut, and then there is nothing to
@@ -650,6 +650,15 @@ export default {
           icon: 'info',
           run: () => shell.openTranslationInfo(anchor, row.held),
         },
+        // Only for a translation that is here: the report reads the chapters
+        // on this device, and there are none for one that has not been
+        // installed.
+        ...(row.held && registry.hasCommand('report.open') ? [{
+          id: 'report',
+          title: L('lib.report', { name }),
+          icon: 'inspector',
+          run: () => { state.set({ reportFor: row.identify }); shell.openDoc('report'); },
+        }] : []),
         ...(row.state === 'update' ? [{
           id: 'update', title: L('lib.update'), icon: 'sync', run: () => act(row.identify, 'install'),
         }] : []),

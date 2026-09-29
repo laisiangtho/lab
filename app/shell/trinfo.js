@@ -14,13 +14,17 @@
  */
 
 import { h } from './dom.js';
+import { wireFades } from './fade.js';
 import { icon } from './icons.js';
 import { L } from './i18n.js';
 import { downloadJson } from '../services/transfer.js';
 
 export function createTranslationInfo(ctx) {
   const body = h('div', { class: 'tri-body' });
-  const element = h('div', { class: 'popover trinfo has-arrow', role: 'dialog', hidden: true }, body);
+  // The actions sit outside the scrolling part: a row of controls that slides
+  // away under a faded edge is a row nobody can rely on finding.
+  const acts = h('div', { class: 'tri-acts' });
+  const element = h('div', { class: 'popover trinfo has-arrow', role: 'dialog', hidden: true }, body, acts);
   let anchor = null;
 
   document.addEventListener('pointerdown', (e) => {
@@ -40,9 +44,14 @@ export function createTranslationInfo(ctx) {
     if (anchor === from && !element.hidden) { close(); return; }
     anchor = from;
     from.setAttribute('aria-expanded', 'true');
-    body.replaceChildren(...(await rows(meta)));
+    const built = await rows(meta);
+    body.replaceChildren(...built.filter((node) => node !== null && !node.classList?.contains('tri-acts')));
+    acts.replaceChildren(...(built.find((node) => node?.classList?.contains('tri-acts'))?.childNodes ?? []));
     element.hidden = false;
     place();
+    // The box hides its scrollbar, so the only thing that can say there is
+    // more is the edge itself — measured once it has a size.
+    wireFades(element);
   }
 
   async function rows(meta) {
@@ -97,12 +106,32 @@ export function createTranslationInfo(ctx) {
     out.push(direction(meta));
 
     const link = info.url || entry?.url || '';
+    /** A row of glyphs: the names are long, the box is 420px, and these three
+        are the same three every time — a strip of words to read past. */
+    const act = (glyph, label, run, extra = '') => h('button', {
+      class: `tri-act${extra ? ` ${extra}` : ''}`, title: label, 'aria-label': label, onclick: run,
+    }, icon(glyph));
+
     out.push(h('div', { class: 'tri-acts' },
-      link ? h('a', { class: 'btn', href: link, target: '_blank', rel: 'noopener noreferrer' }, icon('link'), L('cmd.openSource')) : null,
+      link
+        ? h('a', {
+          class: 'tri-act', href: link, target: '_blank', rel: 'noopener noreferrer',
+          title: L('cmd.openSource'), 'aria-label': L('cmd.openSource'),
+        }, icon('link'))
+        : null,
       // A translation file can be corrected upstream without the catalog's
       // version changing, and an installed copy would never hear about it.
-      h('button', { class: 'btn', onclick: () => { close(); ctx.shell.repairTranslation(meta.identify); } }, icon('undo'), L('cmd.refreshTranslation')),
-      h('button', { class: 'btn', onclick: () => { close(); ctx.shell.openDoc('library'); } }, icon('library'), L('doc.library'))));
+      act('undo', L('cmd.refreshTranslation'), () => { close(); ctx.shell.repairTranslation(meta.identify); }),
+      // This popover is the summary; the counts above it are the part nobody
+      // can act on from here. The report is where they turn into places.
+      ctx.registry.hasCommand('report.open')
+        ? act('inspector', L('doc.report'), () => {
+          close();
+          ctx.state.set({ reportFor: meta.identify });
+          ctx.shell.openDoc('report');
+        })
+        : null,
+      act('library', L('doc.library'), () => { close(); ctx.shell.openDoc('library'); })));
     return out;
   }
 

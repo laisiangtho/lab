@@ -272,6 +272,32 @@ body.is-dragging-ui { user-select: none; cursor: grabbing; }
 .outline-row:hover { background: var(--bg-hover); color: var(--text-normal); }
 .outline-row.level-1 { color: var(--text-normal); font-weight: 600; }
 .outline-row.level-2 { padding-inline-start: 20px; }
+/* The scope is three words, not a menu: the whole point is being able to go
+   from this chapter to the whole translation without thinking about it. */
+.ol-tools { padding: 8px 8px 6px; display: flex; flex-direction: column; gap: 6px; }
+.ol-scope { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 2px; border-radius: var(--radius-m); background: var(--bg-secondary); }
+.ol-tab {
+  height: 24px; display: grid; place-items: center; border-radius: var(--radius-s);
+  color: var(--text-faint);
+}
+.ol-tab svg { width: 14px; height: 14px; }
+.ol-tab:hover { color: var(--text-normal); }
+.ol-tab.is-on { background: var(--surface-raised); color: var(--text-normal); box-shadow: inset 0 0 0 1px var(--border); }
+.ol-filter {
+  width: 100%; height: 26px; padding: 0 8px; border-radius: var(--radius-m);
+  border: 1px solid var(--border); background: var(--base-00);
+  color: var(--text-normal); font-family: var(--font-ui); font-size: var(--fs-ui-s);
+}
+.ol-filter:focus { border-color: var(--accent-line); outline: none; }
+.ol-count { margin: 0 0 2px; padding: 0 8px; font-size: var(--fs-ui-s); color: var(--text-faint); }
+/* At book and translation scope the reference is the label, so it must not be
+   allowed to squeeze the heading it belongs to out of the row. */
+/* The reference is a label on the heading, not the other way round: it keeps
+   to a quarter of the row and the heading gets the rest. */
+.ol-body .outline-row .kbd {
+  flex: 0 0 auto; max-width: 26%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-ui-s);
+}
 
 /* ---- reading plan --------------------------------------------------------*/
 .plan-daily, .plan-card { padding: 12px; }
@@ -470,9 +496,30 @@ body.is-dragging-tab .sidebar[data-empty="true"] .side-body::after {
 }
 .tri-facts dt { color: var(--text-faint); }
 .tri-facts dd { margin: 0; color: var(--text-muted); overflow-wrap: anywhere; }
-.tri-acts { display: flex; gap: 8px; margin-top: 14px; }
-.tri-acts .btn { flex: 1; justify-content: center; white-space: nowrap; }
-.tri-acts .btn svg { flex: 0 0 auto; }
+/* Glyphs, not sentences: three buttons reading "Download again", "Look closer"
+   and "Library" wrapped onto two rows in a 420px box and were the loudest
+   thing in a popover that is mostly facts. The name is the tooltip and the
+   accessible name. */
+.tri-acts {
+  display: flex; gap: 4px; padding: 10px 16px 0; margin: 0 -16px -4px;
+  justify-content: flex-end; border-top: 1px solid var(--border);
+}
+.tri-act {
+  width: 30px; height: 30px; flex: 0 0 auto; display: grid; place-items: center;
+  border-radius: var(--radius-m); color: var(--text-muted); cursor: pointer;
+  transition: background var(--speed), color var(--speed);
+}
+.tri-act:hover { background: var(--bg-hover); color: var(--text-normal); }
+.tri-act svg { width: 15px; height: 15px; }
+/* The scrolling part of the box says so at the edge it can carry on past,
+   which is the same fade the panes and the reading surface use. */
+.tri-body {
+  --fade: 14px;
+  -webkit-mask-image: linear-gradient(to bottom,
+    transparent 0, #000 var(--fade-top, 0px), #000 calc(100% - var(--fade-bottom, 0px)), transparent 100%);
+  mask-image: linear-gradient(to bottom,
+    transparent 0, #000 var(--fade-top, 0px), #000 calc(100% - var(--fade-bottom, 0px)), transparent 100%);
+}
 
 /* A translation in a language this device asks for */
 .badge-hint { background: var(--accent-fade); color: var(--accent-2); box-shadow: inset 0 0 0 1px var(--accent-line); }
@@ -826,9 +873,11 @@ label.set-row:hover { background: var(--bg-hover); }
    written at the same time, so the list of them must not take the page over. */
 .doc.projects { max-width: 76rem; }
 .pj-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 22px; align-items: start; }
+.pj-layout.is-bare { grid-template-columns: minmax(0, 1fr); }
 .pj-shelf { position: sticky; top: 8px; display: flex; flex-direction: column; gap: 10px; }
 .pj-shelf-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .pj-shelf-head h2 { margin: 0; font-size: var(--fs-ui-l); font-weight: 650; }
+.pj-shelf-acts { display: flex; gap: 2px; }
 .pj-list { display: flex; flex-direction: column; gap: 2px; }
 .pj-item {
   display: flex; flex-direction: column; gap: 2px; text-align: start; padding: 8px 10px;
@@ -842,15 +891,23 @@ label.set-row:hover { background: var(--bg-hover); }
 .pj-shelf-foot { border-top: 1px solid var(--border); padding-top: 10px; }
 
 .pj-main { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-.pj-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 14px; align-items: center; }
+/* The same strip the card studio has: the thing being named on the left, the
+   glyphs that act on it at the end, a hairline between groups that do
+   different kinds of work. */
+.pj-bar {
+  display: flex; align-items: center; gap: 2px;
+  padding-bottom: 8px; border-bottom: var(--divider);
+}
+.pj-bar-sep { width: 1px; height: 18px; background: var(--border); margin: 0 6px; flex: 0 0 auto; }
+.pj-bar .pj-tool { width: 28px; height: 28px; }
+.pj-bar .pj-tool svg { width: 15px; height: 15px; }
+.pj-progress { margin: -4px 0 0; font-size: var(--fs-ui-s); }
 .pj-name {
-  grid-column: 1; min-width: 0; background: none; border: 0; padding: 2px 0;
-  font-family: var(--font-ui); font-size: 26px; font-weight: 650; letter-spacing: -.01em;
+  flex: 1; min-width: 0; background: none; border: 0; padding: 2px 0;
+  font-family: var(--font-ui); font-size: 22px; font-weight: 650; letter-spacing: -.01em;
   color: var(--text-normal); outline: none; border-bottom: 1px solid transparent;
 }
 .pj-name:focus { border-bottom-color: var(--accent-line); }
-.pj-head-acts { grid-column: 2; display: flex; gap: 6px; }
-.pj-progress { grid-column: 1 / -1; margin: 0; font-size: var(--fs-ui-s); }
 .pj-summary {
   width: 100%; min-height: 54px; resize: vertical; padding: 9px 11px;
   background: var(--bg-secondary); border: var(--divider); border-radius: var(--radius-m);
@@ -903,10 +960,23 @@ label.set-row:hover { background: var(--bg-hover); }
 }
 .pj-text:focus { border-color: var(--accent-line); outline: none; }
 .pj-preview { padding: 2px 2px 0; }
-.pj-add { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
-.pj-blank { text-align: center; padding: 48px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.pj-blank h2 { margin: 0; font-size: 20px; }
-.pj-blank p { max-width: 34em; margin: 0; }
+.pj-blank {
+  text-align: center; padding: 10vh 20px; display: flex; flex-direction: column;
+  align-items: center; gap: 10px;
+}
+.pj-blank-mark {
+  width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--bg-secondary); color: var(--text-faint); margin-bottom: 4px;
+}
+.pj-blank-mark svg { width: 20px; height: 20px; }
+.pj-blank h2 { margin: 0; font-size: 19px; font-weight: 600; }
+.pj-blank p { max-width: 30em; margin: 0; font-size: var(--fs-ui-s); line-height: 1.6; }
+.pj-blank .btn { margin-top: 6px; }
+.pj-quiet {
+  color: var(--text-faint); font-size: var(--fs-ui-s); padding: 2px 4px;
+  border-radius: var(--radius-s); transition: color var(--speed);
+}
+.pj-quiet:hover { color: var(--text-normal); text-decoration: underline; text-underline-offset: 3px; }
 
 /* The same project, in the sidebar, while reading. */
 .pj-pane { display: flex; flex-direction: column; height: 100%; min-height: 0; }
@@ -965,31 +1035,40 @@ label.set-row:hover { background: var(--bg-hover); }
 }
 
 /* ---- welcome -------------------------------------------------------------*/
-/* One screen, centred, four things. It has to be readable in the time somebody
-   gives a screen they did not ask for. */
-.wl-wrap { display: grid; place-items: start center; padding: 44px 20px 60px; }
-.wl { width: min(46rem, 100%); }
-.wl h1 { margin: 0 0 6px; font-size: 32px; font-weight: 300; letter-spacing: -.02em; }
-.wl-lede { margin: 0 0 26px; font-size: var(--fs-ui-l); line-height: 1.6; color: var(--text-muted); }
-.wl-steps { display: flex; flex-direction: column; gap: 2px; }
-.wl-step {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center;
-  padding: 14px 16px; border-radius: var(--radius-l); background: var(--bg-secondary);
-  box-shadow: inset 0 0 0 1px var(--border);
+/* One column in the middle of the room, with one thing to press. Everything
+   here is centred on that button: the mark and the name lead the eye down to
+   it, and the three lines under it are reassurance rather than more work. */
+.wl-wrap { display: grid; place-items: center; min-height: 100%; padding: 40px 20px; }
+.wl { width: min(30rem, 100%); text-align: center; }
+/* The app's own mark, not a tile with the mark inside it: a rounded square
+   around it reads as an icon in a store listing rather than a page heading. */
+.wl-badge { margin: 0 0 16px; display: grid; place-items: center; }
+.wl-badge img { width: 48px; height: 48px; opacity: .9; }
+.wl h1 { margin: 0 0 8px; font-size: 30px; font-weight: 300; letter-spacing: -.02em; }
+.wl-lede {
+  margin: 0 auto 26px; max-width: 26rem;
+  font-size: var(--fs-ui-m); line-height: 1.65; color: var(--text-muted);
 }
+/* The one button, and the only thing on the page at full contrast. */
+.wl-go { height: 34px; padding: 0 18px; font-size: var(--fs-ui-m); }
+/* Three facts, not three tasks: no borders, no buttons, nothing to finish. */
+.wl-facts {
+  list-style: none; margin: 34px 0 0; padding: 26px 0 0; border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 14px; text-align: start;
+}
+.wl-facts li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; }
+.wl-facts li > span:last-child { font-size: var(--fs-ui-s); line-height: 1.6; color: var(--text-muted); }
 .wl-mark {
-  width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%;
+  width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%;
   background: var(--accent-fade); color: var(--accent-2);
 }
-.wl-mark svg { width: 16px; height: 16px; }
-.wl-text h2 { margin: 0 0 3px; font-size: var(--fs-ui-m); font-weight: 650; }
-.wl-text p { margin: 0; font-size: var(--fs-ui-s); line-height: 1.6; color: var(--text-muted); }
-.wl-acts { display: flex; gap: 8px; margin-top: 22px; }
-.wl-note { margin-top: 14px; font-size: var(--fs-ui-s); }
-@media (max-width: 560px) {
-  .wl-step { grid-template-columns: auto minmax(0, 1fr); }
-  .wl-step .btn { grid-column: 2; justify-self: start; }
+.wl-mark svg { width: 14px; height: 14px; }
+.wl-more { margin-top: 26px; display: flex; justify-content: center; gap: 18px; }
+.wl-link {
+  color: var(--text-faint); font-size: var(--fs-ui-s); border-radius: var(--radius-s);
+  padding: 2px 4px; transition: color var(--speed);
 }
+.wl-link:hover { color: var(--text-normal); text-decoration: underline; text-underline-offset: 3px; }
 /* Long addresses in the formats document wrap rather than push the page. */
 .fm-sec p { overflow-wrap: anywhere; }
 /* The example beside a palette verb, in the shortcuts list. */
@@ -1242,3 +1321,103 @@ label.set-row:hover { background: var(--bg-hover); }
 .tri-why {
   margin: 8px 0 10px; font-size: var(--fs-ui-s); line-height: 1.55; color: var(--text-faint);
 }
+
+/* ---- look closer ---------------------------------------------------------*/
+/* A report rather than a page to read: figures first, then the places they
+   point at, each one a button that opens the chapter it names. */
+.rp { max-width: 62rem; }
+.rp-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding-bottom: 14px; margin-bottom: 8px; border-bottom: var(--divider);
+}
+.rp-name h1 { margin: 0 0 3px; font-size: 24px; font-weight: 600; letter-spacing: -.01em; }
+.rp-name p { margin: 0; font-size: var(--fs-ui-s); }
+.rp-head-acts { flex: 0 0 auto; }
+.rp-sec { margin-top: 26px; }
+.rp-sec h2 { margin: 0 0 4px; font-size: var(--fs-ui-l); font-weight: 650; }
+.rp-lede { margin: 0 0 12px; font-size: var(--fs-ui-s); line-height: 1.6; max-width: 46em; }
+/* Figures large enough to be read across the room, with what they count under
+   them — a number without its noun is a number nobody can use. */
+/* Even columns however many there are: with flex, a last figure alone on its
+   row stretched to the whole width and read as the important one. */
+/* Three across, so six figures are two full rows rather than five and an
+   orphan — and with flex that orphan stretched to the width of the page and
+   read as the important one. */
+.rp-figures {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px; margin-bottom: 12px;
+}
+@media (max-width: 620px) { .rp-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.rp-fig {
+  min-width: 0; padding: 10px 12px; border-radius: var(--radius-m);
+  background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--border);
+}
+.rp-fig b { display: block; font-size: 21px; font-weight: 600; color: var(--text-normal); }
+.rp-fig span { font-size: var(--fs-ui-s); color: var(--text-faint); }
+/* One row per book, and the row is the whole answer for that book: which it
+   is, what the edition calls it, and three numbers. Everything under it is
+   where those numbers came from. */
+.rp-books { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.rp-book {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: start;
+  padding: 6px 8px; border-radius: var(--radius-s); font-size: var(--fs-ui-m);
+  color: var(--text-normal);
+}
+.rp-book:not(:disabled):hover { background: var(--bg-hover); }
+.rp-book:disabled { cursor: default; }
+/* A book the edition does not carry is still listed — that it is absent is
+   the news — but there is nothing under it to open. */
+.rp-book.is-absent { color: var(--text-faint); }
+.rp-chev { flex: 0 0 auto; width: 12px; display: grid; place-items: center; color: var(--text-faint); }
+.rp-chev svg { width: 12px; height: 12px; transition: transform var(--speed); }
+.rp-book.is-open .rp-chev svg { transform: rotate(90deg); }
+.rp-bid {
+  flex: 0 0 auto; min-width: 2.2em; text-align: end;
+  font-size: var(--fs-ui-s); color: var(--text-faint); font-variant-numeric: tabular-nums;
+}
+.rp-bname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-absent { flex: 0 0 auto; font-size: var(--fs-ui-s); color: var(--c-red); }
+.rp-badges { flex: 0 0 auto; display: flex; gap: 4px; }
+/* A number with a letter in front of it, because three numbers in a row need
+   telling apart at a glance and the words would not fit. */
+.rp-badge {
+  min-width: 34px; padding: 1px 6px; border-radius: var(--radius-s); text-align: center;
+  font-size: var(--fs-ui-s); font-variant-numeric: tabular-nums; background: var(--bg-secondary);
+}
+.rp-badge.is-merge { color: var(--accent-2); }
+.rp-badge.is-heading { color: var(--c-green, var(--text-muted)); }
+.rp-badge.is-length { color: var(--c-orange); }
+.rp-badge.is-nil { color: var(--text-faint); background: none; }
+.rp-detail { padding: 2px 0 8px 30px; }
+/* One line, and the whole of it on a press. */
+.rp-desc {
+  margin: 0 0 6px; font-size: var(--fs-ui-s); line-height: 1.6; color: var(--text-muted);
+  max-width: 46em; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rp-desc::after { content: ""; }
+.rp-desc.is-open { white-space: normal; overflow: visible; }
+.rp-desc:hover { color: var(--text-normal); }
+.rp-chapters { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.rp-chapters li { display: flex; align-items: baseline; gap: 10px; padding: 3px 8px; border-radius: var(--radius-s); }
+.rp-chapters li:hover { background: var(--bg-hover); }
+.rp-go {
+  color: var(--accent-2); font-weight: 500; border-radius: var(--radius-s); padding: 1px 3px;
+  white-space: nowrap; flex: 0 0 auto;
+}
+.rp-go:hover { background: var(--accent-fade); }
+.rp-said {
+  color: var(--text-faint); font-size: var(--fs-ui-s); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rp-blank {
+  text-align: center; padding: 12vh 20px; display: flex; flex-direction: column;
+  align-items: center; gap: 8px;
+}
+.rp-blank-mark {
+  width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--bg-secondary); color: var(--text-faint);
+}
+.rp-blank-mark svg { width: 20px; height: 20px; }
+.rp-blank h2 { margin: 0; font-size: 19px; font-weight: 600; }
+.rp-blank p { max-width: 32em; margin: 0; font-size: var(--fs-ui-s); line-height: 1.6; }

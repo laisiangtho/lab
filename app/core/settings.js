@@ -111,6 +111,13 @@ export const defaultSettings = Object.freeze({
    */
   sidebarLeft: Object.freeze([]),
   sidebarRight: Object.freeze([]),
+  /**
+   * The panes this reader has already been offered, whether or not they kept
+   * them. Without it, a pane switched off is indistinguishable from a pane
+   * this build has just added — and the shell places anything it does not
+   * recognise, so every hidden pane would come back at the next launch.
+   */
+  sidebarKnown: Object.freeze([]),
   /** Open tabs, restored next time: [{ kind: 'chapter'|docId, book, chapter }] */
   tabs: Object.freeze([]),
   activeTab: 0,
@@ -196,6 +203,10 @@ export function parseSettings(raw, { source, category }) {
     .filter((row) => row.views.length)
     .slice(0, MAX_ROWS);
 
+  const known = (raw.sidebarKnown === undefined ? [] : expectArray(raw.sidebarKnown, source, '$.sidebarKnown'))
+    .map((id, i) => expectString(id, source, `$.sidebarKnown[${i}]`))
+    .slice(0, 60);
+
   const tabs = (raw.tabs === undefined ? [] : expectArray(raw.tabs, source, '$.tabs'))
     .map((tab, i) => {
       const p = `$.tabs[${i}]`;
@@ -231,6 +242,7 @@ export function parseSettings(raw, { source, category }) {
     restoreTabs: flag('restoreTabs'), motion: flag('motion'),
     ribbonItems: commandList(raw.ribbonItems, source, '$.ribbonItems'),
     sidebarLeft: Object.freeze(rows('sidebarLeft')), sidebarRight: Object.freeze(rows('sidebarRight')),
+    sidebarKnown: Object.freeze([...new Set(known)]),
     tabs: Object.freeze(tabs), activeTab: Number.isInteger(raw.activeTab) && raw.activeTab >= 0 ? Math.min(raw.activeTab, Math.max(tabs.length - 1, 0)) : 0,
   });
 }

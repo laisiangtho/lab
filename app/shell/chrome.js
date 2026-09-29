@@ -19,6 +19,9 @@ import { MAX_ROWS } from '../core/settings.js';
 /** The shortest a sidebar row may be dragged. */
 const MIN_ROW_PX = 96;
 
+/** Stands in for a pane that returned no disposer, so mounted is never null. */
+const noop = () => {};
+
 /**
  * Below this width there is no room for a column beside the text, so a sidebar
  * arrives as a drawer over it. The stylesheet switches at the same number.
@@ -164,7 +167,47 @@ export function createChrome(root, ctx) {
           role: 'tabpanel', 'aria-label': pane.title,
         }, h('div', { class: 'pane-body scroll' }));
         holder.append(view);
-        views.set(pane.id, { pane, element: view });
+        views.set(pane.id, { pane, element: view, off: null });
+      }
+    }
+
+    /**
+     * Build a pane's contents, keeping what it hands back.
+     *
+     * A pane may return a function that undoes its mounting — most of them do,
+     * unsubscribing from the reading position and from notes. That was being
+     * discarded, which is why a pane could be built but never taken down.
+     *
+     * A pane that cannot build itself says so inside its own body; the other
+     * panes, and the text, are unaffected.
+     */
+    function mountOne(entry) {
+      if (!entry || entry.off) return;
+      const body = entry.element.querySelector('.pane-body');
+      try {
+        const off = entry.pane.mount(body);
+        entry.off = typeof off === 'function' ? off : noop;
+      } catch (err) {
+        entry.off = noop;
+        body.replaceChildren(h('div', { class: 'pane-broken' },
+          h('p', {}, L('msg.paneBroken', { name: entry.pane.title })),
+          h('pre', {}, err.message)));
+      }
+    }
+
+    /**
+     * Undo a mounting. A disposer that throws is reported and then let go of:
+     * the pane is being taken down either way, and a half-removed pane is
+     * worse than one that failed to tidy up after itself.
+     */
+    function dispose(entry) {
+      const off = entry?.off;
+      entry.off = null;
+      if (off === noop || typeof off !== 'function') return;
+      try {
+        off();
+      } catch (err) {
+        notify(`${entry.pane.title}: ${err.message}`, 'error');
       }
     }
 
@@ -309,18 +352,44 @@ export function createChrome(root, ctx) {
       },
       build,
       mount() {
-        // A pane that cannot build itself says so inside its own body; the
-        // other panes, and the text, are unaffected.
-        for (const { pane, element: view } of views.values()) {
-          const body = view.querySelector('.pane-body');
-          try {
-            pane.mount(body);
-          } catch (err) {
-            body.replaceChildren(h('div', { class: 'pane-broken' },
-              h('p', {}, L('msg.paneBroken', { name: pane.title })),
-              h('pre', {}, err.message)));
-          }
+        for (const entry of views.values()) mountOne(entry);
+      },
+      /**
+       * Take a pane out: off the strip, out of the document, and — through the
+       * disposer it handed back when it was mounted — off whatever it was
+       * listening to. A pane that is not on screen should not be watching the
+       * reading position.
+       */
+      drop(id) {
+        const entry = views.get(id);
+        if (!entry) return false;
+        for (const row of rows) row.views = row.views.filter((view) => view !== id);
+        for (let i = rows.length - 1; i >= 0; i -= 1) {
+          if (!rows[i].views.length) rows.splice(i, 1);
+          else if (!rows[i].views.includes(rows[i].active)) rows[i].active = rows[i].views[0];
         }
+        dispose(entry);
+        entry.element.remove();
+        views.delete(id);
+        return true;
+      },
+      /**
+       * Put a pane back where its own metadata says it lives: this side, in
+       * `order` among the panes already there. It is built and mounted now
+       * rather than on the next repaint, so whatever asked for it — a command
+       * that shows the search pane and then puts the caret in its box — finds
+       * it ready.
+       */
+      add(pane) {
+        if (views.has(pane.id)) return;
+        build([pane]);
+        mountOne(views.get(pane.id));
+        if (!rows.length) rows.push({ views: [], active: null, size: 1 });
+        const row = rows[0];
+        const rank = (id) => registry.panes().findIndex((p) => p.id === id);
+        const at = row.views.findIndex((id) => rank(id) > rank(pane.id));
+        row.views.splice(at === -1 ? row.views.length : at, 0, pane.id);
+        row.active = pane.id;
       },
       get empty() { return views.size === 0; },
       ids: () => rows.flatMap((r) => r.views),
@@ -329,24 +398,79 @@ export function createChrome(root, ctx) {
 
   /**
    * The saved arrangement, checked against the panes this build actually has: a
-   * pane the settings never heard of joins the first row of the side it
+   * pane the reader has never been offered joins the first row of the side it
    * registered for, and an id no feature provides is dropped.
+   *
+   * "Never been offered" is the distinction `sidebarKnown` exists for. A pane
+   * absent from the arrangement used to mean only one thing — new — so the
+   * shell placed it. Now it means one of two, and the list says which: a pane
+   * the reader has seen and switched off stays off, while a pane this build
+   * has just added still arrives on its own.
    */
   function arrange() {
     const saved = { left: settings.get().sidebarLeft, right: settings.get().sidebarRight };
     const placed = new Set([...saved.left, ...saved.right].flatMap((row) => row.views));
+    const seen = new Set(settings.get().sidebarKnown ?? []);
     for (const side of ['left', 'right']) {
-      const known = new Set(registry.panes().map((p) => p.id));
+      const provided = new Set(registry.panes().map((p) => p.id));
       const rows = saved[side]
-        .map((row) => ({ views: row.views.filter((id) => known.has(id)), active: row.active, size: row.size }))
+        .map((row) => ({ views: row.views.filter((id) => provided.has(id)), active: row.active, size: row.size }))
         .filter((row) => row.views.length);
-      const fresh = registry.panes(side).filter((p) => !placed.has(p.id)).map((p) => p.id);
+      const fresh = registry.panes(side).filter((p) => !placed.has(p.id) && !seen.has(p.id)).map((p) => p.id);
       if (rows.length) rows[0].views.push(...fresh);
       else if (fresh.length) rows.push({ views: fresh, active: fresh[0], size: 1 });
       for (const row of rows) if (!row.views.includes(row.active)) row.active = row.views[0];
       sides[side].rows = rows;
       sides[side].build(rows.flatMap((row) => row.views).map((id) => registry.panes().find((p) => p.id === id)).filter(Boolean));
     }
+    rememberOffered();
+  }
+
+  /**
+   * Every pane this build provides is now a pane the reader has been offered.
+   * Written once the arrangement is settled, so that whatever they do to it
+   * from here — including hiding something — is theirs to keep.
+   */
+  function rememberOffered() {
+    const offered = registry.panes().map((p) => p.id);
+    const seen = settings.get().sidebarKnown ?? [];
+    if (offered.length === seen.length && offered.every((id) => seen.includes(id))) return;
+    ctx.state.set({ sidebarKnown: offered });
+  }
+
+  /** Which side a pane is on, or null when it is switched off. */
+  function sideOf(id) {
+    return ['left', 'right'].find((side) => sides[side].has(id)) ?? null;
+  }
+
+  /**
+   * Switch a pane off, or back on.
+   *
+   * Hiding is the same operation dragging already performs — the id leaves its
+   * row — so nothing about rows, sizes or dragging needs to know this exists.
+   * Showing puts it back at the side and order its own registration declares,
+   * which is what makes a pane's metadata its home rather than a first guess.
+   */
+  function setPaneShown(id, shown) {
+    const pane = registry.panes().find((p) => p.id === id);
+    if (!pane) return false;
+    const at = sideOf(id);
+    if (shown === Boolean(at)) return false;
+    if (at) {
+      sides[at].drop(id);
+      sides[at].render();
+      sides[at].persist();
+    } else {
+      const side = pane.side;
+      sides[side].add(pane);
+      sides[side].render();
+      sides[side].persist();
+      // A pane asked for by name is no use behind a shut sidebar.
+      const key = side === 'left' ? 'leftSidebar' : 'rightSidebar';
+      if (!ctx.state.get()[key]) ctx.state.set({ [key]: true });
+    }
+    applyChrome(ctx.state.get());
+    return true;
   }
 
   /** Where a dragged pane tab would land, and what happens when it is dropped. */
@@ -809,9 +933,17 @@ export function createChrome(root, ctx) {
       isCustom: () => settings.get().ribbonItems !== null,
     },
     selectPane: (side, id) => {
+      // A pane that is switched off is switched on again: a feature asking for
+      // its own pane by name is a reader asking for it, and answering with
+      // silence is the one thing this must not do. It comes back now, not on
+      // the next repaint, so a caller that follows this with `focus()` finds
+      // the pane it asked for already built.
+      if (!sideOf(id)) setPaneShown(id, true);
       // A pane the reader moved to the other sidebar is selected where it is.
       const where = sides[side].has(id) ? side : side === 'left' ? 'right' : 'left';
       sides[where].select(id);
     },
+    panesShown: () => registry.panes().map((p) => ({ ...p, shown: Boolean(sideOf(p.id)) })),
+    setPaneShown,
   };
 }

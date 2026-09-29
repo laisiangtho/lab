@@ -60,6 +60,16 @@ test('sidebar rows validate, and an empty row is dropped', () => {
   assert.equal(out.sidebarLeft[0].size, 2);
 });
 
+test('the panes a reader has been offered survive, deduplicated', () => {
+  const out = parseSettings({ sidebarKnown: ['files', 'search', 'files'] }, opts);
+  assert.deepEqual([...out.sidebarKnown], ['files', 'search']);
+  // Settings written before this version have no such list, and the reader has
+  // been offered nothing: every pane is new to them, which is what puts the
+  // whole sidebar where it has always been.
+  assert.deepEqual([...parseSettings({ book: 1 }, opts).sidebarKnown], []);
+  assert.throws(() => parseSettings({ sidebarKnown: [7] }, opts), /\$\.sidebarKnown\[0\]/);
+});
+
 test('a row whose active pane is not in it falls back to the first', () => {
   const out = parseSettings({ sidebarRight: [{ views: ['notes'], active: 'gone', size: 1 }] }, opts);
   assert.equal(out.sidebarRight[0].active, 'notes');

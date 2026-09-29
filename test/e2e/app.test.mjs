@@ -82,7 +82,7 @@ test('the app in a browser', options, async (t) => {
     assert.equal(await page.locator('.fatal').count(), 0);
     assert.equal((await page.locator('.tabstrip .tab.is-active .t-name').innerText()).trim(), 'Welcome',
       'the first screen is the greeting, not a list of sixty files');
-    await page.locator('.wl-acts .btn.primary').click();
+    await page.locator('.wl .btn.primary').click();
     await page.waitForSelector('.library-item', { timeout: 20000 });
     assert.ok(await page.locator('.library-item').count() >= 3, 'the catalog is listed');
   });
@@ -1030,6 +1030,122 @@ test('the app in a browser', options, async (t) => {
     await page.waitForTimeout(300);
   });
 
+  await t.test('a pane can be put away and asked back, and stays away until it is', async () => {
+    const paneTabs = () => page.evaluate(() => ({
+      left: [...document.querySelectorAll('.sidebar.left .pane-tab')].map((t) => t.dataset.view),
+      right: [...document.querySelectorAll('.sidebar.right .pane-tab')].map((t) => t.dataset.view),
+      mounted: [...document.querySelectorAll('.pane-view')].map((v) => v.dataset.view),
+    }));
+    const runCommand = async (text) => {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(120);
+      await page.keyboard.press('Control+p');
+      await page.locator('.modal-input').fill(text);
+      await page.waitForTimeout(250);
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(400);
+    };
+
+    const before = await paneTabs();
+    assert.ok(before.left.includes('tags'), 'the Tags pane starts where it registered');
+
+    // The palette says which way the command goes before it is pressed.
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Tags pane');
+    await page.waitForTimeout(250);
+    assert.match((await page.locator('.modal-list .mi-t').first().innerText()), /Hide Tags pane/,
+      'a pane that is up offers to be put away');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+
+    const hidden = await paneTabs();
+    assert.ok(!hidden.left.includes('tags'), 'and it goes');
+    assert.ok(!hidden.mounted.includes('tags'), 'taking its view with it, not merely hiding it');
+    assert.deepEqual(hidden.left, before.left.filter((id) => id !== 'tags'),
+      'the rest of the strip is untouched');
+
+    // Asked for again by name, it comes back where its own registration says.
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Tags pane');
+    await page.waitForTimeout(250);
+    assert.match((await page.locator('.modal-list .mi-t').first().innerText()), /Show Tags pane/);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+    const back = await paneTabs();
+    assert.deepEqual([...back.left].sort(), [...before.left].sort(), 'the same panes, none lost');
+    // Not appended to the end: a pane switched back on takes the place its own
+    // registration declares, which is what makes that metadata its home rather
+    // than a guess made once at first run.
+    assert.ok(back.left.indexOf('tags') < back.left.indexOf('project'),
+      `placed by its own order, not on the end (${back.left.join(', ')})`);
+    assert.ok(await page.locator('.sidebar.left .pane-view[data-view="tags"] .tagcloud').count(),
+      'and built, not an empty box');
+
+    // A feature's own command must revive its pane rather than answer with
+    // silence — the thing that would have broken five commands.
+    await runCommand('Hide Search pane');
+    assert.ok(!(await paneTabs()).left.includes('search'));
+    await runCommand('Search');
+    await page.waitForTimeout(300);
+    assert.ok((await paneTabs()).left.includes('search'), 'the Search command brought its pane back');
+    assert.ok(await page.evaluate(() => Boolean(document.activeElement?.closest('.search-field'))),
+      'and put the caret where it always does');
+
+    // Put away for good: hidden panes survive a reload, which is the whole
+    // reason the app records which panes a reader has been offered.
+    await runCommand('Hide Links pane');
+    await page.waitForTimeout(500);
+    const parted = await paneTabs();
+    await app.open();
+    await page.waitForSelector('.pane-tab', { timeout: 20000 });
+    await page.waitForTimeout(600);
+    const reloaded = await paneTabs();
+    assert.ok(![...reloaded.left, ...reloaded.right].includes('links'), 'still away after a restart');
+    // And only that one: the arrangement comes back exactly as it was left,
+    // which is the part a pane that reappeared by itself would have wrecked.
+    assert.deepEqual([...reloaded.left].sort(), [...parted.left].sort(), 'the left side as it was left');
+    assert.deepEqual([...reloaded.right].sort(), [...parted.right].sort(), 'and the right');
+    await runCommand('Show Links pane');
+    assert.ok([...(await paneTabs()).left, ...(await paneTabs()).right].includes('links'),
+      'and it is one command from coming back');
+  });
+
+  await t.test('emptying a sidebar by hiding, not only by dragging, still shuts it', async () => {
+    const right = () => page.evaluate(() => ({
+      empty: document.querySelector('.sidebar.right').dataset.empty,
+      disabled: document.querySelector('.tb-btn[data-l="side.right"]')?.disabled ?? null,
+    }));
+    // The panes on that side by the name their own command uses.
+    const names = await page.evaluate(() => [...document.querySelectorAll('.sidebar.right .pane-tab')]
+      .map((t) => t.getAttribute('title')));
+    assert.ok(names.length, 'there is a sidebar to empty');
+    const before = await page.evaluate(() => document.querySelectorAll('.sidebar .pane-tab').length);
+    const byName = async (word, name) => {
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(120);
+      await page.keyboard.press('Control+p');
+      await page.locator('.modal-input').fill(`${word} ${name} pane`);
+      await page.waitForTimeout(250);
+      await page.locator('.modal-list .mi', { hasText: `${word} ${name} pane` }).first().click();
+      await page.waitForTimeout(350);
+    };
+    for (const name of names) await byName('Hide', name);
+
+    const state = await right();
+    assert.equal(state.empty, 'true', 'a sidebar hidden empty is an empty sidebar');
+    assert.equal(state.disabled, true, 'and its toggle says so rather than answering with silence');
+    assert.equal(await page.evaluate(() => document.body.dataset.right), 'shut');
+
+    // Put them back, so what follows sees the app it expects. They return to
+    // the side each one registered for, which for a pane dragged across
+    // earlier in this suite is not the side it was just hidden from.
+    for (const name of names) await byName('Show', name);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    assert.equal(await page.evaluate(() => document.querySelectorAll('.sidebar .pane-tab').length),
+      before, 'every one of them is back on screen');
+  });
+
   await t.test('a document keeps its place when something in it changes', async () => {
     await page.keyboard.press('Control+p');
     await page.locator('.modal-input').fill('Library');
@@ -1520,6 +1636,164 @@ test('the app in a browser', options, async (t) => {
     await page.locator('.strongs').first().click();
     await page.waitForTimeout(300);
     assert.match(await offer.innerText(), /the first, in place/, 'kept, not fetched twice');
+  });
+
+  await t.test('a translation can be looked at closely, and the counts become places', async () => {
+    await toChapter();
+    await switchTo('Danske');
+    // In from the Library, which is where somebody looking at translations is.
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Library');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.library-item');
+    await page.waitForTimeout(400);
+    await page.locator('.library-item[data-identify="ddb1931"] .lib-act[aria-haspopup="menu"]').click();
+    await page.waitForSelector('.popover.menu');
+    await page.locator('.popover.menu .menu-item', { hasText: 'Look closer' }).click();
+    await page.waitForSelector('.rp', { timeout: 10000 });
+    await page.waitForTimeout(400);
+
+    assert.deepEqual(await page.locator('.rp-sec h2').allInnerTexts(), ['What it holds', 'The books']);
+    assert.equal(await page.locator('.rp-books > li').count(), 66, 'every book of the canon has a row');
+    // Before the pass, the record can say which books are absent and which
+    // chapters it recorded as a different length, and nothing else.
+    assert.match(await page.locator('.rp-sec').nth(1).innerText(), /unknown until the chapters have been read/);
+    assert.ok(await page.locator('.rp-book.is-absent').count() > 50, 'the books this edition lacks say so');
+
+    await page.locator('.rp-head .btn.primary').click();
+    await page.waitForFunction(() => !document.querySelector('.rp-head .btn.primary')?.disabled, null, { timeout: 60000 });
+    await page.waitForTimeout(300);
+
+    // One pass, and the numbers on every book are answered.
+    const psalms = page.locator('.rp-books > li').filter({ has: page.locator('.rp-bid', { hasText: /^19$/ }) });
+    const badges = await psalms.locator('.rp-badge').allInnerTexts();
+    assert.deepEqual(badges, ['M1', 'H2', 'L0'], `the merge and both headings are counted (${badges.join(' ')})`);
+
+    // The row opens onto the chapters those numbers came from.
+    await psalms.locator('.rp-book').click();
+    await page.waitForTimeout(300);
+    assert.match(await psalms.locator('.rp-detail').innerText(), /Samlerne|Salmerne/, 'with what the edition says about the book');
+    assert.match(await psalms.locator('.rp-chapters').innerText(), /3–4/, 'and the merge itself');
+
+    // A row is a place: pressing it opens the chapter it names.
+    await psalms.locator('.rp-go').first().click();
+    await page.waitForTimeout(700);
+    assert.match(await page.locator('.crumbs').first().innerText(), /Salmernes Bog/,
+      'and the report is a way into the text, not a dead end');
+  });
+
+  await t.test('the report leaves as a file, and survives being left', async () => {
+    // Back by name: by this point in the suite the strip has more tabs than
+    // room, and the one wanted may be behind its overflow button.
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Look closer');
+    await page.waitForTimeout(300);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.rp');
+    await page.waitForTimeout(500);
+    // The walk is paid for once: looking at a chapter and coming back must not
+    // throw the answer away.
+    const badges = await page.locator('.rp-books > li')
+      .filter({ has: page.locator('.rp-bid', { hasText: /^19$/ }) }).locator('.rp-badge').allInnerTexts();
+    assert.deepEqual(badges, ['M1', 'H2', 'L0'], 'the examination survived the tab change');
+
+    const saving = page.waitForEvent('download');
+    await page.locator('.rp-head-acts .btn:not(.primary)').click();
+    await page.waitForSelector('.popover.menu');
+    await page.locator('.popover.menu .menu-item', { hasText: 'Markdown' }).click();
+    const file = await saving;
+    assert.match(file.suggestedFilename(), /^ddb1931-report\.md$/);
+  });
+
+  await t.test('the headings of a whole translation are one list, filtered', async () => {
+    await toChapter();
+    const tab = page.locator('.sidebar .pane-tab[data-view="outline"]:not([hidden])');
+    if (!await tab.count()) return; // the strip may have hidden it; the report covers the data
+    await tab.click();
+    await page.waitForTimeout(300);
+    assert.deepEqual(await page.locator('.ol-tab').evaluateAll((ns) => ns.map((n) => n.title)),
+      ['Chapter', 'Book', 'Everywhere'], 'the scope is three glyphs, named for anyone who needs the words');
+
+    await page.locator('.ol-tab[title="Everywhere"]').click();
+    await page.waitForTimeout(2500);
+    const rows = await page.locator('.ol-body .outline-row').allInnerTexts();
+    assert.ok(rows.some((r) => /Herren er min hyrde/.test(r)), `the pericope heading is listed (${rows.join(' | ')})`);
+    assert.ok(rows.some((r) => /Den brændende busk/.test(r)), 'and a heading from another book with it');
+    assert.ok(rows.every((r) => /\d/.test(r)), 'each says where it is');
+
+    await page.locator('.ol-filter').fill('hyrde');
+    await page.waitForTimeout(350);
+    const found = await page.locator('.ol-body .outline-row').allInnerTexts();
+    assert.ok(found.length && found.every((r) => /hyrde/i.test(r)), `the filter narrows it (${found.join(' | ')})`);
+    await page.locator('.ol-filter').fill('');
+    await page.locator('.ol-tab[title="Chapter"]').click();
+    await page.waitForTimeout(400);
+  });
+
+  await t.test('a tab comes back to where it was left', async () => {
+    await toChapter();
+    await page.waitForSelector('.verse');
+    await page.waitForTimeout(300);
+    const top = () => page.evaluate(() => Math.round(document.querySelector('.leaf-scroll')?.scrollTop ?? -1));
+    // Half of whatever room this chapter has, rather than a number that may be
+    // past its end in a tall window.
+    await page.evaluate(() => {
+      const el = document.querySelector('.leaf-scroll');
+      el.scrollTop = Math.round((el.scrollHeight - el.clientHeight) / 2);
+    });
+    await page.waitForTimeout(250);
+    const parked = await top();
+    assert.ok(parked > 20, `there is room to scroll (${parked})`);
+
+    // Every tab change rebuilds the workspace, and a new element starts at the
+    // top — so the place was being thrown away on the way out.
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Library');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.library-item');
+    await page.waitForTimeout(500);
+    await toChapter();
+    await page.waitForTimeout(600);
+    assert.equal(await top(), parked, 'the chapter is where it was left');
+
+    // A different passage in the same tab is a different thing to be looking
+    // at, and belongs at its beginning.
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('gen 3');
+    await page.waitForTimeout(300);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(700);
+    assert.equal(await top(), 0, 'a chapter stepped to starts at the top');
+  });
+
+  await t.test('no label breaks out of the button it belongs to', async () => {
+    // A pane is 240 px wide and its buttons are labelled in sentences, so a
+    // label that will not fit has to be cut rather than wrapped: with a fixed
+    // height, a second line is drawn straight through the border.
+    await toChapter();
+    // Whatever the suite has left on show — a tab the strip has hidden for
+    // want of room cannot be clicked, and is not what this is about.
+    const tabs = await page.locator('.sidebar .pane-tab:not([hidden])').all();
+    for (const tab of tabs) { await tab.click(); await page.waitForTimeout(200); }
+    const spilling = await page.evaluate(() => [...document.querySelectorAll('.sidebar .btn')]
+      .filter((b) => b.getBoundingClientRect().width > 0)
+      .filter((b) => b.scrollHeight > Math.ceil(b.getBoundingClientRect().height) + 1)
+      .map((b) => `${b.textContent.trim().slice(0, 30)} (${b.scrollHeight} in ${Math.round(b.getBoundingClientRect().height)})`));
+    assert.deepEqual(spilling, [], 'every label is held to the one line the button is tall');
+
+    // And cut with an ellipsis rather than through the middle of a letter,
+    // which is what the label needs its own element for.
+    const held = await page.evaluate(() => {
+      const b = [...document.querySelectorAll('.sidebar .btn')].find((x) => x.querySelector('.btn-t'));
+      if (!b) return null;
+      const t = b.querySelector('.btn-t');
+      return { clipped: getComputedStyle(t).textOverflow, whole: b.title || b.textContent.trim() };
+    });
+    assert.equal(held?.clipped, 'ellipsis');
+    assert.ok(held?.whole, 'and the whole of it is still readable somewhere');
   });
 
   await t.test('nothing failed along the way', () => {

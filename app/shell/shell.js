@@ -138,6 +138,9 @@ export function createShell(root, ctx) {
   function start() {
     registerShellCommands();
     registerBooksPane();
+    // Last, so every pane a feature registered — and the one above — has a
+    // command of its own.
+    registerPaneCommands();
     chrome = createChrome(root, ctx);
     workspace = createWorkspace(ctx, chrome);
     verseBar = createVerseBar(ctx);
@@ -266,12 +269,48 @@ export function createShell(root, ctx) {
     shell.notify(L('msg.copied', { what: label }));
   }
 
+  /**
+   * A command per pane, to switch it off and on.
+   *
+   * Generated from the registry rather than written out, so a pane added later
+   * is controllable the moment it is registered and nothing has to remember to
+   * wire it. The command reports what it would do now, so the palette says
+   * "Hide the Notes pane" while that pane is up and the opposite while it is
+   * not — a reader should not have to press it to find out which way it goes.
+   *
+   * Showing goes through `selectPane`, which is what a feature's own command
+   * uses: the pane comes back, its sidebar opens, and it is the tab in front.
+   */
+  function registerPaneCommands() {
+    const shown = (id) => chrome.panesShown().find((p) => p.id === id)?.shown ?? false;
+    for (const pane of ctx.registry.panes()) {
+      ctx.registry.command({
+        id: `pane.${pane.id}`,
+        title: L('cmd.paneShow', { name: pane.title }),
+        icon: pane.icon,
+        state: () => ({
+          on: shown(pane.id),
+          icon: pane.icon,
+          title: L(shown(pane.id) ? 'cmd.paneHide' : 'cmd.paneShow', { name: pane.title }),
+        }),
+        run: () => {
+          if (shown(pane.id)) {
+            chrome.setPaneShown(pane.id, false);
+            shell.notify(L('msg.paneHidden', { name: pane.title }));
+          } else {
+            chrome.selectPane(pane.side, pane.id);
+          }
+        },
+      });
+    }
+  }
+
   function registerBooksPane() {
     ctx.registry.pane({
       id: 'files',
       side: 'left',
       order: 10,
-      icon: 'files',
+      icon: 'book',
       title: L('pane.files'),
       mount(el) {
         tree = createTree(ctx, { onOpen: (book, chapter) => workspace.openChapter(book, chapter) });
@@ -442,7 +481,22 @@ export function createShell(root, ctx) {
   function openPalette() {
     modal.open({
       placeholder: L('ph.palette'),
-      items: ctx.registry.commands().map((c) => ({ id: c.id, title: c.title, keys: c.keys?.replace('Mod', '⌘/Ctrl'), icon: c.icon ?? 'cmd', run: c.run })),
+      // A command that knows what it is doing now says so: `state()` may
+      // answer with the words for what pressing it would do next, which is
+      // what the ribbon draws on its buttons. The palette asks the same
+      // question, so "Read aloud" is "Pause" while it reads, and a pane's
+      // command offers to hide the pane that is up.
+      items: ctx.registry.commands().map((c) => {
+        const live = typeof c.state === 'function' ? c.state() : null;
+        const now = live && typeof live === 'object' ? live : null;
+        return {
+          id: c.id,
+          title: now?.title ?? c.title,
+          keys: c.keys?.replace('Mod', '⌘/Ctrl'),
+          icon: now?.icon ?? c.icon ?? 'cmd',
+          run: c.run,
+        };
+      }),
       // A reference is a command too: "ps 23", "1 jn 2:1-4". It is offered
       // above the commands, since somebody who typed a passage meant a passage.
       // A verb and a reference together — "note ps 23:1-6" — is offered above

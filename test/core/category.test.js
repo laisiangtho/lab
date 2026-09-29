@@ -20,3 +20,15 @@ test('clue.v length must match clue.c', () => {
 test('unknown chapter is a RangeError, not undefined', () => {
   assert.throws(() => category.verseCount(1, 51), RangeError);
 });
+
+test('the canon carries the verse counts editions actually publish', () => {
+  // Four chapters where this canon was one verse short of what published
+  // editions carry, so a translation with the extra verse was reported as
+  // disagreeing and the chapter's chip under-counted it. The reading surface
+  // never clipped them — it draws what the file holds — but the canon is what
+  // everything else is measured against, so it has to be right.
+  assert.equal(category.verseCount(13, 19), 20, '1 Chronicles 19');
+  assert.equal(category.verseCount(14, 13), 23, '2 Chronicles 13');
+  assert.equal(category.verseCount(64, 1), 15, '3 John');
+  assert.equal(category.verseCount(66, 12), 18, 'Revelation 12');
+});

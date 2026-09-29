@@ -64,14 +64,12 @@
       "name": "Old Testament",
       "shortname": "OT",
       "desc": ""
-
     },
     {
       "id": 2,
       "name": "New Testament",
       "shortname": "NT",
       "desc": ""
-
     }
   ],
   "book": [
@@ -491,9 +489,7 @@
           "1Sam",
           "1 Sa",
           "I Samuel",
-          "I Sam",
-          "I Sa",
-          "IS"
+          "I Sam"
         ],
         "desc": ""
       },
@@ -732,7 +728,7 @@
           43,
           27,
           17,
-          19,
+          20,
           8,
           30,
           19,
@@ -782,7 +778,7 @@
           19,
           23,
           16,
-          22,
+          23,
           15,
           19,
           14,
@@ -2694,7 +2690,7 @@
         "s": 11,
         "c": 1,
         "v": [
-          14
+          15
         ]
       }
     },
@@ -2747,7 +2743,7 @@
           21,
           11,
           19,
-          17,
+          18,
           18,
           20,
           8,
@@ -2762,7 +2758,7 @@
       }
     }
   ],
-  "@guide":"testament.section.book",
+  "@guide": "testament.section.book",
   "guide": {
     "1": {
       "1": [

@@ -36,7 +36,7 @@ await time('start with nothing installed', async () => {
   // A brand-new install opens on the welcome screen, which is what a reader
   // sees; the measurement is of reaching the catalog from there.
   await page.waitForSelector('.wl, .library-item');
-  if (await page.locator('.wl-acts .btn.primary').count()) await page.locator('.wl-acts .btn.primary').click();
+  if (await page.locator('.wl .btn.primary').count()) await page.locator('.wl .btn.primary').click();
   await page.waitForSelector('.library-item');
 });
 

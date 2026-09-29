@@ -31,6 +31,7 @@ import { fill, h, keepPlace } from '../../shell/dom.js';
 import { wantsNewTab } from '../../shell/reflink.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
+import { openMenu } from '../../shell/menu.js';
 import { renderMarkdown } from '../../shell/markdown.js';
 import { VERSION } from '../../version.js';
 
@@ -204,15 +205,22 @@ export default {
           L('proj.nWords', { n: progress.words }),
         ].filter(Boolean).join(' · ');
 
-        /** The list of projects, and the buttons that make and move them. */
+        /**
+         * The shelf: what there is, and the two ways to get another one.
+         *
+         * Making a project and bringing one in are a plus and an arrow in
+         * every application anybody has used, so they are icons at the head of
+         * the list rather than a wide primary button above it and a second
+         * button under it. That also stops the shelf from being taller than
+         * the thing it lists when there is one project on it.
+         */
         function shelfColumn() {
           return h('aside', { class: 'pj-shelf' },
             h('div', { class: 'pj-shelf-head' },
               h('h2', {}, L('doc.projects')),
-              h('button', {
-                class: 'btn primary', title: L('proj.new'),
-                onclick: () => { start(L('proj.untitled')); },
-              }, icon('plus'), L('proj.new'))),
+              h('div', { class: 'pj-shelf-acts' },
+                tool('plus', L('proj.new'), () => start(L('proj.untitled'))),
+                tool('enter', L('proj.import'), guard(importProject)))),
             shelf.projects.length
               ? h('div', { class: 'pj-list' }, shelf.projects.map((project) => {
                 const progress = progressOf(project);
@@ -224,9 +232,19 @@ export default {
                   h('span', { class: 'pj-item-s' },
                     `${L('proj.nPassages', { n: progress.passages })} · ${relativeTime(project.updated)}`));
               }))
-              : h('p', { class: 'muted pj-empty' }, L('proj.none')),
-            h('div', { class: 'pj-shelf-foot' },
-              h('button', { class: 'btn', onclick: guard(importProject) }, icon('enter'), L('proj.import'))));
+              : h('p', { class: 'muted pj-empty' }, L('proj.none')));
+        }
+
+        /**
+         * A button that is only its icon. The name is the tooltip and the
+         * accessible name, so nothing is lost to somebody who cannot see the
+         * glyph or does not recognise it.
+         */
+        function tool(glyph, label, run, extra = '') {
+          return h('button', {
+            class: `pj-tool${extra ? ` ${extra}` : ''}`,
+            title: label, 'aria-label': label, onclick: run,
+          }, icon(glyph));
         }
 
         /** One entry: a passage with its text, a piece of writing, or a task. */
@@ -313,10 +331,15 @@ export default {
             // The verses themselves, from whichever translation is being read.
             // Fetched rather than stored, and quietly absent when the passage
             // is not in this translation.
-            const quote = h('div', { class: 'pj-quote' });
+            // Hidden until there is something in it: an empty quote box is a
+            // shaded strip under the reference that looks like a fault, and
+            // there is nothing to quote when the passage is not in the
+            // translation being read.
+            const quote = h('div', { class: 'pj-quote', hidden: true });
             card.insertBefore(quote, body);
             verses(entry).then((lines) => {
               if (!lines.length) return;
+              quote.hidden = false;
               fill(quote, ...lines.map((line) => h('p', { class: 'pj-v', lang: shell.workspace.lang() },
                 h('b', {}, shell.workspace.number(line.verse)), ' ', line.text)));
             }).catch(() => { /* a missing quote is not worth a message */ });
@@ -353,10 +376,14 @@ export default {
           if (!project) {
             return h('div', { class: 'pj-main' },
               h('div', { class: 'pj-blank' },
+                h('span', { class: 'pj-blank-mark' }, icon('files')),
                 h('h2', {}, L('proj.blankTitle')),
                 h('p', { class: 'muted' }, L('proj.blankBody')),
                 h('button', { class: 'btn primary', onclick: () => start(L('proj.untitled')) },
-                  icon('plus'), L('proj.new'))));
+                  icon('plus'), L('proj.new')),
+                // The shelf is not drawn while there is nothing on it, so the
+                // other way in has to be here or there is no way in at all.
+                h('button', { class: 'pj-quiet', onclick: guard(importProject) }, L('proj.import'))));
           }
 
           const name = h('input', {
@@ -378,48 +405,56 @@ export default {
           });
           summaryBox.value = project.summary;
 
+          // One strip, the card studio's manners: the name on the left, what
+          // can be added in the middle, what happens to the whole project at
+          // the end. The three "Add …" buttons used to sit at the foot of the
+          // page — below however many entries there already were, which is
+          // exactly where somebody adding a fourth is not looking.
+          const bar = h('header', { class: 'pj-bar' },
+            name,
+            h('div', { class: 'pj-bar-sep' }),
+            tool('book-open', L('proj.addHere'), () => {
+              const { book, chapter } = state.get();
+              collect({ book, chapter, verse: null, to: null }, { announce: false });
+            }),
+            tool('note', L('proj.addNote'), () => update((p) => addEntry(p, createEntry({ kind: 'text' })))),
+            tool('check', L('proj.addTask'), () => update((p) => addEntry(p, createEntry({ kind: 'todo' })))),
+            h('div', { class: 'pj-bar-sep' }),
+            // Two exports behind one glyph: both are "take this out of here",
+            // and a strip is not the place to explain the difference.
+            tool('download', L('proj.export'), (e) => openMenu(e.currentTarget, [
+              { id: 'md', title: L('proj.asMarkdown'), sub: L('proj.asMarkdownSub'), icon: 'quote', run: () => exportMarkdown(project) },
+              { id: 'json', title: L('proj.asFile'), sub: L('proj.asFileSub'), icon: 'files', run: () => exportJson(project) },
+            ])),
+            tool('trash', L('proj.delete'), async () => {
+              const sure = await shell.confirm({
+                title: L('proj.askDelete'), body: L('proj.askDeleteBody', { name: project.name }),
+                confirm: L('cmd.delete'), danger: true,
+              });
+              if (!sure) return;
+              const left = shelf.projects.filter((p) => p.id !== project.id);
+              keep({ projects: left, open: left[0]?.id ?? null });
+            }, 'danger'));
+
           return h('div', { class: 'pj-main' },
-            h('header', { class: 'pj-head' },
-              name,
-              h('div', { class: 'pj-head-acts' },
-                h('button', { class: 'btn', onclick: () => exportMarkdown(project) }, icon('download'), L('proj.asMarkdown')),
-                h('button', { class: 'btn', onclick: () => exportJson(project) }, icon('download'), L('proj.asFile')),
-                h('button', {
-                  class: 'btn danger', title: L('proj.delete'),
-                  onclick: async () => {
-                    const sure = await shell.confirm({
-                      title: L('proj.askDelete'), body: L('proj.askDeleteBody', { name: project.name }),
-                      confirm: L('cmd.delete'), danger: true,
-                    });
-                    if (!sure) return;
-                    const left = shelf.projects.filter((p) => p.id !== project.id);
-                    keep({ projects: left, open: left[0]?.id ?? null });
-                  },
-                }, icon('trash'))),
-              h('p', { class: 'pj-progress muted' }, summary(progressOf(project)))),
+            bar,
+            h('p', { class: 'pj-progress muted' }, summary(progressOf(project))),
             summaryBox,
             h('div', { class: 'pj-entries' },
               project.entries.length
                 ? project.entries.map((entry, i) => entryCard(project, entry, i))
-                : h('p', { class: 'muted pj-empty' }, L('proj.noEntries'))),
-            h('div', { class: 'pj-add' },
-              h('button', {
-                class: 'btn', onclick: () => {
-                  const { book, chapter } = state.get();
-                  collect({ book, chapter, verse: null, to: null }, { announce: false });
-                },
-              }, icon('book-open'), L('proj.addHere')),
-              h('button', {
-                class: 'btn', onclick: () => update((p) => addEntry(p, createEntry({ kind: 'text' }))),
-              }, icon('note'), L('proj.addNote')),
-              h('button', {
-                class: 'btn', onclick: () => update((p) => addEntry(p, createEntry({ kind: 'todo' }))),
-              }, icon('check'), L('proj.addTask'))));
+                : h('p', { class: 'muted pj-empty' }, L('proj.noEntries'))));
         }
 
         function paint() {
+          // With nothing on the shelf there is no shelf: a column headed
+          // "Projects" saying "No projects yet" beside a page saying the same
+          // thing louder is one empty state too many.
+          const bare = !shelf.projects.length;
           keepPlace(el, () => fill(el, h('section', { class: 'doc projects' },
-            h('div', { class: 'pj-layout' }, shelfColumn(), projectColumn()))));
+            h('div', { class: `pj-layout${bare ? ' is-bare' : ''}` },
+              bare ? null : shelfColumn(),
+              projectColumn()))));
         }
 
         listeners.add(paint);
@@ -466,13 +501,16 @@ export default {
             },
               icon(entry.kind === 'passage' ? 'book-open' : entry.kind === 'todo' ? 'check' : 'note'),
               h('span', {}, entry.kind === 'passage' ? reference(entry) : noteTitle(entry.text, L('proj.untitledEntry')))))),
+            // The pane is 240 px wide on a good day, so its foot says the
+            // short form of what the page's toolbar says with a glyph.
             h('div', { class: 'pj-pane-foot' },
               h('button', {
-                class: 'btn', onclick: () => {
+                class: 'btn', title: L('proj.addHere'),
+                onclick: () => {
                   const { book, chapter } = state.get();
                   collect({ book, chapter, verse: null, to: null }, { announce: false });
                 },
-              }, icon('plus'), L('proj.addHere')))));
+              }, icon('plus'), L('proj.addShort')))));
         }
         listeners.add(paint);
         const offState = state.subscribe(paint);

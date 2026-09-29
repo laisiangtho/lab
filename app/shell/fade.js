@@ -109,7 +109,7 @@ export function unwireFade(node) {
  */
 export function wireFades(root) {
   for (const node of [...watched.keys()]) if (!node.isConnected) unwireFade(node);
-  for (const node of root.querySelectorAll('.pane-body, .leaf-scroll, .np-grid, .modal-list')) wireFade(node);
+  for (const node of root.querySelectorAll('.pane-body, .leaf-scroll, .np-grid, .modal-list, .tri-body')) wireFade(node);
 }
 
 /** How many nodes are being watched — for the test that this stops growing. */

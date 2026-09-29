@@ -15,6 +15,15 @@ Three data sources exist. Their **structure is frozen** (other applications cons
 | File | Role | Source of truth |
 |---|---|---|
 | `category.json` | Canonical skeleton: testaments, sections, 66 books, chapter counts (`clue.c`), verse counts (`clue.v`), grouping (`guide`, `@guide: "testament.section.book"`), English names/abbr | Bundled in `public/` |
+
+The canon is what every file is *measured* against, never a limit on what is
+*shown*: the reading surface and the parallel alignment are built from the
+verses a file actually holds, so a chapter with one more verse than the canon
+renders whole, in one column or four. Four chapters where published editions
+carry a verse this canon did not — 1 Chronicles 19, 2 Chronicles 13, 3 John and
+Revelation 12 — were corrected, and a test pins them: they are the difference
+between a true report and a chapter reported short for agreeing with its own
+tradition.
 | `book.json` | Catalog of available translations | **Remote** `https://raw.githubusercontent.com/laisiangtho/bible/refs/heads/master/book.json`; bundled copy is a first-run seed only |
 | `json/{identify}.json` | One translation (e.g. `tedim1932.json`) | Remote `https://raw.githubusercontent.com/laisiangtho/bible/refs/heads/master/json/{identify}.json`; never bundled |
 
@@ -174,7 +183,56 @@ Up to `MAX_ROWS` (4) rows a side.
 Pane views are built and mounted **once** and parked in a holder when not on
 show, so rearranging a sidebar never remounts a pane — a search with results in
 it survives being dragged into another row, or to the other sidebar. Moving a
-pane across sidebars hands the mounted node to the other side's holder.
+pane across sidebars hands the mounted node to the other side's holder, and the
+disposer with it.
+
+### 3b-i-a. A pane the reader has switched off
+
+Panes are services rather than controls — linking, searching, noting, outlining
+— so switching one off takes a tool out of the sidebar and changes nothing
+else. Every registered pane has a command of its own, generated in
+`registerPaneCommands` after every feature has registered, so no feature writes
+one and a build with fewer features has fewer commands. The palette is the
+whole interface for it.
+
+**Absence is the state; there is no second flag.** Hiding removes the id from
+its row, which is the operation dragging already performs, so rows, sizes,
+splitting and cross-sidebar drag need to know nothing about any of this.
+Showing puts the pane back at the `side` and `order` its own registration
+declares — which is what makes that metadata a home rather than a first guess.
+
+One field makes that possible. Absence from the arrangement used to mean one
+thing, *new*, which is why `arrange()` placed anything it did not recognise;
+it now means one of two, and `settings.sidebarKnown` — the panes this reader
+has been offered — says which. A pane that is known and absent stays absent; a
+pane this build has just added is unknown, so it still arrives on its own. The
+list is written once the arrangement is settled, so a feature that failed to
+register is not recorded as offered and appears when it works again.
+
+Two seams needed work, and both would have failed quietly:
+
+- **`selectPane` revives.** Five features reach their own pane by name
+  (search, notes, bookmarks, tags, plans). Against a pane that is switched off,
+  `has()` answers for neither side and the call would have done nothing at all
+  — a palette entry that looks broken. It now switches the pane back on, and
+  builds and mounts it *now* rather than on the next repaint, because
+  `search.open` follows it with a `focus()` on a box that does not otherwise
+  exist yet.
+- **The disposer is kept.** `registry.pane` has always documented that `mount`
+  may return a function that undoes it, and eight of the nine panes return one;
+  the shell discarded it, so a pane could be built and never taken down.
+  `mountOne` keeps it on the entry and `dispose` runs it when the pane goes, so
+  a pane that is not on screen is not watching the reading position. A disposer
+  that throws is reported and let go of — the pane is going either way, and a
+  half-removed pane is worse than an untidy one.
+
+An empty sidebar is still an empty sidebar however it was emptied: `empty` is
+`views.size === 0`, and hiding deletes the view, so the side toggle disables
+itself and says why exactly as it did when the last pane was dragged out.
+
+Panes are still all mounted at startup. Deferring a mount until a pane is first
+shown is the larger saving and a behaviour change for every reader, including
+those who hide nothing, so it is deliberately not in this batch.
 
 Every pixel of a sidebar resolves to a drop: a strip means "join this row at
 this index", a row body half means "make a new row above/below". Dropping the
@@ -225,7 +283,7 @@ A feature registers four kinds of thing through `registry`, and two more were ad
 | Call | Contributes | Notes |
 |---|---|---|
 | `doc` | a workspace tab | Library, Settings, Projects, Data and formats, Welcome |
-| `pane` | a sidebar pane | `{ side, order }` |
+| `pane` | a sidebar pane | `{ side, order }` — its home, and where a pane switched back on returns to. `mount` may return a disposer, which is now kept |
 | `command` | a palette entry, optionally a hotkey and a ribbon button | |
 | `verseAction` | a button in the verse bar | receives `{ book, chapter, verse, to }` |
 | `setting` | **a row on the settings page** | `{ section, order, build(ui) }`; sections are named in `core/settings.js` and checked at registration, so a typo is a boot error rather than a row nobody sees |
@@ -568,7 +626,99 @@ facts grid, clamped to six lines with a press for the rest: the KJV Cambridge
 Paragraph Bible's runs to five paragraphs, and in a narrow right-hand column it
 turned the box into a scrolling wall.
 
-## 3f. Five rules that came out of defects
+## 3e-iii. Two pages that were doing too much
+
+**Welcome** was four bordered panels, each with a heading, a paragraph and a
+button of its own — a page that looks like a form to work through, shown to
+somebody who has not yet decided to stay. It also offered four places to go
+when only one of them can be first: without a translation there is nothing to
+search, note or read. It is now one centred column with one button. The three
+things worth knowing sit under it as facts rather than tasks — a line each, no
+buttons, nothing to finish — and Help and Data and formats are a quiet pair of
+links at the foot.
+
+**Projects** took the card studio's manners, which is the same shape of
+problem: a workspace whose controls should be at the top of it and out of the
+way. The name, what can be added, and what happens to the whole project are one
+strip of glyphs; the three "Add …" buttons used to sit at the *foot* of the
+page, below however many entries there already were, which is exactly where
+somebody adding a fourth is not looking. The two exports are one glyph with a
+menu, because both are "take this out of here" and a strip is not the place to
+explain the difference. The shelf's new and import are a plus and an arrow, and
+when there is nothing on the shelf there is no shelf — a column headed
+"Projects" saying "No projects yet" beside a page saying the same thing louder
+is one empty state too many.
+
+Where a glyph stands alone the name is its `title` and its `aria-label`, so
+nothing is reachable only by recognising a symbol.
+
+## 3e-iv. Looking a translation over
+
+Six things worth knowing about a file turned out to be two different jobs, and
+they are in two different places because putting them together makes neither
+work.
+
+**Navigation** is the headings and the book descriptions: a reader wants these,
+and "where is the good shepherd" is a reading question. So the **Outline pane**
+gained a scope — this chapter, this book, the whole translation — with a filter
+once the list outgrows a screen. It already merged both kinds of heading for
+the chapter in view; a heading index is that same list at a wider scope, which
+is a control rather than a second pane. `book.info.desc` goes in the chapter
+picker: by the time the chapters are on screen the book has been chosen, so one
+line about it is context. That turned out to be the wrong room for it: a
+chapter grid is a thing to aim at, and a paragraph over it is something to read
+past sixty-six times. The description is in the book's own row in the report
+instead.
+
+**Inspection** is the merges, the differences, the missing books — facts about
+the file rather than things in it. A reader never wants them; somebody
+maintaining a translation wants all of them at once, with a way to jump to each.
+That is the **Look closer** document: read once, wide, never consulted while
+reading, which is exactly what a pane is not for. It also gives three surfaces
+somewhere to lead. The library row has said "65 of 66 books · 49 chapters a
+different length" since the last batch and the information popover has carried
+the same counts, and until now both led nowhere — a count nobody can open is a
+count nobody can act on.
+
+**One pass, three answers.** The record keeps counts and a list of findings
+capped at 400, so it can say whether anything is wrong and not where. Where is
+in the chapters, which are already on this device, so the document opens on the
+record and one press walks them — `core/examine.js`, a cursor like search's,
+about a second. That single pass answers where the merges are, where the
+headings are, and *every* difference from the canon rather than the first four
+hundred, because the three questions are asked of the same rows. So there is
+one button rather than one per section, and the stored cap stops being a
+limitation to work around. The answer is kept per translation at feature scope
+rather than inside the mount: a document is torn down when another tab is
+shown, and a walk paid for once should not be paid for again for having looked
+at a chapter.
+
+**A book is the row.** The first version had a section per kind of finding —
+differences here, merges there, headings somewhere else — which asks the reader
+to hold three lists in their head to answer one question: *what about Isaiah?*
+A book is the unit somebody works in, so the page is the figures and then one
+list of books. Each row is the book's number, what the edition calls it, and
+three counts (merged verses, headings, chapters whose length disagrees), and it
+opens onto the chapters those counts came from, with the edition's own
+description of the book above them. A book the file does not carry is still
+listed, greyed, saying so — that it is absent is the news. `groupByBook` builds
+that shape from a finished pass or, before one has run, from the record alone,
+where merges and headings are `null` for *not known yet* rather than none.
+
+The report leaves as a file: Markdown to read or attach, JSON to compare
+against the same report taken later. Neither carries a timestamp — a report
+that differs from last month's only in its date is a report nobody can diff.
+
+The canon rules moved into that module and `parseTranslation` now calls them:
+the check made at install and the check made later have to be the same code,
+because two copies of a versification rule is two answers to one question and
+no way to tell which is true.
+
+The fixtures gained what a published edition actually has — a merged verse, a
+pericope heading, a sub-heading, a book description. Everything that counts
+those had until then only ever been exercised against zero.
+
+## 3f. Rules that came out of defects
 
 Each of these was a bug first. They are written down because in every case the
 code that broke the rule looked perfectly reasonable, and in every case the
@@ -616,6 +766,58 @@ symptom appeared a long way from the cause.
   passage before an `await` and checks it after: a save that lands after the
   reader has moved re-files the note they were writing onto the chapter they
   moved to.
+
+- **An abbreviation must never outrank a standard code.** `bookMatcher` built
+  one flat table with first-writer-wins, filling it from the canon and then
+  from the USFM and OSIS code tables, so that "a code table must never take a
+  name away from" the canon. But `ISA` is the USFM code for Isaiah and nothing
+  else, while the canon lists `I Sa` among 1 Samuel's abbreviations — and both
+  normalise to `isa`. 1 Samuel is book 9 and was written first, so it kept the
+  key: **every USFM and USFX import filed Isaiah's sixty-six chapters under 1
+  Samuel and then reported Isaiah missing.** The table is built in three layers
+  now — codes, then the canon's own names and short names, then the
+  abbreviation variants — because a code is an identifier written by a machine
+  and an abbreviation is a convenience somebody typed. A test walks all
+  sixty-six books and asserts each answers to its own code, name and short
+  name; `category.json` also lost `I Sa` and `IS` from 1 Samuel, the only two
+  ambiguous entries in the whole canon.
+
+- **A rebuilt element starts at the top, so the place has to be kept
+  somewhere else.** Every tab change rebuilds the workspace — a chapter's
+  leaves are built fresh, a document is unmounted and mounted again — and so
+  does every state change, which is why saving a note while reading threw the
+  scroll away too. `renderPanes` now notes where each pane was before it
+  replaces anything and puts it back after, keyed by the tab *and its
+  passage*: coming back to a tab is coming back to what was left there, while
+  stepping to the next chapter in that tab is a different thing to look at and
+  belongs at its beginning. A verse asked for still wins over both — the
+  reader has just said where they want to be — and because a document's
+  contents arrive after its mount, the restore tries again for a few frames
+  rather than once into a box that is still empty.
+
+- **An async render needs a generation, or the slower answer wins.**
+  `renderPanes` awaits the store several times and runs on every state change,
+  so two changes in a row put two runs in flight — and the older one, finishing
+  last, put back what the state said when it started. Setting a value and then
+  opening a document is exactly that shape, which is why "Look closer" opened
+  an active, empty tab and worked on the second press. It now takes a run
+  number and checks it after every await, the same rule `fillBook` and the
+  outline pane already follow.
+
+- **A label that cannot fit must be cut, not wrapped.** `.btn` is one line
+  tall by declaration, and a label too long for the room — which is every
+  label in a 240 px pane — wrapped onto a second line that the fixed height
+  then sliced through, so the words read as spilling over the border. Three
+  things were needed and only one of them is obvious: `white-space: nowrap`
+  stops the wrap, `min-width: 0` is what lets a button in a flex row shrink at
+  all (the default is its own content's width, which is precisely what has to
+  give), and an *element* around the label is what `text-overflow` can act on
+  — a bare string beside an icon is an anonymous flex item, which cannot be
+  given an ellipsis and was being cut through the middle of a letter instead.
+  `h()` wraps a button's plain-text children in that element, so the wrapping
+  is in one place rather than at two hundred call sites and
+  `h('button', { class: 'btn' }, icon('x'), 'Add the passage on screen')`
+  still reads the way it did.
 
 ## 4. Catalog update flow
 

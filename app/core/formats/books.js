@@ -79,19 +79,37 @@ export function bookMatcher(category) {
   const table = new Map();
   const put = (name, id) => {
     const key = normalizeName(name);
-    // First writer wins: the canon's own names are added first and a code table
-    // must never take a name away from them.
+    // First writer wins *within* a layer; the layers below decide the rest.
     if (key && !table.has(key)) table.set(key, id);
   };
 
-  for (const book of bookList(category)) {
+  const books = bookList(category);
+
+  // Three layers, most authoritative first — and the order matters more than
+  // it looks. `ISA` is the USFM code for Isaiah and nothing else, but the
+  // canon lists "I Sa" among 1 Samuel's abbreviations, which normalises to the
+  // same `isa`. With one flat pass and the canon added first, 1 Samuel claimed
+  // it, so every USFM and USFX import silently filed Isaiah's sixty-six
+  // chapters under 1 Samuel and then reported Isaiah missing.
+  //
+  // A standard code is an identifier: it means one book, it was written by a
+  // machine, and it can never be a near-miss for another. A published
+  // abbreviation is a convenience someone typed. So codes first, then the
+  // canon's own primary names, then the variants — and a variant that collides
+  // with either of the first two is simply not heard.
+  USFM.forEach((code, i) => put(code, i + 1));
+  OSIS.forEach((code, i) => put(code, i + 1));
+
+  for (const book of books) {
     const info = book.info ?? book;
     put(info.name, book.id);
     put(info.shortname, book.id);
+  }
+
+  for (const book of books) {
+    const info = book.info ?? book;
     for (const abbr of info.abbr ?? []) put(abbr, book.id);
   }
-  USFM.forEach((code, i) => put(code, i + 1));
-  OSIS.forEach((code, i) => put(code, i + 1));
   for (const [name, id] of Object.entries(ALSO)) put(name, id);
 
   return {

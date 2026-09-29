@@ -40,6 +40,73 @@ export function createWorkspace(ctx, chrome) {
   let disposeDoc = null;
   /** Which document is mounted in the workspace right now, if any. */
   let mountedDoc = null;
+  /**
+   * Which run of `renderPanes` is the current one.
+   *
+   * It awaits the store several times, and it runs on every state change — so
+   * two changes in a row put two runs in flight, and the older one, finishing
+   * last, replaced the newer one's work with what the state said when it
+   * started. Setting a value and then opening a document is exactly that
+   * shape: the document tab appeared, active and empty, because the run for
+   * the previous tab landed after the run that mounted it and put the old leaf
+   * back. Pressing the button a second time worked, which is what a race looks
+   * like from the outside.
+   */
+  let renderRun = 0;
+  /**
+   * Where each tab was scrolled to, so coming back to it lands where it was
+   * left.
+   *
+   * Every tab change rebuilds the workspace — a chapter's leaves are built
+   * fresh and a document is unmounted and mounted again — and a new element
+   * starts at the top. So the reader's place was being thrown away on the way
+   * out and never had anything to come back to.
+   *
+   * The key carries the passage, not only the tab: stepping to the next
+   * chapter in the same tab is a different thing to be looking at and belongs
+   * at its beginning. One entry per pane, because a parallel column scrolls on
+   * its own.
+   */
+  const places = new Map();
+  /** Which tab the leaves now in the document belong to. */
+  let shownFor = null;
+
+  const placeKey = (tab) => (tab
+    ? (tab.kind === 'chapter' ? `${tab.id}:${tab.book}:${tab.chapter}` : tab.id)
+    : null);
+
+  /** Take note of where the reader is, before the leaves holding it are replaced. */
+  function rememberPlace() {
+    if (!shownFor) return;
+    const tops = [...chrome.panes.querySelectorAll('.leaf-scroll')].map((el) => el.scrollTop);
+    if (tops.some((top) => top > 0)) places.set(shownFor, tops);
+    else places.delete(shownFor);
+  }
+
+  /**
+   * Put the reader back where they were. The content of a document arrives
+   * after its mount — the report reads the store before it draws — so this
+   * tries again for a few frames rather than once into a box that is still
+   * empty, and stops as soon as it has landed.
+   */
+  function restorePlace(key) {
+    const wanted = places.get(key);
+    if (!wanted) return;
+    let tries = 0;
+    const apply = () => {
+      const leaves = [...chrome.panes.querySelectorAll('.leaf-scroll')];
+      let missed = false;
+      leaves.forEach((el, i) => {
+        const top = wanted[i] ?? 0;
+        if (!top) return;
+        if (Math.abs(el.scrollTop - top) > 1) el.scrollTop = top;
+        if (Math.abs(el.scrollTop - top) > 1) missed = true;
+      });
+      tries += 1;
+      if (missed && tries < 8) requestAnimationFrame(apply);
+    };
+    apply();
+  }
   let pendingReveal = null;
   let revealTimer = null;
   const openTranslations = new Map(); // identify -> { meta, resolver }
@@ -496,7 +563,15 @@ export function createWorkspace(ctx, chrome) {
   }
 
   async function renderPanes() {
+    const run = ++renderRun;
+    /** True while this is still the run whose answer is wanted. */
+    const current = () => run === renderRun;
     const tab = activeTab();
+    const key = placeKey(tab);
+    // Always, not only when the tab changes: every state change runs this and
+    // rebuilds the leaves, so a note saved while reading threw the place away
+    // too. Remembering first and restoring after covers both.
+    rememberPlace();
 
     /**
      * A document already on screen is left alone.
@@ -510,9 +585,11 @@ export function createWorkspace(ctx, chrome) {
      * so nothing is lost by leaving them standing.
      */
     if (tab && tab.kind !== 'chapter' && mountedDoc === tab.kind && chrome.panes.querySelector(`.leaf[data-doc="${tab.kind}"]`)) {
+      shownFor = key;
       await ensurePrimaryMeta();
       return;
     }
+    if (!current()) return;
 
     if (typeof disposeDoc === 'function') { disposeDoc(); disposeDoc = null; }
     mountedDoc = null;
@@ -529,9 +606,11 @@ export function createWorkspace(ctx, chrome) {
       chrome.panes.replaceChildren(h('div', { class: 'leaf', dataset: { doc: doc.id } }, body));
       // A document that throws on mount leaves the tab open and says why, so
       // the reader can close it and carry on reading.
+      shownFor = key;
       try {
         disposeDoc = doc.mount(body) ?? null;
         mountedDoc = doc.id;
+        restorePlace(key);
       } catch (err) {
         disposeDoc = null;
         body.replaceChildren(h('div', { class: 'pane-broken' },
@@ -544,6 +623,7 @@ export function createWorkspace(ctx, chrome) {
     }
 
     const installed = await store.list();
+    if (!current()) return;
     if (!installed.length) {
       chrome.panes.replaceChildren(emptyLeaf(L('msg.noTranslations'), L('msg.openLibrary'), () => openDoc('library')));
       return;
@@ -574,6 +654,7 @@ export function createWorkspace(ctx, chrome) {
       const { meta, resolver } = await openTranslation(identify);
       return { identify, index, meta, resolver, verses: await store.getChapter(identify, book, chapter) };
     }));
+    if (!current()) return;
 
     // The translation carries its own book names, and it loads after the first
     // paint. When the primary one changes, everything that shows a book name —
@@ -600,7 +681,11 @@ export function createWorkspace(ctx, chrome) {
     alignRows(loaded, leaves);
     wireSync(leaves);
     wireFades(chrome.panes);
+    shownFor = key;
+    // A verse asked for wins over the place the tab was left at: the reader
+    // has just said where they want to be.
     if (pendingReveal !== null) reveal(pendingReveal);
+    else restorePlace(key);
   }
 
   /**

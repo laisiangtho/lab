@@ -54,8 +54,8 @@ try {
   // Whichever the stored state leads to: the greeting on a first run, the
   // library once it has been read, the text on any later one.
   await page.waitForSelector('.wl, .library-item, .verse', { timeout: 30000 });
-  if (await page.locator('.wl-acts .btn.primary').count()) {
-    await page.locator('.wl-acts .btn.primary').click();
+  if (await page.locator('.wl .btn.primary').count()) {
+    await page.locator('.wl .btn.primary').click();
     await page.waitForSelector('.library-item, .verse', { timeout: 30000 });
   }
   const info = await page.evaluate(() => window.lai?.appInfo());
