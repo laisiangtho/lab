@@ -1,4 +1,9 @@
 # Every push and pull request: the checks that need nothing but Node.
+#
+# The release workflow calls this same file as its gate (with `gate: true`),
+# so a release is tested by exactly these steps. A push whose message starts
+# with "release:" is therefore skipped here — it is tested once, by the
+# release run, rather than twice in parallel.
 name: check
 
 on:
@@ -6,9 +11,16 @@ on:
     branches: ['**']
     tags-ignore: ['v*']
   pull_request:
+  workflow_call:
+    inputs:
+      gate:
+        description: Called as the release gate; run whatever the commit message says.
+        type: boolean
+        default: false
 
 jobs:
   test:
+    if: inputs.gate || github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release:')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

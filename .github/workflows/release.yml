@@ -1,45 +1,114 @@
-# Pushing a v-tag publishes the installers and the web build.
+# Releases, asked for by the commit that should be released.
 #
-#   node scripts/version.mjs --apply     # stamp yy.mm.dd.build
-#   git commit -am "v26.09.24.3" && git tag v26.09.24.3 && git push --tags
+#   node scripts/version.mjs --apply
+#   git commit -am "release:all 26.09.29.9"      # or release:web, release:desktop
+#   git push
 #
-# The desktop update check reads the release this produces, so the tag must
-# match the stamped version: the check compares tag_name (with any leading "v"
-# removed) against the running application's version.
+#   release:web      tests → web build → laisiangtho.github.io
+#   release:desktop  tests → draft release → macOS, Windows, Linux installers
+#                    → the release is published once all three are attached
+#   release:all      both
+#
+# Only the first line of the head commit of a push to master is read (with a
+# squash merge, that is the pull request's title). The same choice is on the
+# Actions tab as "Run workflow". The prefix is checked by
+# scripts/release-plan.mjs, which also refuses a version stamped in one file
+# but not the others; run it locally to see what a push would do.
+#
+# The desktop update check reads releases/latest and compares its tag, minus
+# the "v", with the running version. The release stays a draft — invisible to
+# that check — until every installer is on it, so nobody is told about an
+# update whose download is not there yet. A tag that already exists is an
+# error rather than an overwrite: restamp with scripts/version.mjs --apply.
+#
+# One-time setup (the deploy key for the web target) is in docs/releasing.md.
 name: release
 
 on:
   push:
-    tags: ['v*']
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: What to release
+        type: choice
+        options: [all, web, desktop]
+        default: all
+
+# One release at a time. A second release push waits rather than cancelling a
+# release that may already be half published.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  installers:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  plan:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'release:')
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.plan.outputs.web }}
+      desktop: ${{ steps.plan.outputs.desktop }}
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm test
-      # electron-builder publishes to the release for this tag. Signing
-      # certificates are not configured, so macOS and Windows builds are
-      # unsigned and their systems will warn on first run.
-      - run: npx electron-vite build && npx electron-builder --publish always
+      - id: plan
+        name: Read the release plan
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          TARGET: ${{ inputs.target }}
+          RELEASE_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          if [ "$REF" != "refs/heads/master" ]; then
+            echo "::error::releases are made from master, not $REF"
+            exit 1
+          fi
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            node scripts/release-plan.mjs --target "$TARGET"
+          else
+            node scripts/release-plan.mjs
+          fi
+      - name: Refuse a tag that already exists
+        if: steps.plan.outputs.desktop == 'true'
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "::error::$TAG is already released. Stamp a new version with 'node scripts/version.mjs --apply', commit and push again."
+            exit 1
+          fi
+
+  test:
+    needs: plan
+    uses: ./.github/workflows/ci.yml
+    with:
+      gate: true
+
+  # ---------------------------------------------------------------- web ----
 
   web:
+    needs: [plan, test]
+    if: needs.plan.outputs.web == 'true'
     runs-on: ubuntu-latest
+    environment:
+      name: web
+      url: https://laisiangtho.github.io/
     steps:
+      - name: Require the deploy key
+        env:
+          KEY: ${{ secrets.PAGES_DEPLOY_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::secret PAGES_DEPLOY_KEY is not set on laisiangtho/lab; see docs/releasing.md"
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -47,7 +116,133 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          name: web
-          path: dist/web
+          repository: laisiangtho/laisiangtho.github.io
+          ssh-key: ${{ secrets.PAGES_DEPLOY_KEY }}
+          path: site
+      # The site is the build and nothing else: everything from the previous
+      # build is removed, apart from what belongs to the site repository itself.
+      - name: Replace the site with this build
+        run: |
+          find site -mindepth 1 -maxdepth 1 ! -name .git ! -name LICENSE ! -name CNAME -exec rm -rf {} +
+          cp -R dist/web/. site/
+          # Without this, Pages runs Jekyll over the build and drops any path
+          # starting with an underscore.
+          touch site/.nojekyll
+      - name: Publish
+        working-directory: site
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+          SOURCE: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "::notice::the build is identical to what is already published; nothing to push"
+            exit 0
+          fi
+          git commit -m "Lai Siangtho $VERSION" -m "Built from $SOURCE"
+          git push
+
+  # ------------------------------------------------------------ desktop ----
+
+  draft:
+    needs: [plan, test]
+    if: needs.plan.outputs.desktop == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      # A draft left behind by a run that failed half way is reused, so running
+      # the release again finishes it rather than making a second one.
+      - name: Create the draft release
+        run: |
+          existing=$(gh api "repos/$GH_REPO/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"$TAG\") | .draft")
+          case "$existing" in
+            true) echo "::notice::reusing the draft release for $TAG"; exit 0 ;;
+            false) echo "::error::$TAG is already published"; exit 1 ;;
+          esac
+          cat > notes.md <<'EOF'
+          **macOS:** these builds are not notarized, so macOS reports the app as damaged when it is first opened. After moving it to Applications, run once in Terminal:
+
+              xattr -cr "/Applications/Lai Siangtho.app"
+
+          **Windows:** the installer is not signed. SmartScreen will warn; choose *More info → Run anyway*.
+
+          EOF
+          gh release create "$TAG" --draft --target "$GITHUB_SHA" \
+            --title "Lai Siangtho $VERSION" --notes-file notes.md --generate-notes
+
+  installers:
+    needs: [plan, draft]
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            files: release/*.dmg release/*.zip
+          - os: windows-latest
+            files: release/*.exe
+          - os: ubuntu-latest
+            files: release/*.AppImage
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx electron-vite build
+      # Published here, not by electron-builder: its publisher looks for a
+      # release tagged v<semver> (v26.9.29), and the release is tagged with the
+      # full stamped version (v26.09.29.9). The file names carry the same.
+      - name: Package
+        env:
+          # Nothing is picked up from a keychain by accident; the ad-hoc
+          # identity in electron-builder.yml is the only one used.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --publish never "-c.artifactName=lai-siangtho-$VERSION-\${os}-\${arch}.\${ext}"
+      - name: Attach to the draft release
+        run: |
+          shopt -s nullglob
+          files=(${{ matrix.files }})
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no installers matching '${{ matrix.files }}' in release/"
+            ls -la release || true
+            exit 1
+          fi
+          printf 'attaching %s\n' "${files[@]}"
+          gh release upload "$TAG" "${files[@]}" --clobber
+
+  publish:
+    needs: [plan, installers]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.plan.outputs.tag }}
+    steps:
+      # Publishing creates the tag at the released commit and makes this the
+      # release the desktop update check reads.
+      - run: gh release edit "$TAG" --draft=false --latest

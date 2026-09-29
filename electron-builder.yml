@@ -16,19 +16,36 @@ files:
   - out/**
   - package.json
 asar: true
+# No spaces in file names: a release asset named "Lai Siangtho 26.9.29.dmg" is
+# renamed by GitHub on upload. CI overrides this with the full stamped version
+# (see .github/workflows/release.yml); a local package uses the semver one.
+artifactName: ${name}-${version}-${os}-${arch}.${ext}
 mac:
+  # Both architectures from one machine: the app has no native modules, so the
+  # Intel build is a repackaging rather than a compile.
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
   category: public.app-category.reference
   icon: assets/icon.png
+  # Ad-hoc signature ("-"): Apple Silicon refuses to run a binary with no
+  # signature at all. It is not a Developer ID, so a downloaded copy is still
+  # quarantined and macOS calls it damaged until the quarantine is cleared —
+  # the release notes say how. With a Developer ID, set the identity here (or
+  # CSC_LINK in CI), turn hardenedRuntime on and add notarization.
+  identity: "-"
+  hardenedRuntime: false
 win:
   target:
-    - nsis
+    - target: nsis
+      arch: [x64]
   icon: assets/icon.png
 linux:
   target:
-    - AppImage
+    - target: AppImage
+      arch: [x64]
   # A .deb or .rpm needs a maintainer address in the package metadata, which
   # goes out with every copy. Add `maintainer: Name <address>` here and the
   # target alongside AppImage when there is an address to publish.

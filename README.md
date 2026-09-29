@@ -24,6 +24,7 @@ Phase 2 of the project. The Phase 1 single-file `index.html` is preserved as git
 | `npm run test:all` | `npm test` then the browser suite |
 | `npm run aliases -- <identify> [--file PATH] [--apply]` | Alias overlay maintenance (dry run by default) |
 | `npm run version:stamp -- --apply` | Stamp today's date and the next build number |
+| `node scripts/release-plan.mjs "release:all"` | What a release commit would release (see `docs/releasing.md`) |
 
 The three test commands beyond `npm test` need a browser driver, which is not a dependency of the project: `npm i --no-save playwright-core` and a Chromium build (or `CHROMIUM_PATH`). Without it they say why and skip. A test that needs the desktop application also needs a display; on a machine without one, `xvfb-run -a node test/e2e/desktop.mjs`.
 

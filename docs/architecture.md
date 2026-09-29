@@ -1012,11 +1012,11 @@ The check runs at most once a day, silently unless there is something to say, an
 
 ## 9d. Distribution
 
-- `electron-builder.yml` publishes to `laisiangtho/lab`, the same repository the desktop update check reads; the tag (`v26.09.24.3`) must match the stamped version, minus the `v`.
-- Targets: AppImage, NSIS, dmg + zip. `.deb` and `.rpm` are left out because they require a maintainer address in metadata that ships with every copy.
+- Releases are made in `laisiangtho/lab`, the same repository the desktop update check reads; the tag (`v26.09.24.3`) is the stamped version with a `v`, and the check compares the two.
+- Targets: AppImage (x64), NSIS (x64), dmg + zip (arm64 and x64, ad-hoc signed). `.deb` and `.rpm` are left out because they require a maintainer address in metadata that ships with every copy.
 - Window chrome: the system title bar is hidden only where the system still draws its own buttons — `hiddenInset` on macOS, `titleBarOverlay` on Windows. Linux keeps its title bar; the overlay is not drawn there, and a window with no close button is worse than an extra row. The renderer is told which arrangement it got (`platform.frame`) and reserves the corner.
 - Window size, position and maximised state are kept in `userData/window.json`, outside the reader's library: they belong to this installation on this machine, and they are needed before the renderer exists. A position on a display that is no longer attached is discarded.
-- `.github/workflows/check.yml` runs the unit tests, the browser suite and the packaged desktop app on every push; `release.yml` builds and publishes installers on a `v*` tag.
+- `.github/workflows/ci.yml` runs the unit tests, the browser suite and the packaged desktop app on every push. `release.yml` runs when the head commit of a push to `master` starts with `release:web`, `release:desktop` or `release:all`: it calls the same checks as its gate, then publishes the web build to `laisiangtho.github.io`, the installers to a GitHub release, or both. A desktop release stays a draft until all three installers are attached, because the update check reads `releases/latest` and must never announce a download that is not there. `scripts/release-plan.mjs` reads the commit message and refuses a version the three stamped files disagree about; the procedure and its one-time setup are in `docs/releasing.md`.
 
 ---
 
