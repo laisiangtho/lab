@@ -64,6 +64,14 @@ portable:
 # profile), where the default one turned it off everywhere.
 toolsets:
   appimage: "1.0.3"
+# The AppStream description, so software centres list the installed app and
+# can uninstall it (see the file's own header). fpm maps source=destination.
+deb:
+  fpm:
+    - assets/linux/org.laisiangtho.app.metainfo.xml=/usr/share/metainfo/org.laisiangtho.app.metainfo.xml
+rpm:
+  fpm:
+    - assets/linux/org.laisiangtho.app.metainfo.xml=/usr/share/metainfo/org.laisiangtho.app.metainfo.xml
 linux:
   # AppImage: one file, any distribution, nothing installed.
   # deb / rpm: installed by the system's own installer, with a menu entry, an

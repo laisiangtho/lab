@@ -16,6 +16,6 @@ contextBridge.exposeInMainWorld('lai', Object.freeze({
   openExternal: (url) => ipcRenderer.invoke('lai:open-external', url),
   appInfo: () => ipcRenderer.invoke('lai:app-info'),
   checkUpdate: () => ipcRenderer.invoke('lai:check-update'),
-  /** @param {{ color: string, symbolColor: string }} colors  '#rrggbb' each */
-  setFrameColors: (colors) => ipcRenderer.invoke('lai:frame-colors', colors),
+  /** @param {{ color: string, symbolColor: string, height: number }} frame  '#rrggbb', '#rrggbb', px */
+  setWindowFrame: (frame) => ipcRenderer.invoke('lai:window-frame', frame),
 }));

@@ -15,7 +15,7 @@ export function createPlatform() {
       appInfo: () => bridge.appInfo(),
       checkUpdate: () => bridge.checkUpdate(),
       // Only where the window buttons are an overlay the app can colour.
-      ...(bridge.frame === 'overlay' ? { frameColors: (colors) => bridge.setFrameColors(colors) } : {}),
+      ...(bridge.frame === 'overlay' ? { windowFrame: (frame) => bridge.setWindowFrame(frame) } : {}),
     }),
   });
 }

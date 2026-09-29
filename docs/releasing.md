@@ -85,6 +85,26 @@ the desktop ties the two together. Copies with no launcher entry (AppImage,
 Window frame: on every platform the app's own band is the title bar, with the
 window buttons drawn over its corner (see `targets/desktop/electron/window.js`).
 
+## Uninstalling
+
+| Installed from | Removed by |
+|---|---|
+| `.deb` | The software centre (App Center, GNOME Software, Discover), or `sudo apt remove lai-siangtho` (`purge` also drops its settings files) |
+| `.rpm` | The software centre, or `sudo dnf remove lai-siangtho` |
+| AppImage, `.tar.gz` | Deleting the file or folder |
+| Windows `-setup.exe` | *Settings → Apps → Installed apps → Lai Siangtho → Uninstall* |
+| Windows `-portable.exe` | Deleting the file |
+| macOS | Dragging *Lai Siangtho* from Applications to the Bin |
+
+Software centres list the `.deb` and `.rpm` only because the packages install
+`assets/linux/org.laisiangtho.app.metainfo.xml` into `/usr/share/metainfo`;
+without it the app has no page there and no Uninstall button.
+
+None of these removes the reader's own library (translations, notes, settings),
+which lives in the user's profile — `~/.config/Lai Siangtho` on Linux,
+`%APPDATA%\Lai Siangtho` on Windows, `~/Library/Application Support/Lai Siangtho`
+on macOS — so a reinstall finds it again.
+
 ## One-time setup: the web deploy key
 
 The web build is pushed to a different repository,

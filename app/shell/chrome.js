@@ -537,34 +537,44 @@ export function createChrome(root, ctx) {
     const frame = ctx.platform.frame ?? null;
     if (frame === 'inset') document.body.dataset.platform = 'darwin';
     else if (frame === 'overlay') document.body.dataset.shell = 'on';
-    syncFrameColors();
+    syncWindowFrame();
   }
 
   /**
-   * Where the window buttons are an overlay the target can colour, the corner
-   * takes the band's own colours, and takes them again whenever the theme or
-   * the accent changes — both are written on the root element, by the
-   * settings, the theme button, a reset or the system turning dark. Without
-   * this the corner keeps the colour the window opened with.
+   * Where the window buttons are an overlay the target can style, the corner
+   * takes the band's own colours and height, and takes them again whenever
+   * either changes. Colours change with the theme and the accent, both written
+   * on the root element. The height is the band's --bar-h, which follows the
+   * reader's interface size and the narrow layout; a probe as tall as the band
+   * is watched for size, so every cause of a new height is caught. Without
+   * this the corner keeps what the window opened with — a dark block in the
+   * light theme, and a rectangle that covers the top of the sheet or stops
+   * short of the band's edge.
    */
-  function syncFrameColors() {
-    const setColors = ctx.platform.capabilities?.frameColors;
-    if (!setColors) return;
+  function syncWindowFrame() {
+    const setFrame = ctx.platform.capabilities?.windowFrame;
+    if (!setFrame) return;
     const probe = document.createElement('span');
-    probe.hidden = true;
-    probe.style.cssText = 'background:var(--tabstrip-bg);color:var(--text-muted)';
+    probe.setAttribute('aria-hidden', 'true');
+    probe.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:var(--bar-h);visibility:hidden;pointer-events:none;'
+      + 'background:var(--tabstrip-bg);color:var(--text-muted)';
     document.body.append(probe);
     let last = '';
     const send = () => {
       const style = getComputedStyle(probe);
-      const colors = { color: cssColorToHex(style.backgroundColor), symbolColor: cssColorToHex(style.color) };
-      const key = `${colors.color}${colors.symbolColor}`;
+      const frame = {
+        color: cssColorToHex(style.backgroundColor),
+        symbolColor: cssColorToHex(style.color),
+        height: Math.round(probe.getBoundingClientRect().height),
+      };
+      const key = `${frame.color}${frame.symbolColor}${frame.height}`;
       if (key === last) return;
       last = key;
-      Promise.resolve(setColors(colors)).catch((err) => console.error('window frame colours:', err));
+      Promise.resolve(setFrame(frame)).catch((err) => console.error('window frame:', err));
     };
     send();
     new MutationObserver(send).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style'] });
+    new ResizeObserver(send).observe(probe);
   }
 
   /** Chrome the reader can hide, and the widths they can drag. */

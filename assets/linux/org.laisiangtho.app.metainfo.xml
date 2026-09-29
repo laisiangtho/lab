@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AppStream description of the desktop app. Software centres (GNOME Software,
+  Ubuntu App Center, KDE Discover) list an installed package only when one of
+  these is installed with it; without it the app has no page there and no
+  Uninstall button. Installed by the .deb and .rpm to /usr/share/metainfo
+  (electron-builder.yml, deb.fpm and rpm.fpm). The id and the launchable name
+  the launcher entry, org.laisiangtho.app.desktop (package.json desktopName).
+-->
+<component type="desktop-application">
+  <id>org.laisiangtho.app</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <name>Lai Siangtho</name>
+  <summary>Read and study the Bible, offline</summary>
+  <description>
+    <p>
+      Lai Siangtho is a Bible reader and study tool. Translations are kept on
+      the device and read offline, side by side, with notes and bookmarks that
+      stay with the passage rather than with one translation.
+    </p>
+  </description>
+  <launchable type="desktop-id">org.laisiangtho.app.desktop</launchable>
+  <url type="homepage">https://laisiangtho.github.io/</url>
+  <url type="bugtracker">https://github.com/laisiangtho/lab/issues</url>
+  <developer id="org.laisiangtho">
+    <name>Lai Siangtho</name>
+  </developer>
+  <categories>
+    <category>Education</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+</component>

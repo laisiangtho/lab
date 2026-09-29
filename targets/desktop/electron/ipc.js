@@ -27,19 +27,24 @@ export function registerIpc() {
   });
 
   /**
-   * The colours of the window-button overlay, so the corner matches the band
-   * it sits on in every theme. Only a window created with an overlay has one
-   * to colour (Windows and Linux; macOS draws its traffic lights on the band).
+   * The window-button overlay's colours and height, so the corner matches the
+   * band it sits on: its colours in every theme, and its height at every
+   * interface size (the band is sized from the reader's --ui-size, and an
+   * overlay taller than the band covers the top of the sheet below it). Only a
+   * window created with an overlay has one (Windows and Linux; macOS draws its
+   * traffic lights on the band).
    */
-  handle('lai:frame-colors', (event, colors) => {
+  handle('lai:window-frame', (event, frame) => {
     const hex = /^#[0-9a-f]{6}$/i;
-    if (!hex.test(colors?.color ?? '') || !hex.test(colors?.symbolColor ?? '')) {
-      throw new Error('frame-colors: expected { color: "#rrggbb", symbolColor: "#rrggbb" }');
+    const height = frame?.height;
+    if (!hex.test(frame?.color ?? '') || !hex.test(frame?.symbolColor ?? '')
+      || !Number.isInteger(height) || height < 16 || height > 96) {
+      throw new Error('window-frame: expected { color: "#rrggbb", symbolColor: "#rrggbb", height: integer 16–96 }');
     }
-    if (process.platform === 'darwin') throw new Error('frame-colors: macOS windows have no title-bar overlay');
+    if (process.platform === 'darwin') throw new Error('window-frame: macOS windows have no title-bar overlay');
     const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win) throw new Error('frame-colors: the sender has no window');
-    win.setTitleBarOverlay({ color: colors.color, symbolColor: colors.symbolColor });
+    if (!win) throw new Error('window-frame: the sender has no window');
+    win.setTitleBarOverlay({ color: frame.color, symbolColor: frame.symbolColor, height });
   });
 
   handle('lai:open-external', async (_event, url) => {
