@@ -82,7 +82,11 @@ linux:
   # Published inside every .deb and .rpm.
   maintainer: Khen Solomon Lethil <khensolomon@gmail.com>
   category: Education
-  icon: assets/icon.png
+  # One file per size, installed into the hicolor theme. The theme has sizes
+  # up to 512 and no 1024 folder, so the 1024 px assets/icon.png alone was
+  # never found and desktops showed a generic icon. Generated from
+  # assets/icon.png; see assets/icons/README.md.
+  icon: assets/icons
   # Without this the desktop environment cannot tie a running window to the
   # launcher entry, and the app shows as a second, nameless icon.
   syncDesktopName: true

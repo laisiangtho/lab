@@ -4,6 +4,11 @@
 import { app, BrowserWindow, shell } from 'electron';
 import { fileURLToPath } from 'node:url';
 
+// The window's own icon on Linux, where nothing else supplies one to a copy
+// that installed no launcher entry (AppImage, tar.gz). `?asset` has
+// electron-vite copy the file next to the build and give its path.
+import linuxIcon from '../../../assets/icons/256x256.png?asset';
+
 import { APP_ORIGIN } from './protocol.js';
 import { loadWindowState, watchWindowState } from './state.js';
 
@@ -49,6 +54,7 @@ export function createMainWindow() {
     backgroundColor: BACKGROUND,
     title: 'Lai Siangtho',
     ...frame(),
+    ...(process.platform === 'linux' ? { icon: linuxIcon } : {}),
     webPreferences: {
       preload: PRELOAD,
       contextIsolation: true,

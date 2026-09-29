@@ -76,6 +76,12 @@ Linux formats, and why there are four:
   upgrade. The maintainer address in `electron-builder.yml` ships in both.
 - **.tar.gz** — the application folder, for anything else.
 
+Icons: the `.deb` and `.rpm` install `assets/icons/` (16–512 px) into the hicolor
+theme, which has no 1024 px size; the launcher entry's `StartupWMClass`
+(`org.laisiangtho.app`, from `desktopName`) is the class the window reports, so
+the desktop ties the two together. Copies with no launcher entry (AppImage,
+`.tar.gz`) get the window icon set in `window.js`.
+
 Window frame: on every platform the app's own band is the title bar, with the
 window buttons drawn over its corner (see `targets/desktop/electron/window.js`).
 

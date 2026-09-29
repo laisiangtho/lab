@@ -222,8 +222,12 @@ body[data-platform="darwin"]::before{
   background:var(--tabstrip-bg);border-bottom:1px solid var(--border);
   -webkit-app-region:drag;app-region:drag;
 }
+/* The empty part of the tab strip is the largest stretch of the band, so it
+   stays part of the handle; only the tabs themselves are cut out of it. A tab
+   drag still works across it: the system decides "move the window" only for a
+   press that starts on a drag region, and a tab drag starts on a tab. */
 .band-drag{-webkit-app-region:drag;app-region:drag}
-.band-drag button,.band-drag input,.band-drag .tabstrip,.band-drag .no-drag{
+.band-drag button,.band-drag input,.band-drag .tab,.band-drag .no-drag{
   -webkit-app-region:no-drag;app-region:no-drag;
 }
 .app-pill{
