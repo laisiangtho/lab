@@ -430,7 +430,11 @@ export function createChrome(root, ctx) {
       const rows = saved[side]
         .map((row) => ({ views: row.views.filter((id) => provided.has(id)), active: row.active, size: row.size }))
         .filter((row) => row.views.length);
-      const fresh = registry.panes(side).filter((p) => !placed.has(p.id) && !seen.has(p.id)).map((p) => p.id);
+      // A pane registered to start hidden is offered all the same — it is in
+      // the list written below — so it stays out until the reader asks for it.
+      const fresh = registry.panes(side)
+        .filter((p) => !placed.has(p.id) && !seen.has(p.id) && !p.startsHidden)
+        .map((p) => p.id);
       if (rows.length) rows[0].views.push(...fresh);
       else if (fresh.length) rows.push({ views: fresh, active: fresh[0], size: 1 });
       for (const row of rows) if (!row.views.includes(row.active)) row.active = row.views[0];

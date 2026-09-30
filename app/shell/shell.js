@@ -80,6 +80,8 @@ export function createShell(root, ctx) {
     openChapter: (book, chapter, options) => workspace.openChapter(book, chapter, options),
     openSwitcher,
     openPalette,
+    /** The palette with something already typed in it: a verb to finish, say. */
+    openPaletteWith: (query) => openPaletteWith(query),
     openTranslationPicker,
     /** The one modal, for a feature that needs to offer a list of its own. */
     pick: (options) => modal.open(options),
@@ -518,6 +520,16 @@ export function createShell(root, ctx) {
    * palette a way of doing something *here* as well as somewhere named.
    */
   function verbItems(text) {
+    // "?" is how a question starts: "? how do I bookmark" goes to whichever
+    // verb takes the word "ask", with no space needed after the mark.
+    const question = /^\s*\?\s*(.*)$/s.exec(text);
+    if (question) {
+      const verb = ctx.registry.verbs().find((v) => v.word === 'ask');
+      if (!verb) return [];
+      const rest = question[1].trim();
+      if (!rest) return [verbHint(verb)];
+      return [{ id: `verb.${verb.id}`, title: `${verb.title}: ${rest}`, sub: verb.hint ?? undefined, icon: verb.icon, run: () => verb.run(rest) }];
+    }
     const trimmed = text.trim();
     // A word on its own is a name, not an instruction: "parallel" is the
     // command called Open parallel pane, and a reader who typed it and pressed

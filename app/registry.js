@@ -62,9 +62,12 @@ export function createRegistry() {
     /**
      * A sidebar pane.
      * @param {{ id: string, side: 'left'|'right', title: string, icon?: string, order?: number,
-     *           mount(el: HTMLElement): (void | (() => void)) }} p
+     *           startsHidden?: boolean, mount(el: HTMLElement): (void | (() => void)) }} p
      *        `order` sorts the strip (lower first); features register before the
      *        shell does, so without it the Books pane would land last.
+     *        `startsHidden` offers the pane without placing it: it is known, so
+     *        it does not arrive on its own, and its command (or `selectPane`)
+     *        brings it in. Not mounted until then.
      */
     pane(p) {
       if (!p?.id || !p.title || typeof p.mount !== 'function') throw new Error('registry.pane: expected { id, title, mount }');

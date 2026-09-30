@@ -74,7 +74,12 @@ newest first.
   warning when text and background are too close to read.
 - Export a passage as Markdown, a citation, plain text, a file or a printed
   sheet; export and convert a whole translation, a testament or chosen books,
-  as one file or a zip.
+  as one file, gzipped, or a compressed zip — with or without Strong's
+  numbers, headings and cross-references, with the reader's notes, compact or
+  readable — always carrying the copyright.
+- A guide that answers questions about the app in the reader's own words,
+  in English, Norwegian or Burmese, with the button that does what was asked;
+  it adapts to the answers a reader uses, on the device only.
 - Import the reader's own translations — this app's JSON, USFM, Zefania, OSIS,
   USFX, a spreadsheet, or a whole eBible.org archive — checked against the canon
   exactly as a published one is. Nothing is uploaded anywhere.
@@ -133,6 +138,28 @@ newest first.
 ---
 
 ## Releases
+
+### 26.09.30.4 — 30 September 2026
+
+- **Guide.** A new pane that answers "how do I…" in English, Norwegian or
+  Burmese from what the app knows about itself, and offers the button that
+  does it. A passage is answered with the passage; a question it cannot
+  answer offers a Bible search. It starts switched off: `? …` or `ask …` in
+  the palette opens it. It learns which answers you use, on this device only,
+  and Settings → Study forgets that. No text is generated and nothing is sent
+  anywhere.
+- **Export options.** The Library's export dialog is drop-downs and chips:
+  one file, gzipped, or a compressed zip; leave out Strong's numbers,
+  headings or cross-references (offered only when the translation has them);
+  add your own notes to Markdown or a spreadsheet; compact JSON and XML;
+  English book names. It estimates the size, reports the real one, and
+  remembers your choices per format. Every export keeps the copyright, and
+  every zip carries ABOUT.txt.
+- Licence: MIT throughout (package.json said UNLICENSED), copyright
+  2016–2026 Khen Solomon Lethil.
+- Fixed: importing USX or OSIS headed verse 1 with the book's own title, or
+  the file's title; the export dialog's notes on what a format loses were
+  English in every language; Zefania was said to keep cross-references.
 
 ### 26.09.30.3 — 30 September 2026
 

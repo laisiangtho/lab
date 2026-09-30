@@ -28,6 +28,7 @@ import updates from '../../app/features/updates/index.js';
 import exportPassage from '../../app/features/export-passage/index.js';
 import projects from '../../app/features/projects/index.js';
 import report from '../../app/features/report/index.js';
+import guide from '../../app/features/guide/index.js';
 import welcome from '../../app/features/welcome/index.js';
 import { createPlatform } from './platform.js';
 import './theme.css'; // after boot.js so target tokens override the defaults
@@ -35,6 +36,6 @@ import './theme.css'; // after boot.js so target tokens override the defaults
 start({
   root: document.getElementById('app'),
   createPlatform,
-  features: [library, settings, search, notes, bookmarks, composer, notesManager, tags, backlinks, outline, plans, graph, board, ink, speech, verseCard, help, exportChapter, updates, exportPassage, projects, report, welcome],
+  features: [library, settings, search, notes, bookmarks, composer, notesManager, tags, backlinks, outline, plans, graph, board, ink, speech, verseCard, help, exportChapter, updates, exportPassage, projects, report, guide, welcome],
   config: {},
 });

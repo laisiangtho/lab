@@ -1512,12 +1512,14 @@ test('the app in a browser', options, async (t) => {
     await page.locator('.popover.menu .menu-item', { hasText: 'Export' }).click();
     await page.waitForSelector('.fd', { timeout: 10000 });
 
-    const formats = await page.locator('.fd-row[data-field="format"] .fd-opt-n').allInnerTexts();
+    const formats = await page.locator('.fd-row[data-field="format"] option').allInnerTexts();
     assert.ok(formats.length >= 6, `every writer is offered (${formats.join(', ')})`);
     // It says what it will do before it is asked to do it.
     assert.match(await page.locator('.fd-live').innerText(), /66 books · \d+ chapters/, 'on open');
     // One book, as USFM: the granular case, which is what anybody actually wants.
-    await page.locator('.fd-row[data-field="format"] .fd-opt', { hasText: 'USFM' }).click();
+    await page.locator('.fd-row[data-field="format"] select').selectOption('usfm');
+    // Sixty-six books of USFM are sixty-six files: only a zip is offered.
+    assert.equal(await page.locator('.fd-row[data-field="pack"] select').inputValue(), 'zip');
     // Naming books is the same question as the scope beside it, so it stands
     // in that row and takes it over.
     const scope = page.locator('.fd-row[data-field="scope"] .fd-opts');
@@ -1535,6 +1537,9 @@ test('the app in a browser', options, async (t) => {
     assert.match(await page.locator('.fd-live').innerText(), /66 books/, 'and the whole translation is back');
     await scope.locator('input.fd-free').fill('Psalms');
     await page.waitForTimeout(250);
+    // One book is one file again: the reader's own choice comes back when it
+    // is offered again, rather than staying on the zip it was moved to.
+    assert.equal(await page.locator('.fd-row[data-field="pack"] select').inputValue(), 'file');
     const saving = page.waitForEvent('download');
     await page.locator('.fd-acts .btn.primary').click();
     const file = await saving;

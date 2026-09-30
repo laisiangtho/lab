@@ -41,6 +41,16 @@ export function L(key, vars = {}) {
   return text.replace(/\{(\w+)\}/g, (_, name) => (vars[name] === undefined ? `{${name}}` : String(vars[name])));
 }
 
+/**
+ * Whether a string exists, for a feature that finds its text by pattern (the
+ * guide reads every setting's name and sentence). Every locale has the same
+ * keys, which the locale tests hold them to, so English answers for all.
+ */
+export const hasString = (key) => Object.hasOwn(en, key);
+
+/** Every string key, for the same purpose. */
+export const stringKeys = () => Object.keys(en);
+
 /** The locale in force. */
 export function currentLocale() {
   return locale;

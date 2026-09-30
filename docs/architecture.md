@@ -277,6 +277,11 @@ An empty sidebar is still an empty sidebar however it was emptied: `empty` is
 `views.size === 0`, and hiding deletes the view, so the side toggle disables
 itself and says why exactly as it did when the last pane was dragged out.
 
+A pane can also be registered `startsHidden`: offered — it goes into
+`sidebarKnown` with the rest — but not placed, so it stays out until its
+command or `selectPane` brings it in. The guide (3d-x) is the one that does.
+Its absence costs nothing: a pane that is not placed is not built.
+
 Panes are still all mounted at startup. Deferring a mount until a pane is first
 shown is the larger saving and a behaviour change for every reader, including
 those who hide nothing, so it is deliberately not in this batch.
@@ -547,6 +552,44 @@ URL import is deliberately not here: the web target pins `connect-src` to the
 catalog host, and widening that is a decision about the app's security posture
 rather than a step in this feature.
 
+## 3d-x. The guide
+
+A pane that answers questions about the app in the reader's words and offers
+the button that does what was asked. It answers from text the build already
+carries, so it cannot describe a feature that is not there and works offline
+in every interface language.
+
+- **Sources.** `guide.t.*` topics (title, phrasings one per line, answer, and
+  what the button does), every registered command (with Help's sentence for it
+  where Help has one), every palette verb, every document, and every setting
+  found by its string pair `set.X` / `set.XHint`. A topic whose command this
+  build lacks keeps its words and loses its button.
+- **Matching** (`core/guide.js`, pure). BM25 over title and phrasings (weight
+  3) and text (1), with prefix matches at a discount for inflections, and a
+  prior per kind of entry (topics above commands above settings). Stop words
+  for English and Norwegian; for Burmese, which runs words together, a run of
+  Myanmar script is cut into character pairs after its question particles are
+  removed. Duplicate titles are shown once. A question that parses as a
+  passage is answered with the passage; one that reaches nothing says so and
+  offers a search of the Bible and Help.
+- **Memory.** Using an answer, or marking it *Helpful*, stores the question's
+  terms against the entry; *Not this* stores a negative. A later question
+  sharing at least half its terms with a stored one (Jaccard) borrows its
+  weight. 300 pairs, oldest first out, in the feature record `guide` — so it
+  travels in the settings export — read defensively, and forgotten from
+  Settings → Study. This is adaptation, not training: nothing is generated and
+  nothing leaves the device.
+- **Loading.** The pane starts hidden (`startsHidden`) and its code
+  (`features/guide/pane.js` with `core/guide.js`, about 10 KB) is a separate
+  chunk imported on first mount. `ask …` and `? …` in the palette queue their
+  question until it has loaded.
+- **Not done yet.** Downloadable study packs (a topical index, a dictionary,
+  cross-reference sets) keyed by reference, so answers can quote the reader's
+  own translation; and an opt-in connection to a generative model with the
+  reader's own key. Both were weighed and deliberately left for later: the
+  first needs pack formats and hosting, the second needs a network and trust
+  the rest of the app does not ask for.
+
 ## 3e. Search
 
 No index is built at install time; the scan reads `chapters` in pages, in a worker.
@@ -595,6 +638,22 @@ wrapping the textarea in a flex column inside a scrolling box left it half the
 height it had — `.source` is sized by `height: 100%`, which needs a parent whose
 height is definite. The view is the textarea again, and the controls sit beside
 the translation-info button.
+
+**Options.** `write(format, selection, options)` takes what may be left out or
+changed — `strongs`, `headings`, `references`, `notes`, `compact`, `names` —
+and `optionsFor(format)` says which of them mean anything to a format, which is
+exactly what the dialog offers. Every default is the whole file. The options
+are applied once, to the chapters, before any writer sees them, so no writer
+has its own idea of "without headings". An unknown option, or English names
+with no source for them, is an error. The copyright is not an option: every
+format with a place for it carries it (`\rem` in USFM, `rem` in USX), and a zip
+carries `ABOUT.txt` from `aboutText(meta)`, which is where a spreadsheet's goes.
+What a format loses is `lossOf(format)`, ids worded per locale as
+`exp.loss.*`. Before the dialog opens, the library worker is asked (`probe`)
+which of Strong's numbers, headings and references the translation actually
+has, reading until all three are found; a chip for something absent is not
+offered. Zips are deflated with the platform's `CompressionStream`; a single
+file can be gzipped the same way.
 
 ## 3d-viii. A translation as it is published
 

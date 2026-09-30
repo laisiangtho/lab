@@ -10,23 +10,11 @@ import { requestPersistence, storageStatus } from '../../services/store.js';
 import { formatSections } from './formats.js';
 import { fill, h } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
+import { keyLabel } from '../../shell/keys.js';
 import { L, when } from '../../shell/i18n.js';
 import { BUILT_AT, VERSION } from '../../version.js';
 
-const APPLE = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform ?? '');
-
-/** "Mod+p" as this device writes it. */
-export function keyLabel(keys) {
-  return keys
-    .replace('Mod', APPLE ? '⌘' : 'Ctrl')
-    .replace('Alt', APPLE ? '⌥' : 'Alt')
-    .replace('Shift', '⇧')
-    .replace('ArrowRight', '→')
-    .replace('ArrowLeft', '←')
-    .replace('ArrowUp', '↑')
-    .replace('ArrowDown', '↓')
-    .split('+');
-}
+export { keyLabel };
 
 const kbd = (keys) => keyLabel(keys).map((key) => h('span', { class: 'kbd' }, key));
 
@@ -57,6 +45,7 @@ export default {
       title: L('doc.help'),
       icon: 'help',
       mount(el) {
+        const guidePane = registry.panes().find((pane) => pane.id === 'guide');
         const has = (id) => registry.commands().some((c) => c.id === id);
         const cards = [
           task('book-open', L('cmd.switcher'), L('doc.t.switcher'), keysOf('shell.switcher'), run('shell.switcher')),
@@ -67,6 +56,8 @@ export default {
           has('graph.open') ? task('graph', L('doc.graph'), L('doc.t.graph'), '', run('graph.open')) : null,
           has('plan.open') ? task('calendar', L('pane.plan'), L('doc.t.plan'), '', run('plan.open')) : null,
           has('speech.toggle') ? task('audio', L('cmd.read'), L('doc.t.read'), '', run('speech.toggle')) : null,
+          // Shown, not toggled: its own command would hide a guide already open.
+          guidePane ? task('guide', L('pane.guide'), L('doc.t.guide'), '', () => shell.selectPane(guidePane.side, 'guide')) : null,
         ].filter(Boolean);
 
         el.append(

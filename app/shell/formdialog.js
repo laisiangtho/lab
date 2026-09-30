@@ -44,6 +44,13 @@ export function createFormDialog() {
 
   let settle = null;
   let values = {};
+  /**
+   * What the reader picked in each select, as opposed to what the dialog
+   * moved it to when their pick was hidden: when the pick is shown again, it
+   * comes back. Otherwise one book of USFM after all sixty-six stayed a zip,
+   * because "one file" had been hidden for a moment.
+   */
+  let picked = {};
   let fields = [];
   let onChange = null;
 
@@ -76,6 +83,7 @@ export function createFormDialog() {
       // value, and the row it shares tells nothing about it.
       if (field.free) values[field.free.id] = field.free.value ?? '';
     }
+    picked = { ...values };
     onChange = options.onChange ?? null;
     title.textContent = options.title;
     lede.textContent = options.lede ?? '';
@@ -136,9 +144,10 @@ export function createFormDialog() {
       if (field.type === 'select') {
         const select = row.querySelector('select');
         const shown = [...select.options].filter((o) => !o.hidden);
-        if (shown.length && !shown.some((o) => o.value === values[field.id])) {
-          values[field.id] = shown[0].value;
-          select.value = shown[0].value;
+        const want = shown.some((o) => o.value === picked[field.id]) ? picked[field.id] : shown[0]?.value;
+        if (want !== undefined && want !== values[field.id]) {
+          values[field.id] = want;
+          select.value = want;
         }
         // One choice left is not a question; the row says what it will be.
         select.disabled = shown.length <= 1;
@@ -192,7 +201,7 @@ export function createFormDialog() {
   function select(field, changed) {
     const control = h('select', {
       class: 'fd-select', 'aria-label': field.label,
-      onchange: (e) => { values[field.id] = e.currentTarget.value; changed(); },
+      onchange: (e) => { values[field.id] = e.currentTarget.value; picked[field.id] = values[field.id]; changed(); },
     }, ...(field.options ?? []).map((option) => h('option', {
       value: option.id, dataset: { value: option.id },
     }, option.label)));

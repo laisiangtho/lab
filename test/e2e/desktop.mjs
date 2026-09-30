@@ -76,6 +76,14 @@ try {
   const info = await page.evaluate(() => window.lai?.appInfo());
   check('the shell rendered', await page.locator('.ribbon').count() === 1);
   check('it has something to show', await page.locator('.library-item, .verse').count() > 0);
+  // The guide is the one part loaded on demand, as a chunk of its own; a
+  // renderer whose loader or policy refused it would only show at first use.
+  await page.keyboard.press('Control+p');
+  await page.locator('.modal-input').fill('? getting started');
+  await page.waitForTimeout(300);
+  await page.keyboard.press('Enter');
+  const guide = await page.waitForSelector('.gd-card', { timeout: 15000 }).then(() => true, () => false);
+  check('a part loaded on demand loads (the guide)', guide);
   check('the preload bridge answers', Boolean(info?.version));
   check('nothing was logged', problems.length === 0, problems.join(' / '));
   console.log(`  ${info.name} ${info.version} · ${info.runtime} · ${info.platform}`);
