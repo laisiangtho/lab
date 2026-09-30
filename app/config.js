@@ -21,6 +21,12 @@ export const defaults = Object.freeze({
    */
   lexiconUrl: 'https://raw.githubusercontent.com/laisiangtho/bible/refs/heads/master/lexicon/strongs-{code}.json',
   /**
+   * The catalog repository's file list, and one file of it; {path} is
+   * substituted. The guide lists what is under guide/ and downloads it.
+   */
+  repoTreeUrl: 'https://api.github.com/repos/laisiangtho/bible/git/trees/master?recursive=1',
+  repoFileUrl: 'https://raw.githubusercontent.com/laisiangtho/bible/refs/heads/master/{path}',
+  /**
    * Where the web build is published. A link copied to a verse points here,
    * so a link made in the desktop app opens for somebody without it.
    */
@@ -37,6 +43,7 @@ export function resolveConfig(overrides = {}) {
   if (!config.translationUrl.includes('{identify}')) throw new Error('config: translationUrl must contain {identify}');
   if (!config.langPackUrl.includes('{code}')) throw new Error('config: langPackUrl must contain {code}');
   if (!config.lexiconUrl.includes('{code}')) throw new Error('config: lexiconUrl must contain {code}');
+  if (!config.repoFileUrl.includes('{path}')) throw new Error('config: repoFileUrl must contain {path}');
   if (!/^https:\/\/[^/]+\/.*$/.test(config.publicUrl) || !config.publicUrl.endsWith('/')) {
     throw new Error('config: publicUrl must be an https URL ending in /');
   }

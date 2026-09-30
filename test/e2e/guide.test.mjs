@@ -128,3 +128,59 @@ test('the guide on a phone keeps its field above the bar', options, async (t) =>
   assert.ok(field.y + field.height <= bar.y, `the field ends (${Math.round(field.y + field.height)}) above the bar (${Math.round(bar.y)})`);
   assert.deepEqual(app.problems, []);
 });
+
+test('the guide downloads more answers', options, async (t) => {
+  const app = await launch({ viewport: { width: 1280, height: 900 } });
+  const { page } = app;
+  t.after(() => app.close());
+  await app.open();
+  await firstRun(page);
+  await page.keyboard.press('Control+p');
+  await page.locator('.modal-input').fill('? who wrote psalms');
+  await page.waitForTimeout(250);
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.gd-x');
+
+  await t.test('the greeting offers more, and they come from the repository', async () => {
+    await page.locator('.gd-clear').click();
+    assert.match(await page.locator('.gd-more-status').innerText(), /can be downloaded/);
+    await page.locator('.gd-data-btn').click();
+    await page.waitForFunction(() => /topics downloaded/.test(document.querySelector('.gd-more-status')?.textContent ?? ''), null, { timeout: 15000 });
+    assert.ok(app.requests.some((url) => url.includes('api.github.com') && url.includes('/git/trees/')), 'the file list came from GitHub');
+    assert.ok(!app.requests.some((url) => url.endsWith('README.md')), 'Markdown is not fetched');
+    await page.locator('.gd-input').fill('who wrote psalms');
+    await page.keyboard.press('Enter');
+    const answer = page.locator('.gd-x').last().locator('.gd-card').first();
+    await answer.waitFor();
+    assert.match(await answer.locator('.gd-topic').innerText(), /psalms/i);
+    assert.equal(await answer.locator('.gd-t').innerText(), 'Who wrote Psalms?');
+  });
+
+  await t.test('a downloaded answer\'s button goes to its passage', async () => {
+    const answer = page.locator('.gd-x').last().locator('.gd-card').first();
+    await answer.locator('.gd-do').click();
+    await page.waitForTimeout(600);
+    assert.match(await page.locator('.tabstrip .tab.is-active').innerText(), /Psalm 23/);
+  });
+
+  await t.test('the greeting says what is held, and Settings removes it', async () => {
+    await page.locator('.gd-clear').click();
+    assert.match(await page.locator('.gd-more-status').innerText(), /2 topics downloaded, 3 questions/);
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('Settings');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.settings');
+    const row = page.locator('.set-row', { hasText: 'Downloaded answers' });
+    await row.scrollIntoViewIfNeeded();
+    await row.locator('button', { hasText: 'Remove' }).click();
+    await page.waitForTimeout(300);
+    const left = await page.evaluate(async () => {
+      const db = await new Promise((r) => { const q = indexedDB.open('lai-siangtho'); q.onsuccess = () => r(q.result); });
+      return new Promise((r) => { const q = db.transaction('guide').objectStore('guide').count(); q.onsuccess = () => r(q.result); });
+    });
+    assert.equal(left, 0);
+  });
+
+  await t.test('nothing went wrong on the way', () => assert.deepEqual(app.problems, []));
+});

@@ -16,7 +16,7 @@
  */
 
 const DB_NAME = 'lai-siangtho';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 const DIAGNOSTIC_LIMIT = 400;
 
 /**
@@ -44,6 +44,10 @@ export async function openStore({ name = DB_NAME, onLost = null } = {}) {
       // A lexicon is megabytes, so it gets a store of its own rather than a
       // place in `records`, which is read whole at startup. Added in v5.
       if (!d.objectStoreNames.contains('lexicon')) d.createObjectStore('lexicon', { keyPath: 'id' });
+      // Downloaded guide answers, one row per file, keyed by its path in the
+      // catalog repository. Not in `records`: those travel in every settings
+      // export, and these are the catalog's, fetched again at will. Added in v6.
+      if (!d.objectStoreNames.contains('guide')) d.createObjectStore('guide', { keyPath: 'path' });
     };
     req.onblocked = () => reject(new Error('Another window of this app is open with an older version of its storage. Close the other windows and reload.'));
     req.onsuccess = () => resolve(req.result);
@@ -166,6 +170,26 @@ class TranslationStore {
     const all = await request(this.#tx('lexicon').objectStore('lexicon').getAll());
     return all.map(({ id, entries, bytes, fetchedAt }) => (
       { id, count: Object.keys(entries ?? {}).length, bytes: bytes ?? 0, fetchedAt }));
+  }
+
+  /** Every downloaded guide file: { path, sha, lang, topic, entries, modified, fetchedAt }. */
+  async guideFiles() {
+    return request(this.#tx('guide').objectStore('guide').getAll());
+  }
+
+  /** Put these guide files and take those paths away, in one transaction. */
+  async changeGuideFiles({ put = [], remove = [] } = {}) {
+    const tx = this.#tx('guide', 'readwrite');
+    const files = tx.objectStore('guide');
+    for (const row of put) files.put(row);
+    for (const path of remove) files.delete(path);
+    await done(tx);
+  }
+
+  async clearGuideFiles() {
+    const tx = this.#tx('guide', 'readwrite');
+    tx.objectStore('guide').clear();
+    await done(tx);
   }
 
   async removeLexicon(id) {

@@ -18,7 +18,9 @@ export const basePolicy = Object.freeze({
   'script-src': ["'self'"],
   'style-src': ["'self'"],
   'img-src': ["'self'", 'data:'],
-  'connect-src': ["'self'", 'https://raw.githubusercontent.com'],
+  // The catalog and its files, and GitHub's list of them (the guide's data
+  // has no index of its own; see app/core/guidedata.js).
+  'connect-src': ["'self'", 'https://raw.githubusercontent.com', 'https://api.github.com'],
   'worker-src': ["'self'"],
   'object-src': ["'none'"],
   'base-uri': ["'none'"],

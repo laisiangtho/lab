@@ -19,6 +19,7 @@
  * Settings → Study.
  */
 
+import { createGuideData } from '../../services/guidedata.js';
 import { L } from '../../shell/i18n.js';
 
 export const GUIDE_KEY = 'guide';
@@ -27,6 +28,7 @@ export default {
   id: 'guide',
   setup(ctx) {
     const { registry, records, shell } = ctx;
+    const guideData = createGuideData({ store: ctx.store, config: ctx.config });
     /** The mounted pane's `ask`, once there is one; questions wait for it. */
     let live = null;
     const waiting = [];
@@ -50,7 +52,7 @@ export default {
         el.classList.add('guide-host');
         import('./pane.js').then(({ mountGuide }) => {
           if (disposed) return;
-          const pane = mountGuide(el, ctx);
+          const pane = mountGuide(el, ctx, { guideData });
           dispose = pane.dispose;
           live = pane;
           while (waiting.length) pane.ask(waiting.shift());
@@ -69,6 +71,22 @@ export default {
       title: L('guide.verb'),
       hint: L('guide.verbHint'),
       run: (text) => openWith(text),
+    });
+
+    registry.setting({
+      id: 'guide.data',
+      section: 'study',
+      order: 91,
+      build: (ui) => ui.action({
+        name: L('guide.data.set'),
+        hint: L('guide.data.setHint'),
+        label: L('guide.data.remove'),
+        glyph: 'trash',
+        onClick: async () => {
+          await guideData.clear();
+          shell.notify(L('guide.data.removed'), 'ok');
+        },
+      }),
     });
 
     registry.setting({

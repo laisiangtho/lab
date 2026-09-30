@@ -101,9 +101,12 @@ export function tokens(text) {
 }
 
 /**
- * @typedef {{ id: string, title: string, text?: string, phrases?: string[], prior?: number }} Entry
+ * @typedef {{ id: string, title: string, text?: string, phrases?: string[], prior?: number, must?: string[] }} Entry
  *          `prior` scales an entry's score: a topic written for the guide is a
  *          better answer than a command whose only text is its name.
+ *          `must` is terms a question has to contain for the entry to be a
+ *          full answer to it — the "3" of 3 John: asked "what is John about",
+ *          the shorter 3 John otherwise outscored John on the same word.
  */
 
 /**
@@ -173,7 +176,8 @@ export function ask(index, question, { memory = null, limit = 3 } = {}) {
   const boost = memory ? learnedBoost(memory, terms) : new Map();
   const ranked = [];
   for (const doc of index.docs) {
-    const base = (scores.get(doc) ?? 0) * (doc.entry.prior ?? 1);
+    const missing = (doc.entry.must ?? []).some((term) => !terms.includes(term));
+    const base = (scores.get(doc) ?? 0) * (doc.entry.prior ?? 1) * (missing ? 0.5 : 1);
     const extra = boost.get(doc.entry.id) ?? 0;
     const score = base + extra;
     if (score >= MIN_SCORE) ranked.push({ entry: doc.entry, score, learned: extra > 0 });

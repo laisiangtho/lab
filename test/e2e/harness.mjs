@@ -112,6 +112,17 @@ export async function launch(options = {}) {
     return route.fulfill({ status: 200, headers, body: JSON.stringify(body) });
   });
 
+  // GitHub's list of the catalog repository's files, which the guide reads to
+  // find its downloadable answers. Answered from the fixtures, like the rest.
+  await context.route('https://api.github.com/**', async (route) => {
+    const url = route.request().url();
+    requests.push(url);
+    const headers = { 'access-control-allow-origin': '*', 'content-type': 'application/json' };
+    const body = data.forUrl(url);
+    if (body === null) return route.fulfill({ status: 404, headers, body: '{}' });
+    return route.fulfill({ status: 200, headers, body: JSON.stringify(body) });
+  });
+
   const page = await context.newPage();
   const problems = [];
   const missing = [];
@@ -196,12 +207,34 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
     dan: pack('dan', { 1: 'Det Gamle Testamente', 2: 'Det Nye Testamente' }, { 1: 'Første Mosebog' }, []),
   };
 
+  /** Downloadable guide answers, as the catalog repository will hold them. */
+  const faq = (name, questions) => ({
+    '@context': 'https://schema.org', '@type': 'FAQPage', name, inLanguage: 'en',
+    mainEntity: questions.map(([q, a, target]) => ({
+      '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a },
+      ...(target ? { potentialAction: { '@type': 'Action', target } } : {}),
+    })),
+  });
+  const guide = {
+    'guide/README.md': null,
+    'guide/en/books/19-psalms.json': faq('Psalms', [
+      ['Who wrote Psalms?', 'Many writers; about half are headed "of David".', 'laisiangtho:passage/19/23'],
+      ['What is Psalms about?', 'Israel\'s book of prayer and song.', 'laisiangtho:passage/19/1'],
+    ]),
+    'guide/en/help/search.json': faq('Search', [['How do I search only one testament?', 'Choose where in the scope under the field.', 'laisiangtho:command/search.open']]),
+  };
+
   return {
     catalog,
     translations,
     packs,
     /** What the app would get from the catalog repository for this URL. */
     forUrl(url) {
+      if (url.includes('api.github.com/') && url.includes('/git/trees/')) {
+        return { truncated: false, tree: Object.keys(guide).map((path) => ({ path, type: 'blob', sha: `sha-${path}`, size: 100 })) };
+      }
+      const guideFile = url.match(/\/master\/(guide\/.+)$/);
+      if (guideFile) return guide[decodeURIComponent(guideFile[1])] ?? null;
       if (url.endsWith('/book.json')) return catalog;
       const pack = url.match(/lang\/iso-([a-z]{3})\.json$/);
       if (pack) return packs[pack[1]] ?? null;

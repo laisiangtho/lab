@@ -16,7 +16,7 @@ import { ask, createIndex, learn, readMemory } from '../../core/guide.js';
 import { fill, h } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { keyLabel } from '../../shell/keys.js';
-import { hasString, L, stringKeys } from '../../shell/i18n.js';
+import { currentLocale, hasString, L, stringKeys } from '../../shell/i18n.js';
 import { GUIDE_KEY } from './index.js';
 
 /**
@@ -76,12 +76,51 @@ const COMMAND_TEXT = Object.freeze({
 /** The first questions offered, before anything has been asked. */
 const STARTERS = Object.freeze(['start', 'offline', 'search', 'note']);
 
-export function mountGuide(el, ctx) {
+export function mountGuide(el, ctx, { guideData }) {
   const { records, registry, shell } = ctx;
-  const entries = gather(ctx);
-  const index = createIndex(entries);
-  const byId = new Map(entries.map((entry) => [entry.id, entry]));
+  const builtIn = gather(ctx);
+  let entries = builtIn;
+  let index = createIndex(entries);
+  let byId = new Map(entries.map((entry) => [entry.id, entry]));
   let memory = readMemory(records.get(GUIDE_KEY, null));
+  /** What has been downloaded: topics and questions, for the line under the greeting. */
+  let downloaded = { topics: 0, questions: 0 };
+  let busy = false;
+
+  /** The built-in answers and the downloaded ones, as one index. */
+  async function rebuild() {
+    const files = await guideData.held();
+    const extra = downloadedEntries(files, currentLocale());
+    entries = [...builtIn, ...extra.entries];
+    index = createIndex(entries);
+    byId = new Map(entries.map((entry) => [entry.id, entry]));
+    downloaded = { topics: extra.topics, questions: extra.entries.length };
+  }
+
+  /** Download, or bring up to date, the answers for this language (and English). */
+  async function fetchMore() {
+    if (busy) return;
+    busy = true;
+    const status = log.querySelector('.gd-more-status');
+    const say = (text) => { if (status) status.textContent = text; };
+    say(L('guide.data.checking'));
+    try {
+      const langs = [...new Set([currentLocale(), 'en'])];
+      const result = await guideData.update(langs, ({ done, total }) => { if (total) say(L('guide.data.progress', { n: done, of: total })); });
+      await rebuild();
+      const changed = result.added + result.updated + result.removed;
+      shell.notify(changed ? L('guide.data.done', { n: downloaded.topics }) : L('guide.data.current'), 'ok');
+      if (result.failed.length) {
+        const shown = result.failed.slice(0, 3).map((f) => f.message).join(' · ');
+        shell.notify(L('guide.data.failed', { n: result.failed.length, list: shown }), 'error');
+      }
+    } catch (err) {
+      shell.notify(L('guide.data.error', { why: err.message }), 'error');
+    } finally {
+      busy = false;
+      if (!exchanges) paintHello();
+    }
+  }
 
   const log = h('div', { class: 'gd-log', role: 'log', 'aria-live': 'polite' });
   const input = h('textarea', {
@@ -129,7 +168,19 @@ export function mountGuide(el, ctx) {
       h('div', { class: 'gd-starters' }, starters.map((entry) => h('button', {
         type: 'button', class: 'gd-starter',
         onclick: () => answer(entry.title, entry.id),
-      }, entry.title)))));
+      }, entry.title))),
+      moreLine()));
+  }
+
+  /** How many answers have been downloaded, and the button that gets more. */
+  function moreLine() {
+    const has = downloaded.topics > 0;
+    return h('div', { class: 'gd-data' },
+      h('span', { class: 'gd-more-status' }, has
+        ? L('guide.data.held', { n: downloaded.topics, q: downloaded.questions })
+        : L('guide.data.none')),
+      h('button', { type: 'button', class: 'gd-data-btn', disabled: busy, onclick: () => fetchMore() },
+        icon(has ? 'sync' : 'download'), has ? L('guide.data.update') : L('guide.data.get')));
   }
 
   /**
@@ -189,6 +240,8 @@ export function mountGuide(el, ctx) {
       }, L('guide.notThis')));
     acts.append(h('span', { class: 'spacer' }), feedback);
     return h('article', { class: 'gd-card', dataset: { entry: entry.id } },
+      entry.topic ? h('p', { class: 'gd-topic' }, entry.topic,
+        entry.lang && entry.lang !== currentLocale() ? h('span', { class: 'gd-lang' }, entry.lang.toUpperCase()) : null) : null,
       h('h3', { class: 'gd-t' }, entry.title, keys.length ? h('span', { class: 'gd-keys' }, ...keys) : null),
       entry.text ? h('p', { class: 'gd-a' }, entry.text) : null,
       learned ? h('p', { class: 'gd-learned' }, L('guide.learned')) : null,
@@ -217,6 +270,9 @@ export function mountGuide(el, ctx) {
         find ? h('button', {
           type: 'button', class: 'btn soft gd-do', onclick: () => find.run(question),
         }, icon('search'), L('guide.searchBible', { q: question })) : null,
+        downloaded.topics ? null : h('button', {
+          type: 'button', class: 'btn gd-do', onclick: () => fetchMore().then(() => answer(question)),
+        }, icon('download'), L('guide.data.get')),
         h('button', { type: 'button', class: 'btn gd-do', onclick: () => shell.openDoc('help') }, icon('help'), L('doc.help'))));
   }
 
@@ -232,9 +288,21 @@ export function mountGuide(el, ctx) {
       return { glyph: 'arrow-right', label: L('guide.open'), run: () => shell.openDoc(does.doc) };
     }
     if (does.pane) {
-      const [side, id] = does.pane;
-      if (!registry.panes().some((p) => p.id === id)) return null;
-      return { glyph: 'arrow-right', label: L('guide.open'), run: () => shell.selectPane(side, id) };
+      // A topic written here names its side; a downloaded one names only the
+      // pane, and the pane's own registration says where it lives.
+      const id = Array.isArray(does.pane) ? does.pane[1] : does.pane;
+      const pane = registry.panes().find((p) => p.id === id);
+      if (!pane) return null;
+      return { glyph: 'arrow-right', label: L('guide.open'), run: () => shell.selectPane(pane.side, id) };
+    }
+    if (does.passage) {
+      const { book, chapter, verse } = does.passage;
+      const where = shell.workspace;
+      const name = `${where.bookName(book)} ${where.number(chapter)}${verse ? `:${where.number(verse)}` : ''}`;
+      return {
+        glyph: 'book-open', label: L('guide.goTo', { where: name }),
+        run: () => (verse ? shell.openVerse(book, chapter, verse) : shell.openChapter(book, chapter)),
+      };
     }
     if (does.palette) {
       return { glyph: 'cmd', label: L('guide.tryIt'), run: () => shell.openPaletteWith(does.palette) };
@@ -247,9 +315,30 @@ export function mountGuide(el, ctx) {
     records.save(GUIDE_KEY, memory).catch((err) => shell.notify(err.message, 'error'));
   }
 
+  // The downloaded answers join once they are read, a moment after the pane
+  // opens; the greeting is drawn again only if nothing has been asked yet.
+  rebuild().then(() => { if (!exchanges) paintHello(); }).catch((err) => shell.notify(L('guide.data.error', { why: err.message }), 'error'));
+
   return {
     ask: (question) => { answer(question); },
     dispose: () => {},
+  };
+}
+
+/**
+ * Downloaded answers in the interface language, and in English for a topic
+ * nobody has written in it yet — shown as English, not passed off as a
+ * translation. A topic is its path under the language folder.
+ */
+function downloadedEntries(files, locale) {
+  const topicOf = (path) => path.split('/').slice(2).join('/');
+  const mine = files.filter((file) => file.lang === locale);
+  const covered = new Set(mine.map((file) => topicOf(file.path)));
+  const english = locale === 'en' ? [] : files.filter((file) => file.lang === 'en' && !covered.has(topicOf(file.path)));
+  const chosen = [...mine, ...english];
+  return {
+    topics: chosen.length,
+    entries: chosen.flatMap((file) => file.entries.map((entry) => ({ ...entry, prior: 1.2 }))),
   };
 }
 
