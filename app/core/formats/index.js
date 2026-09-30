@@ -26,6 +26,7 @@
 import { fromDelimited, sniffDelimiter } from './csv.js';
 import { fromUsfm } from './usfm.js';
 import { fromXml, sniffXml } from './xml.js';
+import { directionOf, languageName } from '../langcode.js';
 
 /**
  * @typedef {{ id: string, ext: string[],
@@ -154,14 +155,23 @@ export function describe(text, format, name = '') {
     out.identify = (/\\id\s+([A-Z0-9]{3})/i.exec(head)?.[1] ?? '').toLowerCase();
     out.name = /\\(?:toc1|h)\s+(.+)/i.exec(head)?.[1]?.trim() ?? '';
   } else if (format === 'xml') {
-    out.name = attr(head, 'biblename') || attr(head, 'title') || '';
+    // Zefania names itself in an attribute; OSIS and USFX in a <title> in the
+    // header (OSIS: <work><title>), which is the first title in the file.
+    out.name = attr(head, 'biblename') || element(head, 'title') || attr(head, 'title') || '';
     out.identify = (attr(head, 'osisidwork') || attr(head, 'id') || '').toLowerCase();
-    out.language = attr(head, 'xml:lang') || attr(head, 'lang') || '';
+    out.language = attr(head, 'xml:lang') || attr(head, 'lang') || element(head, 'language') || '';
   }
   out.identify = slug(out.identify || name);
   out.name = out.name || '';
   return out;
 }
+
+/** The text of the first `<tag>` in the head, entities decoded, on one line. */
+const element = (head, tag) => {
+  const found = new RegExp(`<${tag}(?:\\s[^>]*)?>([^<]+)</${tag}>`, 'i').exec(head)?.[1] ?? '';
+  return found.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/\s+/g, ' ').trim();
+};
 
 const attr = (head, key) => new RegExp(`${key}\\s*=\\s*["']([^"']+)["']`, 'i').exec(head)?.[1] ?? '';
 
@@ -252,11 +262,14 @@ function languageOf(fromFile, fromReader) {
   const code = String(fromReader ?? given.code ?? given.name ?? (typeof fromFile === 'string' ? fromFile : '')).trim();
   const short = code.length === 2 ? code : '';
   const long = code.length === 3 ? code : '';
+  // A direction the file states is kept; otherwise it follows the language,
+  // since no OSIS, USFM or Zefania file says which way it is written.
+  const stated = given.textdirection === 'rtl' || given.textdirection === 'ltr' ? given.textdirection : null;
   return {
-    text: String(given.text ?? '').trim() || code || 'Unknown',
+    text: String(given.text ?? '').trim() || (code ? languageName(code, 'en') : '') || 'Unknown',
     name: long || String(given.name ?? '').trim() || code || 'und',
     iso: { '639-1': short || (given.iso?.['639-1'] ?? ''), '639-3': long || (given.iso?.['639-3'] ?? '') },
-    textdirection: given.textdirection === 'rtl' ? 'rtl' : 'ltr',
+    textdirection: stated ?? directionOf(code),
   };
 }
 

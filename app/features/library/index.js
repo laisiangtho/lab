@@ -125,6 +125,8 @@ export default {
       }
       const best = guesses[0].id;
       const found = describe(file.text, best, file.name);
+      /** The format the boxes were last filled for. */
+      let describedAs = best;
 
       const answers = await shell.form({
         title: L('imp.title'),
@@ -149,7 +151,12 @@ export default {
         ],
         // Choosing a different format re-reads the file for what that format
         // says about itself, so the boxes agree with the answer above them.
+        // Only then: this runs after every answer, and re-reading on a
+        // keystroke put the file's guess back over what was being typed —
+        // the boxes looked disabled.
         onChange: (values, set) => {
+          if (values.format === describedAs) return;
+          describedAs = values.format;
           const again = describe(file.text, values.format, file.name);
           set('name', again.name);
           set('identify', again.identify);
@@ -568,6 +575,14 @@ export default {
         ?? null;
     }
 
+    /** "BHS · Biblia hebraica", from what is stored, for a row with no catalog entry. */
+    function ownTitle(row) {
+      const info = row.held?.info;
+      if (!info?.name) return row.identify;
+      const short = info.shortname && info.shortname.toLowerCase() !== info.name.toLowerCase() ? info.shortname : '';
+      return short ? `${short} · ${info.name}` : info.name;
+    }
+
     /** What a stored translation was imported from, named. */
     const formatName = (id) => (FORMATS.some((f) => f.id === id) ? L(`imp.fmt.${id}`) : L('lib.offline'));
 
@@ -760,7 +775,10 @@ export default {
           }[row.state];
           return h('li', { class: `library-item state-${row.state}`, dataset: { identify: row.identify } },
             h('div', { class: 'library-meta' },
-              h('strong', {}, e ? `${e.shortname} · ${e.name}` : row.identify),
+              // A translation of the reader's own has no catalog entry, but it
+              // has the name they gave it: showing its identify instead made
+              // an import look as if the name had been lost.
+              h('strong', {}, e ? `${e.shortname} · ${e.name}` : ownTitle(row)),
               h('span', { class: 'muted' }, e
                 ? [e.year, e.publisher].filter(Boolean).join(' · ')
                 : L(row.state === 'local' ? 'lib.yours' : 'lib.unlisted')),

@@ -131,3 +131,32 @@ export function languageName(code, locale = undefined) {
     return base;
   }
 }
+
+/**
+ * Languages written right to left, by two-letter code where one exists. What
+ * `Intl.Locale#getTextInfo` answers where it is available; this list is for
+ * where it is not, and for the three-letter codes it does not know.
+ */
+const RTL = new Set(['ar', 'he', 'iw', 'fa', 'ur', 'yi', 'ps', 'dv', 'sd', 'ug', 'ckb', 'syr', 'arc', 'sam', 'nqo', 'rhg']);
+
+/**
+ * Which way a language is written, from its code. A file that says nothing
+ * about direction — every OSIS, USFM and Zefania file — would otherwise have
+ * Hebrew and Arabic laid out left to right.
+ *
+ * @returns {'rtl'|'ltr'}
+ */
+export function directionOf(code) {
+  const base = baseCode(code);
+  if (!base) return 'ltr';
+  const tag = twoLetter(base) ?? base;
+  if (RTL.has(tag) || RTL.has(base)) return 'rtl';
+  try {
+    const locale = new Intl.Locale(tag);
+    const info = typeof locale.getTextInfo === 'function' ? locale.getTextInfo() : locale.textInfo;
+    if (info?.direction === 'rtl') return 'rtl';
+  } catch {
+    // An unknown code is written left to right as far as anyone here knows.
+  }
+  return 'ltr';
+}
