@@ -1548,3 +1548,109 @@ label.set-row:hover { background: var(--bg-hover); }
 @media (max-width: 760px) {
   .gd-foot { margin-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* ---- one verse in every translation --------------------------------------*/
+/* A sheet like the windows: one surface, a soft frame. Each translation is a
+   row — its short name, then its text in its own script and direction — so
+   the eye runs down the differences rather than across chrome. */
+.cmp-scrim { place-items: center; padding-top: 0; }
+.cmp {
+  width: min(640px, calc(100vw - 32px)); max-height: min(78vh, 760px);
+  display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 12px; background: var(--bg-elevated);
+  box-shadow: var(--win-ring), var(--win-shadow); animation: win-in .16s ease-out;
+}
+.cmp-head { display: flex; align-items: center; gap: 4px; padding: 10px 10px 10px 12px; border-bottom: 1px solid var(--border); }
+.cmp-title { margin: 0 4px; font-size: var(--fs-ui-l); font-weight: 650; color: var(--text-normal); font-variant-numeric: tabular-nums; }
+.cmp-step, .cmp-close, .cmp-act {
+  width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+  color: var(--text-faint); transition: background var(--speed), color var(--speed);
+}
+.cmp-step:hover, .cmp-close:hover, .cmp-act:hover { background: var(--bg-hover); color: var(--text-normal); }
+.cmp-prev svg { transform: rotate(180deg); }
+.cmp svg { width: 15px; height: 15px; }
+.cmp-list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 0; user-select: text; }
+.cmp-row { padding: 10px 16px 12px; }
+.cmp-row + .cmp-row { border-top: 1px solid var(--border); }
+.cmp-meta { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.cmp-short {
+  flex: 0 0 auto; padding: 1px 8px; border-radius: 99px; background: var(--accent-fade);
+  color: var(--accent-2); font-size: 11px; font-weight: 650; letter-spacing: .02em;
+}
+.cmp-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-ui-s); color: var(--text-faint); }
+.cmp-span { flex: 0 0 auto; font-size: 11px; color: var(--c-orange); }
+.cmp-meta .spacer { flex: 1; }
+.cmp-act { opacity: .55; }
+.cmp-row:hover .cmp-act, .cmp-act:focus-visible { opacity: 1; }
+.cmp-text { margin: 4px 0 0; font-family: var(--font-text); font-size: 17px; line-height: 1.6; color: var(--text-normal); unicode-bidi: plaintext; }
+.cmp-text:lang(my) { line-height: 2; }
+.cmp-missing { font-family: var(--font-ui); font-size: var(--fs-ui-s); color: var(--text-faint); font-style: italic; }
+.cmp-foot { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }
+.cmp-count { flex: 1; font-size: var(--fs-ui-s); color: var(--text-faint); }
+@media (hover: none) { .cmp-act { opacity: 1; width: 36px; height: 36px; } .cmp-step, .cmp-close { width: 38px; height: 38px; } }
+@media (max-width: 560px) {
+  .cmp-scrim { place-items: end center; }
+  .cmp { width: 100vw; max-height: 86vh; border-radius: 14px 14px 0 0; }
+  .cmp-foot { padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ---- memory verses -------------------------------------------------------*/
+/* A list like the Library's, and a practice that is one card in the middle of
+   the page: the reference, the verse with its gaps, and three verdicts. */
+.mem-start { margin: 4px 0 18px; }
+.mem-start svg { width: 14px; height: 14px; }
+.mem-rest { margin: 4px 0 18px; font-size: var(--fs-ui-s); color: var(--text-faint); }
+.mem-list { display: flex; flex-direction: column; border-radius: var(--radius-l); background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--border); overflow: hidden; }
+.mem-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 14px; }
+.mem-row + .mem-row { border-top: 1px solid var(--border); }
+.mem-open { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: start; }
+.mem-ref { font-size: var(--fs-ui-m); font-weight: 600; color: var(--text-normal); }
+.mem-text { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-ui-s); color: var(--text-faint); }
+.mem-box { display: inline-flex; gap: 3px; flex: 0 0 auto; }
+.mem-box i { width: 6px; height: 6px; border-radius: 50%; background: var(--base-25); }
+.mem-box i.on { background: var(--accent); }
+.mem-due { flex: 0 0 auto; min-width: 72px; text-align: end; font-size: var(--fs-ui-s); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.mem-remove { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--text-faint); opacity: .6; }
+.mem-remove:hover { opacity: 1; background: var(--bg-hover); color: var(--text-normal); }
+.mem-remove svg { width: 13px; height: 13px; }
+@media (max-width: 560px) { .mem-box { display: none; } .mem-due { min-width: 0; } }
+
+.mem-practice { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.mem-progress { display: flex; align-items: center; font-size: var(--fs-ui-s); color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.mem-progress .spacer { flex: 1; }
+.mem-quit { padding: 4px 8px; border-radius: 6px; color: var(--text-faint); font-size: var(--fs-ui-s); }
+.mem-quit:hover { background: var(--bg-hover); color: var(--text-normal); }
+.mem-card {
+  padding: 26px 28px 30px; border-radius: 14px; background: var(--bg-elevated);
+  box-shadow: var(--win-ring), var(--win-shadow-back);
+}
+.mem-card-ref { margin-bottom: 12px; font-size: var(--fs-ui-s); font-weight: 650; letter-spacing: .03em; text-transform: uppercase; color: var(--accent-2); }
+.mem-verse { margin: 0; font-family: var(--font-text); font-size: 22px; line-height: 1.75; color: var(--text-normal); unicode-bidi: plaintext; }
+.mem-verse:lang(my) { line-height: 2.2; font-size: 20px; }
+/* A gap the width of its word, drawn as a rule under where the word goes;
+   the first letter shows in it once the verse is well on the way. */
+.mem-gap {
+  display: inline-block; min-width: var(--w, 3ch); padding: 0 1px; margin: 0 1px;
+  border-bottom: 2px solid var(--accent-line); border-radius: 0; color: var(--accent-2);
+  font: inherit; line-height: 1.2; text-align: start; vertical-align: baseline; cursor: pointer;
+}
+.mem-gap:hover { background: var(--accent-fade); }
+.mem-peeked { color: var(--accent-2); }
+.mem-missing { font-family: var(--font-ui); font-size: var(--fs-ui-m); color: var(--text-faint); }
+.mem-grades { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.mem-grades .btn { min-width: 110px; justify-content: center; }
+.mem-again:hover { color: var(--c-red); }
+.mem-good { background: var(--accent); color: #fff; box-shadow: none; }
+.mem-good:hover { background: var(--accent-1); }
+.mem-finished { align-items: center; text-align: center; padding-top: 10vh; }
+.mem-finished h2 { margin: 0; font-size: var(--fs-ui-l); color: var(--text-normal); }
+.mem-done-mark { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-fade); color: var(--accent-2); }
+.mem-done-mark svg { width: 22px; height: 22px; }
+@media (max-width: 560px) { .mem-card { padding: 20px 18px 24px; } .mem-verse { font-size: 19px; } .mem-grades .btn { flex: 1; min-width: 0; } }
+
+/* ---- reading streak, in the Plan pane --------------------------------------*/
+.reading-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 10px 6px; text-align: center; }
+.rs-fig { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; }
+.rs-fig b { font-size: 18px; font-weight: 700; color: var(--text-normal); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.rs-fig span { max-width: 100%; font-size: 10.5px; line-height: 1.3; color: var(--text-faint); overflow-wrap: anywhere; }
+.reading-stats.is-today .rs-fig:first-child b { color: var(--accent-2); }

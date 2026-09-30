@@ -7,12 +7,21 @@
  */
 
 import { chapterKey, dailyVerse, localDate, parseChapterKey, planChapters, planState, PLANS } from '../../core/plans.js';
+import { logRead, readingStats, readLog } from '../../core/reading.js';
 import { h } from '../../shell/dom.js';
 import { wantsNewTab } from '../../shell/reflink.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
 
 const KEY = 'plan';
+/** The reading log (`core/reading.js`): days read, and every chapter ever read. */
+const LOG = 'reading';
+/**
+ * How long a chapter stays in front of the reader before it counts as read.
+ * Long enough that passing through on the way somewhere else does not count,
+ * short enough that a psalm does.
+ */
+const DWELL_MS = 30 * 1000;
 
 export default {
   id: 'plans',
@@ -40,7 +49,35 @@ export default {
       if (on) read[key] = Date.now();
       else delete read[key];
       await records.save(KEY, { ...held, read });
+      if (on) await logChapter(key);
     }
+
+    async function logChapter(key) {
+      const log = readLog(records.get(LOG, null));
+      const next = logRead(log, key, localDate());
+      if (next !== log) await records.save(LOG, next);
+    }
+
+    // A chapter left in front of the reader for half a minute, with the window
+    // on screen, is a chapter read. The timer starts again on every move.
+    let dwell = null;
+    let watching = null;
+    const watch = () => {
+      const { book, chapter } = state.get();
+      const key = chapterKey(book, chapter);
+      if (key === watching) return;
+      watching = key;
+      clearTimeout(dwell);
+      dwell = setTimeout(() => {
+        const now = state.get();
+        const onChapter = shell.workspace?.activeTab?.kind === 'chapter';
+        if (document.hidden || !onChapter || chapterKey(now.book, now.chapter) !== key) { watching = null; return; }
+        logChapter(key).catch((err) => shell.notify(err.message, 'error'));
+      }, DWELL_MS);
+    };
+    state.subscribe(watch);
+    shell.whenReady(watch);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { watching = null; watch(); } });
 
     /** The chapter in view, marked read — only when the plan covers it. */
     async function markCurrent() {
@@ -142,6 +179,19 @@ export default {
           ];
         }
 
+        /** The streak, the week and the whole, in one line of three figures. */
+        function statsCard() {
+          const total = category.books.reduce((n, book) => n + book.chapters, 0);
+          const s = readingStats(readLog(records.get(LOG, null)), localDate(), total);
+          const figure = (value, label, hint) => h('div', { class: 'rs-fig', title: hint },
+            h('b', {}, value), h('span', {}, label));
+          const percent = s.share > 0 && s.share < 0.01 ? '<1%' : `${Math.round(s.share * 100)}%`;
+          return h('div', { class: `card reading-stats${s.readToday ? ' is-today' : ''}` },
+            figure(String(s.streak), L('rs.streak', { n: s.streak }), L('rs.streakHint', { longest: s.longest })),
+            figure(String(s.week), L('rs.week', { n: s.week }), L('rs.weekHint')),
+            figure(percent, L('rs.bible'), L('rs.bibleHint', { n: s.read, of: total })));
+        }
+
         async function paint() {
           const run = ++token;
           const daily = await dailyCard();
@@ -154,6 +204,7 @@ export default {
               class: 'plan-continue',
               onclick: (e) => shell.openChapter(book, chapter, { newTab: wantsNewTab(e) }),
             }, icon('book-open'), h('span', {}, L('plan.continue')), h('b', {}, ref(book, chapter))),
+            statsCard(),
             ...(st ? [planCard(st)] : picker()));
         }
 

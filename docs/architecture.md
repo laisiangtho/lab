@@ -590,6 +590,38 @@ in every interface language.
   first needs pack formats and hosting, the second needs a network and trust
   the rest of the app does not ask for.
 
+## 3d-xi. Compare, verse links, memory verses, the reading log
+
+Four small features, each a pure core with its surface in a feature.
+
+- **Compare** (`features/compare`). `verseAt(verses, n)` in `core/align.js`
+  finds the verse that carries verse *n* in one translation — itself, or the
+  one whose merge runs over it. The dialog reads one chapter per translation
+  and keeps it while open, so stepping through a passage reads nothing twice.
+  Stepping crosses chapter ends using the highest verse any translation here
+  carries, falling back to the canon's count.
+- **Verse links.** The address is `#/book/chapter[/verse[-to]]`. `syncHash`
+  keeps a verse part while its chapter is the one open; a link is revealed
+  only after the saved tabs are restored (`tabsRestored`), since restoring
+  would otherwise replace it. `shell.passageLink` writes this page's own
+  address on the web and `config.publicUrl` elsewhere, so a link made in the
+  desktop app opens for somebody without it.
+- **Memory verses** (`core/memory.js`, `features/memory`). Leitner boxes with
+  intervals 0, 1, 3, 7, 14, 30, 90 days, due at local midnight; Hard keeps the
+  box at half the interval, Again returns to box 0 in ten minutes and comes
+  back in the same practice. The box sets how much is hidden (a third, half,
+  initials, all), chosen by a sequence seeded with the card's id so a verse is
+  hidden the same way each day. Words split on spaces with punctuation kept in
+  sight; a Myanmar run is cut into syllables (a consonant begins one unless
+  stacked after ္ or killed by ်). Cards are the feature record `memory`,
+  read defensively.
+- **Reading log** (`core/reading.js`, used by `features/plans`). Days read
+  (the last 400) and every chapter ever read with its first day. A chapter
+  counts after 30 s in front of the reader with the page visible, or when
+  ticked in a plan. The streak counts back from today, or from yesterday while
+  today is still unread, so it breaks only when a whole day is missed. The
+  record is `reading`.
+
 ## 3e. Search
 
 No index is built at install time; the scan reads `chapters` in pages, in a worker.

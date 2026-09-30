@@ -46,6 +46,19 @@ export default {
       },
     });
 
+    registry.verseAction({
+      id: 'bookmarks.link',
+      title: L('cmd.copyLink'),
+      icon: 'link',
+      // An address that opens on this verse, for a message or a page: it opens
+      // the web build for somebody without the app.
+      run: async (p) => {
+        const link = shell.passageLink(p);
+        await navigator.clipboard.writeText(link);
+        shell.notify(L('msg.linkCopied'));
+      },
+    });
+
     registry.verb({
       id: 'bookmarks.verb',
       word: 'mark',

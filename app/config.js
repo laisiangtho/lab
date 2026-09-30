@@ -20,6 +20,11 @@ export const defaults = Object.freeze({
    * belongs to — a reader of the Hebrew never downloads the Greek.
    */
   lexiconUrl: 'https://raw.githubusercontent.com/laisiangtho/bible/refs/heads/master/lexicon/strongs-{code}.json',
+  /**
+   * Where the web build is published. A link copied to a verse points here,
+   * so a link made in the desktop app opens for somebody without it.
+   */
+  publicUrl: 'https://laisiangtho.github.io/',
   /** Minimum hours between automatic catalog checks; 0 disables automatic checks. */
   updateCheckHours: 24,
 });
@@ -32,6 +37,9 @@ export function resolveConfig(overrides = {}) {
   if (!config.translationUrl.includes('{identify}')) throw new Error('config: translationUrl must contain {identify}');
   if (!config.langPackUrl.includes('{code}')) throw new Error('config: langPackUrl must contain {code}');
   if (!config.lexiconUrl.includes('{code}')) throw new Error('config: lexiconUrl must contain {code}');
+  if (!/^https:\/\/[^/]+\/.*$/.test(config.publicUrl) || !config.publicUrl.endsWith('/')) {
+    throw new Error('config: publicUrl must be an https URL ending in /');
+  }
   if (!Number.isFinite(config.updateCheckHours) || config.updateCheckHours < 0) {
     throw new Error('config: updateCheckHours must be a non-negative number');
   }

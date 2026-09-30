@@ -58,3 +58,21 @@ export function alignChapter(columns) {
 export function verseLabel(key, verse) {
   return verse.merge ? `${key}–${verse.merge}` : String(key);
 }
+
+/**
+ * The verse that carries verse `n` in one translation: the verse itself, or
+ * the one whose merge runs over it (17 merged with 18 carries 18).
+ *
+ * @param {Record<string, { text: string, merge?: number }> | null} verses
+ * @param {number} n
+ * @returns {{ start: number, end: number, verse: object } | null} null when the
+ *          translation has nothing for that verse
+ */
+export function verseAt(verses, n) {
+  if (!verses) return null;
+  if (verses[n]) return { start: n, end: Number(verses[n].merge ?? n), verse: verses[n] };
+  for (const { start, end } of spansOf(verses)) {
+    if (start < n && Number(end) >= n) return { start, end: Number(end), verse: verses[start] };
+  }
+  return null;
+}

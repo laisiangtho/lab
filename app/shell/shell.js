@@ -30,6 +30,8 @@ import { applyAccent, applyTheme, THEME_CYCLE } from './theme.js';
 export function createShell(root, ctx) {
   const { store } = ctx;
   let chrome = null;
+  /** Set once the saved tabs are back: before then a verse link waits for them. */
+  let tabsRestored = false;
   let workspace = null;
   let tree = null;
   let verseBar = null;
@@ -119,6 +121,8 @@ export function createShell(root, ctx) {
      * names and numerals — for a feature that wants a passage without building
      * its own parser. Null when the text names nothing.
      */
+    /** A shareable address for a passage (see `passageLink`). */
+    passageLink: (passage) => passageLink(passage),
     readPassage(text) {
       const [first] = passageItems(text);
       return first ? first.passage : null;
@@ -181,6 +185,11 @@ export function createShell(root, ctx) {
 
     workspace.restore();
     refresh();
+    // A link to a verse: the chapter was set above, before the tabs came
+    // back; the verse is revealed once there is a page to reveal it in.
+    tabsRestored = true;
+    const linked = readHash();
+    if (linked?.verse) workspace.openVerse(linked.book, linked.chapter, linked.verse);
 
     for (const fn of ready.splice(0)) {
       try {
@@ -828,20 +837,47 @@ export function createShell(root, ctx) {
 
   // --- address hash -------------------------------------------------------
 
+  /**
+   * The address says where the reader is: `#/19/23`, or `#/19/23/1` and
+   * `#/19/23/1-3` when it was opened on a verse. A verse stays in the address
+   * while the chapter does, so reloading a shared link lands on it again.
+   */
   function syncHash() {
     const { book, chapter } = ctx.state.get();
     const hash = `#/${book}/${chapter}`;
-    if (location.hash !== hash) history.replaceState(null, '', hash);
+    if (location.hash === hash || location.hash.startsWith(`${hash}/`)) return;
+    history.replaceState(null, '', hash);
+  }
+
+  /** @returns {{ book: number, chapter: number, verse: number|null, to: number|null } | null} */
+  function readHash() {
+    const m = /^#\/(\d+)\/(\d+)(?:\/(\d+)(?:-(\d+))?)?$/.exec(location.hash);
+    if (!m) return null;
+    const book = Number(m[1]);
+    if (!ctx.category.hasBook(book)) return null;
+    const chapter = Math.min(Math.max(Number(m[2]), 1), ctx.category.book(book).chapters);
+    const verse = m[3] ? Math.max(Number(m[3]), 1) : null;
+    const to = verse && m[4] && Number(m[4]) > verse ? Number(m[4]) : null;
+    return { book, chapter, verse, to };
   }
 
   function applyHash() {
-    const m = /^#\/(\d+)\/(\d+)$/.exec(location.hash);
-    if (!m) return;
-    const book = Number(m[1]);
-    if (!ctx.category.hasBook(book)) return;
-    const chapter = Math.min(Math.max(Number(m[2]), 1), ctx.category.book(book).chapters);
+    const found = readHash();
+    if (!found) return;
+    const { book, chapter, verse } = found;
+    if (verse && tabsRestored) { workspace.openVerse(book, chapter, verse); return; }
     const current = ctx.state.get();
     if (current.book !== book || current.chapter !== chapter) ctx.state.set({ book, chapter });
+  }
+
+  /**
+   * A link to a passage that opens for anyone: the web build's address when
+   * this is not the web build, this page's own address when it is.
+   */
+  function passageLink({ book, chapter, verse = null, to = null }) {
+    const own = /^https?:$/.test(location.protocol) ? `${location.origin}${location.pathname}` : ctx.config.publicUrl;
+    const tail = verse ? `/${verse}${to && to !== verse ? `-${to}` : ''}` : '';
+    return `${own}#/${book}/${chapter}${tail}`;
   }
 
   return shell;

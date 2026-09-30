@@ -83,7 +83,7 @@ export async function serve() {
 
 /**
  * A browser with the catalog repository answered from fixtures.
- * @param {{ viewport?: {width:number,height:number}, phone?: boolean, locale?: string, fixtures?: object }} options
+ * @param {{ viewport?: {width:number,height:number}, phone?: boolean, locale?: string, fixtures?: object, permissions?: string[] }} options
  */
 export async function launch(options = {}) {
   const { chromium } = await import('playwright-core');
@@ -98,6 +98,8 @@ export async function launch(options = {}) {
     ...(options.phone ? { isMobile: true, hasTouch: true, deviceScaleFactor: 3 } : {}),
     // The device's language, as navigator.languages reports it.
     ...(options.locale ? { locale: options.locale } : {}),
+    // What the page may do without asking: reading the clipboard back, say.
+    ...(options.permissions ? { permissions: options.permissions } : {}),
   });
 
   const requests = [];

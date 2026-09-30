@@ -47,6 +47,10 @@ const TOPICS = Object.freeze([
   { id: 'privacy', does: { doc: 'about' } },
   { id: 'strongs', does: { cmd: 'reading.strongs' } },
   { id: 'layout', does: { cmd: 'reading.panel' } },
+  { id: 'compare', does: { palette: 'compare ' } },
+  { id: 'link', does: null },
+  { id: 'memory', does: { doc: 'memory' } },
+  { id: 'streak', does: { cmd: 'plan.open' } },
   { id: 'guide', does: { doc: 'settings' } },
 ]);
 
