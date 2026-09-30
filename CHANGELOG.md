@@ -147,6 +147,34 @@ newest first.
 
 ## Releases
 
+### 26.09.30.9 — 30 September 2026
+
+- The Library takes the Cards page's shape: one band of tools, no title and
+  no standing paragraph; storage and catalog facts are a readout with their
+  detail in its tooltip.
+- Fixed: Strong's numbers appeared as raw codes — `word{H430}` — on cards, in
+  the verse of the day, in search results, in exported passages, in the word
+  count and when a verse was read aloud. Only the reading surface shows them,
+  and only when switched on.
+- Numbers an edition uses past the end of Strong's lexicon, like the H9999
+  that eBible.org's tagged Judson Bible puts on Burmese particles, are kept
+  but never shown as links; a translation's information says how many words
+  carry Strong's numbers and which of its own numbers it uses.
+- A search for a Strong's number (`H430`) finds the words tagged with it, and
+  a phrase is found across a tagged word.
+- An export writes Strong's numbers in each format's own markup (USFM `\w`,
+  USX `char`, OSIS `w`, Zefania `gr`), and Zefania's are read on import.
+- Section headings and cross-references can be switched off, like Strong's
+  numbers: from the reading panel's Show row, the palette or Settings.
+- An eBible.org read-aloud, Browser Bible or website download is recognised,
+  and the import names the `_usfx.zip` to take instead.
+- Fixed: in the card studio's panels, every label sat far above its control.
+- Fixed: the guide answered "how can you help me?" with a title and nothing
+  under it; every answer now says something, and the question has its own.
+- Fixed: a whole-word search in Burmese matched a letter inside a word.
+- Guide data: searching and regular expressions, from plain words to
+  lookarounds, with every example checked against the app's own matcher.
+
 ### 26.09.30.8 — 30 September 2026
 
 - The Library is two pages. *On this device* shows only what is here, with

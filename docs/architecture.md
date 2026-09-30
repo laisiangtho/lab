@@ -389,7 +389,7 @@ Two rules keep the rest honest. A stored id this build no longer has is dropped 
 - **Names in the reader's language**: book names, and now testament names, come from the translation (`meta.testament[id].info.name`) wherever they are shown — tabs, breadcrumbs, the books tree, the chapter header — with the canon as fallback. Chrome that carries such a name is tagged with the script's language so it gets the same line room.
 - **Chapter-only controls**: a command may declare `needsChapter`. While a document tab is active, `body[data-tab="doc"]` is set and those buttons are shown but not pressable — the nav arrows, the parallel-pane button, layout, source mode, Strong's, synchronised scrolling, ink, read aloud, verse card and chapter export — rather than failing when pressed.
 - **An empty sidebar** keeps its place in the document: while a pane is being dragged it shows a rail to drop onto, and a pane dropped there opens that sidebar. Without it, the last pane moved out of a sidebar could never be moved back.
-- **The Library** filters on name, abbreviation, language, publisher or year, and arranges itself by language, as one flat list, or as the offline set only; the choice is remembered.
+- **The Library** is two pages under one band of tools (see 3d-x-b): what is on this device, and where more comes from. It filters on name, abbreviation, language, publisher or year.
 - **Detached windows** remember the size and position they were last left at (records key `floats`), offset so a second window does not hide the first and clamped into the window as it is now.
 - **Resize handles** draw no grip in any state: the grip's percentage offset resolved differently while a drag was running, which put a mark at the top of the window. The moving edge and the cursor are the feedback.
 - **The status bar** reports what is being read — translation, passage, word count and verse count for the chapter on screen — and on the right the state the reader can click, ending with storage use (`navigator.storage.estimate()`), whose tooltip names the quota and whether the origin is persisted. Counts are measured from the chapter records actually in view, so they describe what is in front of the reader.
@@ -501,11 +501,11 @@ never mistaken for a fault.
 
 ## 3d-vi. Importing somebody else's file
 
-The library lists four ways: by language, all, offline, and **yours** — the
-translations the reader imported, which is the one group nothing else in the
-list can be narrowed down to. Its two actions are icons (add, refresh) rather
-than sentences: they take a quarter of the room and read at a glance in a
-language this build has never been translated into.
+A translation the reader imported is marked **Yours** on the Library's home,
+with the format it came from. The Library's actions are icons (add, from a web
+address, check for updates) rather than sentences: they take a quarter of the
+room and read at a glance in a language this build has never been translated
+into.
 
 A translation in one of the reader's own languages is marked and floated to the
 top. That had never once fired: the catalog names a language by its 639-3 code
@@ -656,6 +656,25 @@ source's own list into one row shape (`source`, `id`, `identify`, `name`,
   its main process (`lai:fetch-bytes`: https only, at most 150 MB, streamed),
   where no such rule applies. The web version reports which host refused and
   offers the file route; it does not try a proxy.
+- **Downloads that are not the data.** eBible.org publishes each translation
+  in several shapes. The read-aloud zip has had its verse numbers taken out
+  for speech engines, so nothing says which verse is which; the Browser Bible
+  and website zips are pages. `otherEdition` recognises them by the archive's
+  name or its files and the import says which download to take instead — the
+  same translation's `_usfx.zip` — rather than "no scripture file". They are
+  not read, because nothing here could be tested against a real one, and a
+  guessed reader is a reader that fails on the first real file.
+- **The page.** The Cards page's shape: one band of tools across the leaf and
+  the work under it, no title and no standing paragraph. The band holds the
+  two pages as a segmented pair, the sources as tools (Get more only), the
+  filter, a short readout — storage used, the catalog's version, a list's
+  size — with the detail in its tooltip, and the actions. It is sticky inside
+  the leaf rather than a scroller of its own, so the leaf stays the page's one
+  scrolling box. It is fitted by measuring (`fitBar`), as the Cards band is:
+  the sources give up their names, then the filter takes a line of its own. A
+  container query was the first attempt and let the filter slide over "From a
+  web address" at a width nobody had tried; an e2e check now looks for any
+  two tools of the band overlapping, at six widths.
 - **Content policy.** `connect-src` is `'self' https:` on both targets, so
   a web address the reader types can be fetched at all. Scripts and styles
   are still `'self'` only; what is fetched is data, parsed by the importers,
@@ -709,7 +728,8 @@ Four small features, each a pure core with its surface in a feature.
 
 No index is built at install time; the scan reads `chapters` in pages, in a worker.
 
-- **Matching** (`app/core/search.js`) has three modes and one flag — offered to the reader as two independent switches (whole words, regular expression) plus case, since a pattern sets its own boundaries and the two cannot both apply: plain terms (ANDed, `"quoted"` as a phrase), whole words (a term must sit on a word boundary, tested with `\p{L}\p{N}_`), and a regular expression compiled as written. Case folds unless the reader asks otherwise. Plain and whole-word matching fold to NFD and strip Latin combining marks only; a pattern is matched against the text as written, since folding would change what it means. A pattern that cannot compile raises the reason, without the flags the reader never typed.
+- **Matching** (`app/core/search.js`) has three modes and one flag — offered to the reader as two independent switches (whole words, regular expression) plus case, since a pattern sets its own boundaries and the two cannot both apply: plain terms (ANDed, `"quoted"` as a phrase), whole words (a term must sit on a word boundary, tested with `\p{L}\p{M}\p{N}_` — the marks because a Burmese vowel sign belongs to its word; without them a whole-word search for က found it inside ကောင်း), and a regular expression compiled as written. Case folds unless the reader asks otherwise. Plain and whole-word matching fold to NFD and strip Latin combining marks only; a pattern is matched against the text as written, since folding would change what it means. A pattern that cannot compile raises the reason, without the flags the reader never typed.
+- **Plain text.** Every mode reads the verse without its Strong's numbers; a query that is one number reads the markup instead (see 3d-ix).
 - **Scope**: a set of translations and a set of books. `store.scanChapters(identify, visit, { books, while })` reads one key range per book when a set is given — the key is `[identify, book, chapter]`, so each book is one contiguous range — a hundred records to a request, and asks `while()` between records, which is how a newer query abandons an older one mid-translation.
 - **Counting is not limited**: the worker counts every match and keeps only the first `limit` rows (2,000). So the answer states how many verses matched, in how many chapters and books, and the tree lists every book that matched. Opening a book whose verses were past the limit searches that one book again, which is cheap.
 - Results stream in batches of 40, each carrying the counts so far; the pane repaints at most once a frame.
@@ -822,6 +842,45 @@ with a button on it is a different thing from a dead end.
 
 A bare number with no H or G is not guessed at when both lexicons are held: 430
 is God in Hebrew and something else in Greek.
+
+**Plain text by default.** The markup lives in the stored verse text, and for
+a while every feature that read a verse had to remember to take it out. Most
+did not: cards, the verse of the day, reading aloud, a copied or exported
+passage, search results and the status bar's word count all showed
+`word{H430}`. So the default moved to where the text is read.
+`store.getChapter` returns plain text unless `{ markup: true }` is asked for,
+and only the reading surface asks. A feature added later is right without
+knowing Strong's numbers exist. Search reads the plain text too, so a phrase is
+found across a tagged word; a query that is one number (`H430`, `g26`) is the
+one search that reads the markup, and finds the words tagged with it.
+
+**Numbers an edition adds.** Strong's Hebrew ends at H8674 and the Greek at
+G5624. Tagged editions number past those ends for their own purposes:
+STEPBible's prefixes and suffixes are H9001 upward, and eBible.org's tagged
+Judson Bible marks the words that have nothing behind them in the source — the
+particles Burmese needs — as H9999. `kindOf` tells the two apart. An edition's
+number still ends the word it is on (a Burmese verse runs tagged words together,
+so without it the next word would swallow this one), but it is never drawn as a
+link, since no lexicon has an entry for it. It is kept in the stored text, so an
+export carries it, and counted at install: `stats.strongs` is how many words
+carry a Strong's number and how often each edition number appears, which the
+translation's information and the import notice both say. A sense letter
+(`H1254a`) is kept, in capitals; a search for H1254 finds every sense.
+
+**Written out in each format's own markup.** An export used to carry the
+inline notation into every format, so a USFM file held `God{H430}` — text no
+other USFM reader understands. Each writer now uses its format's markup:
+`\w God|strong="H430"\w*` in USFM, `<char style="w" strong="H430">` in USX,
+`<w lemma="strong:H430">` in OSIS, `<gr str="430">` in Zefania (whose reader
+now reads it back, lettered by testament) and a superscript in Markdown. The
+inline notation is kept only where a format has no markup of its own: this app's
+JSON and a spreadsheet. The round trip is tested for each, the edition's own
+numbers included.
+
+**Headings and cross-references switch too.** A translation's headings and its
+cross-reference lines are as optional as its Strong's numbers, so each is a
+setting (`headings`, `xrefs`), a command, and a switch in the reading panel's
+*Show* row beside Strong's numbers.
 
 ## 3e-ii. Saying what the canon report means
 
@@ -1041,6 +1100,27 @@ symptom appeared a long way from the cause.
   is in one place rather than at two hundred call sites and
   `h('button', { class: 'btn' }, icon('x'), 'Add the passage on screen')`
   still reads the way it did.
+
+- **In a column, flex-basis is a height.** `.set-text { flex: 1 1 200px }` is
+  a sensible width for a label in a Settings row. The card studio's panels turn
+  their rows into columns, and there the same 200 px became the label's
+  height: every label in the colour, shape and type panels sat a couple of
+  hundred pixels above its control. Nothing failed and no screenshot at the
+  size anyone reviewed happened to show it. A rule that sets a basis has to
+  say which direction it means, and `test/e2e/cards.test.mjs` opens every
+  panel on a desktop and on a phone in Burmese and compares each row's height
+  with what is drawn in it — measured by the words inside a label, not its
+  box, since the box was the part that had stretched. The test was run once
+  against the old stylesheet to see it fail; a check that has never failed
+  has not been shown to check anything.
+
+- **A band of tools is fitted by measuring it.** The Library's band first
+  relied on a container query and on its sources being allowed to shrink. At
+  a width in between, the sources ran out of their row and the filter field
+  sat on top of "From a web address", covering it. Only a test that tried to
+  press it noticed. The band is now measured after every paint and on every
+  resize, and steps down only when it overflows, the way the Cards band does.
+  `library.test.mjs` checks at six widths that no two of its tools overlap.
 
 ## 4. Catalog update flow
 
