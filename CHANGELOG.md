@@ -144,6 +144,14 @@ newest first.
 
 ## Releases
 
+### 26.09.30.7 — 30 September 2026
+
+- Fixed: the boxes in the import dialog could not be typed in — each
+  keystroke was replaced by what the file suggested.
+- An OSIS file is named from its header title, and a language written right
+  to left (Hebrew, Arabic, Persian, Urdu…) is set right to left on import.
+- Your own translations are listed under the name you gave them.
+
 ### 26.09.30.6 — 30 September 2026
 
 - **Compare a verse in every translation** on the device, in one sheet, from
