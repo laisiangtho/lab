@@ -19,7 +19,7 @@ import { createVerseBar } from './versebar.js';
 import { createWorkspace } from './workspace.js';
 import { h } from './dom.js';
 import { icon } from './icons.js';
-import { L } from './i18n.js';
+import { L, when } from './i18n.js';
 import { createLookup, parsePassageQuery, passageOf } from '../core/lookup.js';
 import { MODES } from '../core/settings.js';
 import { storageStatus } from '../services/store.js';
@@ -372,7 +372,7 @@ export function createShell(root, ctx) {
 
   async function showAbout() {
     const native = ctx.platform.capabilities.appInfo ? await ctx.platform.capabilities.appInfo() : null;
-    const built = new Date(BUILT_AT).toLocaleDateString();
+    const built = when.date(BUILT_AT);
     shell.notify(`${L('app.name')} ${VERSION} · ${L('lbl.built', { date: built })}`
       + (native ? ` · ${native.runtime} · ${native.platform}` : ` · ${ctx.platform.id}`));
   }

@@ -10,7 +10,7 @@ import { requestPersistence, storageStatus } from '../../services/store.js';
 import { formatSections } from './formats.js';
 import { fill, h } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
-import { L } from '../../shell/i18n.js';
+import { L, when } from '../../shell/i18n.js';
 import { BUILT_AT, VERSION } from '../../version.js';
 
 const APPLE = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform ?? '');
@@ -225,7 +225,7 @@ export default {
         const card = h('div', { class: 'about' },
           h('div', { class: 'about-mark' }, h('img', { src: './icons/icon.svg', alt: '', width: 64, height: 64 })),
           h('h1', {}, L('app.name')),
-          h('div', { class: 'about-ver' }, `v${VERSION} · ${L('lbl.built', { date: new Date(BUILT_AT).toLocaleDateString() })}`),
+          h('div', { class: 'about-ver' }, `v${VERSION} · ${L('lbl.built', { date: when.date(BUILT_AT) })}`),
           h('p', { class: 'about-lede' }, L('doc.about.lede')),
           facts,
           actions,

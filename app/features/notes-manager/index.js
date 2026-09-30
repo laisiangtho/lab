@@ -9,11 +9,10 @@
 
 import { verseLabelOf } from '../../core/annotations.js';
 import { noteTitle, wordCount } from '../../core/markdown.js';
-import { relativeTime } from '../../core/time.js';
 import { h } from '../../shell/dom.js';
 import { wantsNewTab } from '../../shell/reflink.js';
 import { icon } from '../../shell/icons.js';
-import { L } from '../../shell/i18n.js';
+import { L, when } from '../../shell/i18n.js';
 
 const SORTS = Object.freeze(['updated', 'created', 'passage', 'length']);
 
@@ -37,7 +36,7 @@ export default {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
-    const asMarkdown = (note) => [`## ${passage(note)}`, '', note.text, '', `_${new Date(note.updated).toLocaleString()}_`].join('\n');
+    const asMarkdown = (note) => [`## ${passage(note)}`, '', note.text, '', `_${when.dateTime(note.updated)}_`].join('\n');
 
     registry.doc({
       id: 'notes-manager',
@@ -109,7 +108,7 @@ export default {
             h('span', { class: 'nm-title' }, noteTitle(note.text, passage(note)), h('span', { class: 'nm-sub' }, gist(note))),
             h('span', {}, h('button', { class: 'pill', onclick: (e) => shell.openChapter(note.book, note.chapter, { newTab: wantsNewTab(e) }) },
               `${shell.workspace.bookName(note.book)} ${note.chapter}`)),
-            h('span', { class: 'nm-when' }, relativeTime(note.updated)),
+            h('span', { class: 'nm-when' }, when.ago(note.updated)),
             h('span', { class: 'nm-words' }, String(wordCount(note.text))),
             h('span', { class: 'nm-acts' },
               h('button', { title: L('cmd.edit'), 'aria-label': L('cmd.edit'), onclick: open }, icon('edit')),

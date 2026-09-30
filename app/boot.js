@@ -27,12 +27,15 @@ import { createSettings } from './services/settings.js';
 import { openStore, resetStore } from './services/store.js';
 import { createShell } from './shell/shell.js';
 import { h } from './shell/dom.js';
-import { L } from './shell/i18n.js';
+import { L, resolveLocale, setLocale } from './shell/i18n.js';
 
 import './styles/shell.css';
 import './styles/views.css';
 
 export async function start({ root, createPlatform, features, config }) {
+  // The device's language from the first moment, so even the screen of last
+  // resort speaks it; the reader's own choice replaces it once settings load.
+  setLocale(resolveLocale(null, globalThis.navigator?.languages ?? []));
   try {
     if (!(root instanceof HTMLElement)) throw new Error('boot: root element not found');
     const platform = createPlatform();
@@ -61,6 +64,8 @@ async function boot({ root, platform, features, config: overrides }) {
   await library.load();
 
   const settings = await createSettings({ store, category });
+  // Before any feature registers: command titles and pane names are read once.
+  setLocale(resolveLocale(settings.get().locale, globalThis.navigator?.languages ?? []));
   const annotations = await createAnnotations({ store, category });
   const records = await createRecords({ store });
   const lexicons = createLexicons({ store, config });
@@ -146,13 +151,13 @@ async function boot({ root, platform, features, config: overrides }) {
 function renderFatal(root, err) {
   const target = root instanceof HTMLElement ? root : document.body;
   const message = err?.message ?? String(err);
-  const erase = h('button', { class: 'btn' }, 'Erase stored data');
+  const erase = h('button', { class: 'btn' }, L('fatal.erase'));
   let armed = false;
   erase.addEventListener('click', async () => {
     if (!armed) {
       armed = true;
       erase.classList.add('is-armed');
-      erase.textContent = 'Erase everything and reload — press again';
+      erase.textContent = L('fatal.eraseArmed');
       return;
     }
     erase.disabled = true;
@@ -166,10 +171,10 @@ function renderFatal(root, err) {
   });
 
   target.replaceChildren(h('div', { class: 'fatal', role: 'alert' },
-    h('h1', {}, 'Lai Siangtho could not start'),
+    h('h1', {}, L('fatal.title')),
     h('pre', {}, message),
     h('div', { class: 'fatal-acts' },
-      h('button', { class: 'btn primary', onclick: () => location.reload() }, 'Try again'),
+      h('button', { class: 'btn primary', onclick: () => location.reload() }, L('fatal.retry')),
       erase),
-    h('p', { class: 'fatal-note' }, 'Erasing removes the translations stored on this device, along with notes and bookmarks.')));
+    h('p', { class: 'fatal-note' }, L('fatal.note'))));
 }

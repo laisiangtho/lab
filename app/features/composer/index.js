@@ -14,7 +14,7 @@
 import { noteTitle, wordCount } from '../../core/markdown.js';
 import { h } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
-import { L } from '../../shell/i18n.js';
+import { L, when } from '../../shell/i18n.js';
 import { renderMarkdown } from '../../shell/markdown.js';
 
 const KEY = 'composer';
@@ -155,7 +155,7 @@ export default {
       for (const button of modes) button.classList.toggle('is-on', button.dataset.mode === element.dataset.mode);
       meta.textContent = [
         L('lbl.words', { n: wordCount(text.value) }),
-        editing ? L('lbl.savedAt', { time: new Date(editing.updated).toLocaleTimeString() }) : L('lbl.unsaved'),
+        editing ? L('lbl.savedAt', { time: when.time(editing.updated) }) : L('lbl.unsaved'),
       ].join(' · ');
 
       if (element.dataset.mode !== 'write') {

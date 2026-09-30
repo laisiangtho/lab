@@ -83,7 +83,7 @@ export async function serve() {
 
 /**
  * A browser with the catalog repository answered from fixtures.
- * @param {{ viewport?: {width:number,height:number}, phone?: boolean, fixtures?: object }} options
+ * @param {{ viewport?: {width:number,height:number}, phone?: boolean, locale?: string, fixtures?: object }} options
  */
 export async function launch(options = {}) {
   const { chromium } = await import('playwright-core');
@@ -96,6 +96,8 @@ export async function launch(options = {}) {
     // A phone: touch, no hover, and the pixel density that makes a 1 px
     // hairline and a 40 px margin look the way they do on one.
     ...(options.phone ? { isMobile: true, hasTouch: true, deviceScaleFactor: 3 } : {}),
+    // The device's language, as navigator.languages reports it.
+    ...(options.locale ? { locale: options.locale } : {}),
   });
 
   const requests = [];

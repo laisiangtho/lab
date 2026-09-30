@@ -16,7 +16,7 @@
 import { h } from './dom.js';
 import { wireFades } from './fade.js';
 import { icon } from './icons.js';
-import { L } from './i18n.js';
+import { L, when } from './i18n.js';
 import { downloadJson } from '../services/transfer.js';
 
 export function createTranslationInfo(ctx) {
@@ -77,7 +77,7 @@ export function createTranslationInfo(ctx) {
     row(L('lbl.version'), entry && entry.version !== meta.version
       ? L('lbl.versionBehind', { held: meta.version, listed: entry.version })
       : String(meta.version));
-    row(L('lbl.installedOn'), installed?.installedAt ? new Date(installed.installedAt).toLocaleDateString() : '');
+    row(L('lbl.installedOn'), installed?.installedAt ? when.date(installed.installedAt) : '');
     row(L('lbl.size'), installed?.bytes ? formatBytes(installed.bytes) : '');
     const stats = installed?.stats;
     if (stats) {

@@ -137,3 +137,59 @@ test('the band of a window that draws its own title bar', options, async (t) => 
 
   await t.test('nothing went wrong on the way', () => assert.deepEqual(app.problems, []));
 });
+
+test('every page fits a phone, in the longest language', options, async (t) => {
+  // Burmese runs longest and tallest of the interface languages, so a page that
+  // fits in it fits in the others. A control is "cut" when an ancestor that
+  // clips (overflow hidden, not a scroller) ends before it does — what a
+  // choice running under a panel's rounded edge, or a toolbar button half off
+  // the band, looks like to a reader.
+  const { default: en } = await import('../../app/shell/locales/en.js');
+  const { default: my } = await import('../../app/shell/locales/my.js');
+  const app = await launch({ viewport: { width: 390, height: 844 }, phone: true, locale: 'my' });
+  const { page } = app;
+  t.after(() => app.close());
+  const titleOf = (key) => my[key];
+
+  await app.open();
+  await page.waitForSelector('.wl', { timeout: 20000 });
+  await page.locator('.wl .btn.primary').click();
+  await page.waitForSelector('.library-item');
+  await page.locator('[data-identify="kjv1611"] .library-actions .btn').click();
+  await page.locator('[data-identify="kjv1611"] .badge-ok').waitFor({ timeout: 60000 });
+
+  const pages = ['doc.library', 'doc.settings', 'doc.help', 'doc.shortcuts', 'doc.projects', 'proj.new', 'doc.cards', 'doc.notes', 'doc.board', 'doc.graph', 'doc.welcome'];
+  for (const key of pages) assert.ok(en[key] && my[key], `${key} is a string in both`);
+
+  const faults = [];
+  for (const key of pages) {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(150);
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill(titleOf(key));
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(900);
+    const found = await page.evaluate(() => {
+      const out = [];
+      if (document.documentElement.scrollWidth > innerWidth + 1) out.push(`the page scrolls sideways (${document.documentElement.scrollWidth}px)`);
+      for (const el of document.querySelectorAll('#app button, #app input, #app select')) {
+        const r = el.getBoundingClientRect();
+        if (!r.width || r.top > innerHeight || r.bottom < 0 || el.closest('[hidden]')) continue;
+        for (let p = el.parentElement; p && p.id !== 'app'; p = p.parentElement) {
+          const ps = getComputedStyle(p);
+          if (!/(hidden|clip)/.test(ps.overflowX) || /(auto|scroll)/.test(ps.overflowX)) continue;
+          const pr = p.getBoundingClientRect();
+          if (r.right > pr.right + 1 || r.left < pr.left - 1) {
+            out.push(`${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]} "${(el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, 20)}" cut by .${String(p.className).split(' ')[0]}`);
+          }
+          break;
+        }
+      }
+      return out;
+    });
+    for (const fault of found) faults.push(`${en[key]}: ${fault}`);
+  }
+  assert.deepEqual(faults, []);
+  assert.deepEqual(app.problems, []);
+});

@@ -13,7 +13,7 @@ import { createRows } from '../../shell/settingrows.js';
 import { requestPersistence, resetStore, storageStatus } from '../../services/store.js';
 import { applyAccent, applyTheme, THEME_CYCLE } from '../../shell/theme.js';
 import { icon } from '../../shell/icons.js';
-import { L } from '../../shell/i18n.js';
+import { L, LOCALES, currentLocale, when } from '../../shell/i18n.js';
 
 /** A short palette; the colour input covers everything else. */
 const ACCENTS = Object.freeze(['#7c3aed', '#2563eb', '#0ea5e9', '#14b8a6', '#e9973f', '#e11d48']);
@@ -162,6 +162,28 @@ export default {
          * It is built with the elements to hand, because the picker changes the
          * colour while the reader drags and must not rebuild the page to do it.
          */
+        /**
+         * The interface language. Every label is read once, when the shell and
+         * the features are built, so a new language takes effect by starting
+         * the interface again — after the choice is safely written, or the
+         * restart would come back in the old one. Each language is named in
+         * itself; one not yet checked by a native speaker says so.
+         */
+        function languageRow(current) {
+          const shown = LOCALES[currentLocale()];
+          const hint = shown.review ? `${L('set.languageHint')} ${L('set.languageReview')}` : L('set.languageHint');
+          return ui.choice({
+            name: L('set.language'), hint,
+            options: [['device', L('set.languageDevice')], ...Object.entries(LOCALES).map(([id, { name }]) => [id, name])],
+            value: current.locale ?? 'device',
+            onChange: async (value) => {
+              state.set({ locale: value === 'device' ? null : value });
+              await settings.save();
+              window.location.reload();
+            },
+          });
+        }
+
         function accentRow(current) {
           const custom = Boolean(current.accent) && !ACCENTS.includes(current.accent);
           const swatches = ACCENTS.map((colour) => h('button', {
@@ -332,6 +354,7 @@ export default {
 
                 section('appearance', 'set.appearance',
                   h('div', { class: 'set-group' },
+                    languageRow(current),
                     ui.choice({
                       name: L('cmd.theme'), hint: L('set.themeHint'),
                       options: THEME_CYCLE.map((id) => [id, L(`val.${id}`)]), value: current.theme,
@@ -454,7 +477,7 @@ export default {
                     h('p', { class: 'muted' }, L('set.importSummary', {
                       name: importedFrom.name, notes: importedFrom.merged.notes,
                       marks: importedFrom.merged.marks, count: importedFrom.count,
-                    }) + (importedFrom.exportedAt ? ` · ${L('set.exportedAt', { when: new Date(importedFrom.exportedAt).toLocaleString() })}` : '')),
+                    }) + (importedFrom.exportedAt ? ` · ${L('set.exportedAt', { when: when.dateTime(importedFrom.exportedAt) })}` : '')),
                     missing.length
                       ? [h('ul', {}, missing.map((t) => h('li', {}, `${t.identify}${t.version ? ` (v${t.version})` : ''}`))),
                         busy ? h('span', { class: 'muted' }, busy)
@@ -462,7 +485,7 @@ export default {
                       : h('p', { class: 'muted' }, L('set.allInstalled'))) : null),
 
                 h('p', { class: 'set-foot muted' },
-                  `${L('app.name')} v${VERSION} · ${L('lbl.built', { date: new Date(BUILT_AT).toLocaleDateString() })}`,
+                  `${L('app.name')} v${VERSION} · ${L('lbl.built', { date: when.date(BUILT_AT) })}`,
                   ' · ',
                   h('button', { class: 'link-btn', onclick: () => shell.openDoc('about') }, L('doc.about'))))))));
         }

@@ -88,16 +88,26 @@ export function createModal() {
   return { element, open, close, setQuery, get isOpen() { return !element.hidden; } };
 }
 
-/** Subsequence match on title + sub, ranked by how tightly the query fits. */
+/**
+ * Subsequence match on title + sub, ranked by how tightly the query fits.
+ *
+ * Ties go to the title that is exactly what was typed, then to the shorter
+ * title — the one with less in it that nobody asked for. Registration order
+ * used to decide them, which put "Export settings" above "Settings" wherever a
+ * language starts both titles with the same word, as Burmese does.
+ */
 export function filter(items, query) {
   const q = query.trim().toLowerCase();
   if (!q) return items;
   const scored = [];
   for (const item of items) {
-    const score = fuzzy(`${item.title} ${item.sub ?? ''}`.toLowerCase(), q);
-    if (score !== null) scored.push({ item, score });
+    const title = String(item.title).toLowerCase();
+    const score = fuzzy(`${title} ${item.sub ?? ''}`.toLowerCase(), q);
+    if (score !== null) scored.push({ item, score, exact: title.trim() === q, length: title.length });
   }
-  return scored.sort((a, b) => a.score - b.score).map((s) => s.item);
+  return scored
+    .sort((a, b) => (b.exact - a.exact) || (a.score - b.score) || (a.length - b.length))
+    .map((s) => s.item);
 }
 
 function fuzzy(text, query) {

@@ -1149,7 +1149,10 @@ body.study-in-margin .outline-study{display:none}
 @media (hover:none){
   .btn{min-height:36px;padding:0 14px}
   input:not([type]),input[type=text],input[type=search],input[type=number],input[type=url],input[type=email],select{min-height:36px}
-  input[type=range]{min-height:28px}
+  /* A bigger thumb, not a taller input: the track is painted on the input's
+     own box, so height turned a hairline into a pill. */
+  input[type=range]::-webkit-slider-thumb{width:22px;height:22px}
+  input[type=range]::-moz-range-thumb{width:22px;height:22px}
   .crumb,.link-btn,.wl-link,.pj-quiet{min-height:32px}
   .tree-follow{min-width:32px;min-height:32px}
 }
@@ -1300,6 +1303,13 @@ body[data-status="off"] .statusbar{display:none}
 .ov-act:hover{background:var(--bg-hover);color:var(--text-normal)}
 .ov-act[disabled]{opacity:.35;pointer-events:none}
 .ov-bar label{display:flex;align-items:center;gap:6px;color:var(--text-faint);flex:0 0 auto}
+/* A phone: the bar wraps instead of running its controls off the edge, and
+   the hint (double-click to open) goes, since a touch screen has no
+   double-click to explain. */
+@media (max-width:760px){
+  .ov-bar{height:auto;flex-wrap:wrap;row-gap:6px;padding:6px 10px}
+  .ov-bar .ov-hint,.ov-bar .spacer{display:none}
+}
 .ov-bar input[type=range]{
   width:76px;accent-color:var(--accent);height:3px;background:var(--base-25);
   border-radius:99px;appearance:none;
@@ -1308,6 +1318,7 @@ body[data-status="off"] .statusbar{display:none}
   appearance:none;width:11px;height:11px;border-radius:50%;background:var(--accent-2);
   border:0;cursor:default;
 }
+@media (hover:none){.ov-bar input[type=range]::-webkit-slider-thumb{width:22px;height:22px}.ov-bar input[type=range]{width:110px}}
 .ov-count{
   font-size:10px;font-variant-numeric:tabular-nums;color:var(--text-faint);
   background:var(--base-20);border-radius:99px;padding:1px 7px;flex:0 0 auto;

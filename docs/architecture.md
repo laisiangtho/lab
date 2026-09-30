@@ -113,9 +113,43 @@ later runs, so names never depend on being online; a cached pack older than 30
 days is used immediately and re-fetched in the background. A missing pack is
 normal, not a failure.
 
-`locale` is not wired yet: those keys are the upstream app's, not this one's.
-It is the obvious path to a translated interface, and the reason to keep the
-pack service rather than inline the names.
+A pack's `locale` block (interface strings) is not read: those keys are the
+upstream app's, not this one's. The interface is translated here instead — see
+*Interface languages* below.
+
+### Interface languages
+
+Menus, buttons and messages come from `app/shell/locales/{en,nb,my}.js`, one
+file per language; scripture and book names are the translation's and the
+pack's, whatever the interface speaks. English is the source, and
+`test/locales.test.js` holds every other file to it: the same keys, the same
+placeholders (as a set — a language with one plural form writes `{n}` once),
+plural forms that fit the language (`singular|plural` for Norwegian, a single
+form for Burmese, whose `Intl.PluralRules` has only `other`), and fewer than 8%
+of strings identical to English. At run time a key missing from a translation
+would show in English and nobody would notice; the test is where it fails
+instead.
+
+- **Which language.** `settings.locale` is the reader's choice, or null to
+  follow the device: the first of `navigator.languages` this app has, with any
+  Norwegian (no, nb, nn) reading Bokmål, and English last. It is applied at the
+  start of `start()` from the device alone — so even the screen of last resort
+  speaks it — and again from settings before any feature registers, since
+  command titles and pane names are read once. Changing it saves, waits for the
+  write, and restarts the interface.
+- **Named in themselves.** Settings lists *English, Norsk bokmål, မြန်မာ*: the
+  list is read by somebody looking for their own language. A translation not
+  yet checked by a native speaker is marked `review` and Settings says so;
+  Burmese is.
+- **Dates too.** Every date the interface writes goes through `when` in
+  `i18n.js` (`date`, `time`, `dateTime`, `ago`) in the interface language; the
+  browser's own locale put Norwegian dates inside a Burmese interface.
+- **Not translated:** the *Data and formats* document, whose prose documents
+  JSON keys that stay English (its header says why), and the palette's verbs
+  (`go`, `find`, …), which are what the parser reads.
+- **Size.** The three files are about 45 KB compressed together; Burmese is the
+  largest (three bytes a character). They load with the app rather than on
+  demand, since `L()` is synchronous and everything reads it at build time.
 
 ## 2. Cross-reference resolution
 
@@ -383,7 +417,9 @@ Three decisions worth keeping:
 - **A project is a file.** `{ app, kind: 'project', schema, project }` exports and re-imports whole; the same project also exports as Markdown for people who do not use this app. An import never replaces a project already held — a same-id import lands as a second copy, because the file may be an older version of what its owner has been working on all morning.
 - **The shelf drops what it cannot read** rather than refusing to open: a project from a future build is skipped, and the export file remains the copy of record.
 
-The feature adds the Projects document (shelf beside the open project), a right-hand pane for use while reading, a verse action, a palette verb and a Settings row.
+The feature adds the Projects document, a right-hand pane for use while reading, a verse action, a palette verb and a Settings row.
+
+**The document is a studio, laid out like the card studio.** One band across the top — a switcher (the shelf, as a menu: each project with its size and when it last changed, then New and Import), the name, what can be added (the passage on screen, a note, a task), and apart at the end what happens to the whole project (export, delete); a stage that scrolls on its own, where the summary sits above the entries and the entries flow into as many columns as the width holds, in order; and the counts at the foot. It replaced a narrow centred page with the shelf as a column of its own — a quarter of the width spent listing what is usually one or two names. The stage scrolls, not the page, so `paint()` carries the stage's scroll position across a repaint itself; `keepPlace` looks outward from the page and would not find it.
 
 ## 3d-iv. Cards
 

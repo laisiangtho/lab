@@ -13,7 +13,7 @@
  * reported when the reader asked for it.
  */
 
-import { L } from '../../shell/i18n.js';
+import { L, when as dates } from '../../shell/i18n.js';
 
 const KEY = 'updates';
 const DAY = 86_400_000;
@@ -85,7 +85,7 @@ export default {
             }),
             ui.action({
               name: L('cmd.appUpdate'),
-              hint: when ? L('set.checkedAt', { when: new Date(when).toLocaleString() }) : L('set.neverChecked'),
+              hint: when ? L('set.checkedAt', { when: dates.dateTime(when) }) : L('set.neverChecked'),
               label: L('set.checkNow'),
               glyph: 'download',
               onClick: () => check({ quiet: false }).then(() => ui.refresh()),

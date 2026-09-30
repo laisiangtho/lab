@@ -12,7 +12,7 @@ import { makeZip, openZip } from '../../services/zip.js';
 import { fill, formatBytes, h, keepPlace } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { openMenu } from '../../shell/menu.js';
-import { L } from '../../shell/i18n.js';
+import { L, when } from '../../shell/i18n.js';
 import { requestPersistence, storageStatus } from '../../services/store.js';
 
 /** How the list is arranged. The choice is remembered. */
@@ -537,8 +537,8 @@ export default {
             ? L('lib.bundled')
             : L('lib.catalog', {
               version: catalog.version,
-              updated: new Date(catalog.updated).toLocaleDateString(),
-              checked: new Date(library.fetchedAt).toLocaleString(),
+              updated: when.date(catalog.updated),
+              checked: when.dateTime(library.fetchedAt),
             });
 
           const mode = view;

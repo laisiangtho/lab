@@ -25,12 +25,11 @@ import {
   addEntry, buildProjectFile, createEntry, createProject, editEntry, moveEntry,
   parseProjectFile, parseShelf, progressOf, removeEntry, toMarkdown,
 } from '../../core/projects.js';
-import { relativeTime } from '../../core/time.js';
 import { downloadJson, pickJson } from '../../services/transfer.js';
 import { fill, h, keepPlace } from '../../shell/dom.js';
 import { wantsNewTab } from '../../shell/reflink.js';
 import { icon } from '../../shell/icons.js';
-import { L } from '../../shell/i18n.js';
+import { L, when } from '../../shell/i18n.js';
 import { openMenu } from '../../shell/menu.js';
 import { renderMarkdown } from '../../shell/markdown.js';
 import { VERSION } from '../../version.js';
@@ -206,33 +205,28 @@ export default {
         ].filter(Boolean).join(' · ');
 
         /**
-         * The shelf: what there is, and the two ways to get another one.
-         *
-         * Making a project and bringing one in are a plus and an arrow in
-         * every application anybody has used, so they are icons at the head of
-         * the list rather than a wide primary button above it and a second
-         * button under it. That also stops the shelf from being taller than
-         * the thing it lists when there is one project on it.
+         * The shelf, as a menu at the start of the band: every project with its
+         * size and when it last changed, then the two ways to get another.
+         * It used to be a column of its own beside the project — a quarter of
+         * the page spent listing what is usually one or two names.
          */
-        function shelfColumn() {
-          return h('aside', { class: 'pj-shelf' },
-            h('div', { class: 'pj-shelf-head' },
-              h('h2', {}, L('doc.projects')),
-              h('div', { class: 'pj-shelf-acts' },
-                tool('plus', L('proj.new'), () => start(L('proj.untitled'))),
-                tool('enter', L('proj.import'), guard(importProject)))),
-            shelf.projects.length
-              ? h('div', { class: 'pj-list' }, shelf.projects.map((project) => {
-                const progress = progressOf(project);
-                return h('button', {
-                  class: `pj-item${project.id === shelf.open ? ' is-on' : ''}`,
-                  onclick: () => keep({ ...shelf, open: project.id }),
-                },
-                  h('span', { class: 'pj-item-n' }, project.name),
-                  h('span', { class: 'pj-item-s' },
-                    `${L('proj.nPassages', { n: progress.passages })} · ${relativeTime(project.updated)}`));
-              }))
-              : h('p', { class: 'muted pj-empty' }, L('proj.none')));
+        function switcher() {
+          return h('button', {
+            class: 'pj-tool pj-switch', title: L('proj.switch'), 'aria-label': L('proj.switch'),
+            'aria-haspopup': 'menu',
+            onclick: (e) => openMenu(e.currentTarget, [
+              ...shelf.projects.map((project) => ({
+                id: project.id,
+                title: project.name,
+                sub: `${L('proj.nPassages', { n: progressOf(project).passages })} · ${when.ago(project.updated)}`,
+                icon: 'files',
+                active: project.id === shelf.open,
+                run: () => keep({ ...shelf, open: project.id }),
+              })),
+              { id: 'new', title: L('proj.new'), icon: 'plus', run: () => start(L('proj.untitled')) },
+              { id: 'import', title: L('proj.import'), icon: 'enter', run: guard(importProject) },
+            ]),
+          }, icon('files'), h('span', { class: 'pj-switch-n' }, String(shelf.projects.length)));
         }
 
         /**
@@ -371,19 +365,19 @@ export default {
             .map((verse) => ({ verse, text: chapter[verse].text }));
         }
 
-        function projectColumn() {
-          const project = openProject();
+        /**
+         * The studio's band: which project, its name, what can be added to it,
+         * and — at the end, apart — what happens to the whole of it. The card
+         * studio's arrangement, so the two read as one kind of place.
+         */
+        function band(project) {
           if (!project) {
-            return h('div', { class: 'pj-main' },
-              h('div', { class: 'pj-blank' },
-                h('span', { class: 'pj-blank-mark' }, icon('files')),
-                h('h2', {}, L('proj.blankTitle')),
-                h('p', { class: 'muted' }, L('proj.blankBody')),
-                h('button', { class: 'btn primary', onclick: () => start(L('proj.untitled')) },
-                  icon('plus'), L('proj.new')),
-                // The shelf is not drawn while there is nothing on it, so the
-                // other way in has to be here or there is no way in at all.
-                h('button', { class: 'pj-quiet', onclick: guard(importProject) }, L('proj.import'))));
+            return h('header', { class: 'pj-bar' },
+              shelf.projects.length ? switcher() : null,
+              h('span', { class: 'pj-bar-title' }, L('doc.projects')),
+              h('div', { class: 'spacer' }),
+              tool('plus', L('proj.new'), () => start(L('proj.untitled'))),
+              tool('enter', L('proj.import'), guard(importProject)));
           }
 
           const name = h('input', {
@@ -395,22 +389,8 @@ export default {
             },
           });
 
-          const summaryBox = h('textarea', {
-            class: 'pj-summary', dir: 'auto', placeholder: L('proj.phSummary'),
-            oninput: (e) => {
-              const value = e.currentTarget.value;
-              clearTimeout(timers.get('summary'));
-              timers.set('summary', setTimeout(() => update((p) => ({ ...p, summary: value }), { quiet: true }), SAVE_DELAY_MS));
-            },
-          });
-          summaryBox.value = project.summary;
-
-          // One strip, the card studio's manners: the name on the left, what
-          // can be added in the middle, what happens to the whole project at
-          // the end. The three "Add …" buttons used to sit at the foot of the
-          // page — below however many entries there already were, which is
-          // exactly where somebody adding a fourth is not looking.
-          const bar = h('header', { class: 'pj-bar' },
+          return h('header', { class: 'pj-bar' },
+            switcher(),
             name,
             h('div', { class: 'pj-bar-sep' }),
             tool('book-open', L('proj.addHere'), () => {
@@ -419,7 +399,7 @@ export default {
             }),
             tool('note', L('proj.addNote'), () => update((p) => addEntry(p, createEntry({ kind: 'text' })))),
             tool('check', L('proj.addTask'), () => update((p) => addEntry(p, createEntry({ kind: 'todo' })))),
-            h('div', { class: 'pj-bar-sep' }),
+            h('div', { class: 'spacer' }),
             // Two exports behind one glyph: both are "take this out of here",
             // and a strip is not the place to explain the difference.
             tool('download', L('proj.export'), (e) => openMenu(e.currentTarget, [
@@ -435,26 +415,52 @@ export default {
               const left = shelf.projects.filter((p) => p.id !== project.id);
               keep({ projects: left, open: left[0]?.id ?? null });
             }, 'danger'));
+        }
 
-          return h('div', { class: 'pj-main' },
-            bar,
-            h('p', { class: 'pj-progress muted' }, summary(progressOf(project))),
+        /**
+         * The stage: what the project is for, then its entries, flowing into
+         * as many columns as the width holds — in order, left to right — so a
+         * wide window shows the whole of a project rather than a strip of it.
+         */
+        function stage(project) {
+          if (!project) {
+            return h('div', { class: 'pj-stage' },
+              h('div', { class: 'pj-blank' },
+                h('span', { class: 'pj-blank-mark' }, icon('files')),
+                h('h2', {}, L('proj.blankTitle')),
+                h('p', { class: 'muted' }, L('proj.blankBody')),
+                h('button', { class: 'btn primary', onclick: () => start(L('proj.untitled')) },
+                  icon('plus'), L('proj.new')),
+                h('button', { class: 'pj-quiet', onclick: guard(importProject) }, L('proj.import'))));
+          }
+          const summaryBox = h('textarea', {
+            class: 'pj-summary', dir: 'auto', placeholder: L('proj.phSummary'),
+            oninput: (e) => {
+              const value = e.currentTarget.value;
+              clearTimeout(timers.get('summary'));
+              timers.set('summary', setTimeout(() => update((p) => ({ ...p, summary: value }), { quiet: true }), SAVE_DELAY_MS));
+            },
+          });
+          summaryBox.value = project.summary;
+          return h('div', { class: 'pj-stage' },
             summaryBox,
-            h('div', { class: 'pj-entries' },
-              project.entries.length
-                ? project.entries.map((entry, i) => entryCard(project, entry, i))
-                : h('p', { class: 'muted pj-empty' }, L('proj.noEntries'))));
+            project.entries.length
+              ? h('div', { class: 'pj-entries' }, project.entries.map((entry, i) => entryCard(project, entry, i)))
+              : h('p', { class: 'muted pj-empty' }, L('proj.noEntries')));
         }
 
         function paint() {
-          // With nothing on the shelf there is no shelf: a column headed
-          // "Projects" saying "No projects yet" beside a page saying the same
-          // thing louder is one empty state too many.
-          const bare = !shelf.projects.length;
-          keepPlace(el, () => fill(el, h('section', { class: 'doc projects' },
-            h('div', { class: `pj-layout${bare ? ' is-bare' : ''}` },
-              bare ? null : shelfColumn(),
-              projectColumn()))));
+          const project = openProject();
+          // The stage scrolls, not the page, so its place is carried across a
+          // repaint here; keepPlace looks outward from the page and would not
+          // find it.
+          const was = el.querySelector('.pj-stage')?.scrollTop ?? 0;
+          keepPlace(el, () => fill(el, h('section', { class: 'doc doc-full projects' },
+            band(project),
+            stage(project),
+            project ? h('p', { class: 'pj-progress' }, summary(progressOf(project))) : null)));
+          const now = el.querySelector('.pj-stage');
+          if (now) now.scrollTop = was;
         }
 
         listeners.add(paint);
