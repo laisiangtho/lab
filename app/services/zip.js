@@ -168,59 +168,105 @@ async function inflate(raw) {
 const text = (bytes) => new TextDecoder().decode(bytes);
 
 /**
- * Write a zip. Stored, not compressed: an export is written once and read once,
- * and a deflate stream here would buy a few per cent on text that the reader's
- * own filesystem will compress anyway — at the cost of a compressor.
+ * Write a zip, stored: each file as it is. Quick, synchronous, and what the
+ * reader's own filesystem may compress anyway.
  *
  * @param {{ name: string, text: string }[]} files
  * @returns {Blob}
  */
 export function makeZip(files) {
   const encoder = new TextEncoder();
+  return assemble(files.map((file) => {
+    const body = encoder.encode(file.text);
+    return { name: file.name, data: body, size: body.byteLength, crc: crc32(body), method: 0 };
+  }));
+}
+
+/**
+ * Write a zip with every file deflated — what "compressed" means in the export
+ * dialog. Scripture is plain text and shrinks to about a third. The platform's
+ * `CompressionStream('deflate-raw')` does the work; there is no compressor here.
+ *
+ * @param {{ name: string, text: string }[]} files
+ * @returns {Promise<Blob>}
+ */
+export async function makeDeflatedZip(files) {
+  const encoder = new TextEncoder();
+  const entries = [];
+  for (const file of files) {
+    const body = encoder.encode(file.text);
+    const data = await squeeze(body, 'deflate-raw');
+    entries.push({ name: file.name, data, size: body.byteLength, crc: crc32(body), method: 8 });
+  }
+  return assemble(entries);
+}
+
+/**
+ * One file gzipped: `kjv1611.json.gz`. Every archive tool, and most text tools,
+ * open it, and a web server can serve it as it is.
+ *
+ * @returns {Promise<Blob>}
+ */
+export async function gzipText(text) {
+  const data = await squeeze(new TextEncoder().encode(text), 'gzip');
+  return new Blob([data], { type: 'application/gzip' });
+}
+
+async function squeeze(bytes, format) {
+  if (typeof CompressionStream !== 'function') throw new Error('zip: this browser cannot compress (no CompressionStream)');
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream(format));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+/** The local headers, the central directory and its end, for prepared entries. */
+function assemble(entries) {
+  const encoder = new TextEncoder();
   const parts = [];
   const central = [];
   let offset = 0;
 
-  for (const file of files) {
-    const name = encoder.encode(file.name);
-    const body = encoder.encode(file.text);
-    const sum = crc32(body);
+  for (const entry of entries) {
+    const name = encoder.encode(entry.name);
+    // Bit 11: the name is UTF-8, so a Burmese file name survives the trip.
+    const flags = 0x0800;
 
     const local = new Uint8Array(30 + name.byteLength);
     const lv = new DataView(local.buffer);
     lv.setUint32(0, LOCAL, true);
     lv.setUint16(4, 20, true);         // version needed
-    lv.setUint16(8, 0, true);          // stored
-    lv.setUint32(14, sum, true);
-    lv.setUint32(18, body.byteLength, true);
-    lv.setUint32(22, body.byteLength, true);
+    lv.setUint16(6, flags, true);
+    lv.setUint16(8, entry.method, true);
+    lv.setUint32(14, entry.crc, true);
+    lv.setUint32(18, entry.data.byteLength, true);
+    lv.setUint32(22, entry.size, true);
     lv.setUint16(26, name.byteLength, true);
     local.set(name, 30);
-    parts.push(local, body);
+    parts.push(local, entry.data);
 
     const head = new Uint8Array(46 + name.byteLength);
     const hv = new DataView(head.buffer);
     hv.setUint32(0, CENTRAL, true);
     hv.setUint16(4, 20, true);
     hv.setUint16(6, 20, true);
-    hv.setUint16(10, 0, true);
-    hv.setUint32(16, sum, true);
-    hv.setUint32(20, body.byteLength, true);
-    hv.setUint32(24, body.byteLength, true);
+    hv.setUint16(8, flags, true);
+    hv.setUint16(10, entry.method, true);
+    hv.setUint32(16, entry.crc, true);
+    hv.setUint32(20, entry.data.byteLength, true);
+    hv.setUint32(24, entry.size, true);
     hv.setUint16(28, name.byteLength, true);
     hv.setUint32(42, offset, true);
     head.set(name, 46);
     central.push(head);
 
-    offset += local.byteLength + body.byteLength;
+    offset += local.byteLength + entry.data.byteLength;
   }
 
   const directory = central.reduce((n, c) => n + c.byteLength, 0);
   const end = new Uint8Array(22);
   const ev = new DataView(end.buffer);
   ev.setUint32(0, EOCD, true);
-  ev.setUint16(8, files.length, true);
-  ev.setUint16(10, files.length, true);
+  ev.setUint16(8, entries.length, true);
+  ev.setUint16(10, entries.length, true);
   ev.setUint32(12, directory, true);
   ev.setUint32(16, offset, true);
   return new Blob([...parts, ...central, end], { type: 'application/zip' });

@@ -4,9 +4,10 @@ import test from 'node:test';
 
 import { parseCategory } from '../../app/core/category.js';
 import { convert } from '../../app/core/formats/index.js';
-import { describeLoss, esc, write, WRITERS } from '../../app/core/formats/write.js';
+import { aboutText, esc, lossOf, optionsFor, write, WRITERS } from '../../app/core/formats/write.js';
 import { parseTranslation } from '../../app/core/translation.js';
 import { root } from '../helpers.js';
+import en from '../../app/shell/locales/en.js';
 
 const category = parseCategory(JSON.parse(readFileSync(root('public/category.json'), 'utf8')));
 
@@ -156,10 +157,14 @@ test('a whole Bible in USFM is one file per book, named the way Paratext names t
 });
 
 test('what a format cannot carry is said, not hidden', () => {
-  assert.deepEqual(describeLoss('native'), [], 'our own format loses nothing');
-  assert.match(describeLoss('usfm')[0], /paragraphing/);
-  assert.match(describeLoss('csv')[0], /dropped/);
-  assert.match(describeLoss('markdown')[0], /rather than a file to import back/);
+  assert.deepEqual(lossOf('native'), [], 'our own format loses nothing');
+  for (const writer of WRITERS) {
+    for (const id of lossOf(writer.id)) assert.ok(en[`exp.loss.${id}`], `${writer.id}: exp.loss.${id} is worded`);
+  }
+  assert.match(en['exp.loss.layout'], /paragraphing/);
+  assert.match(en['exp.loss.csv'], /dropped/);
+  assert.match(en['exp.loss.markdown'], /rather than a file to import back/);
+  assert.throws(() => lossOf('nonsense'), /nothing writes/);
 });
 
 test('an export of part of a translation is a smaller translation, not a broken one', () => {
@@ -174,4 +179,113 @@ test('an export of part of a translation is a smaller translation, not a broken 
   // And it lays out: the fitting check that this is a real translation file.
   assert.ok(parsed.chapters[0].verses[1].text.startsWith('The LORD'));
   assert.equal(measure('x'), 1);
+});
+
+// --- export options ----------------------------------------------------------
+
+/** Read files written in `format` back into "book/chapter/verse" → verse. */
+function readBack(format, files) {
+  const back = new Map();
+  for (const file of files) {
+    const reader = format === 'native' ? 'native' : format === 'usfm' ? 'usfm' : 'xml';
+    const { raw } = convert({
+      text: file.text, format: reader, source: file.name, category,
+      info: { identify: 'again', name: 'Fixture Version', language: 'eng' },
+    });
+    const parsed = parseTranslation(raw, { identify: 'again', category });
+    for (const row of parsed.chapters) {
+      for (const [n, verse] of Object.entries(row.verses)) back.set(`${row.book}/${row.chapter}/${n}`, verse);
+    }
+  }
+  return back;
+}
+
+test('each format says which options mean anything to it', () => {
+  for (const writer of WRITERS) assert.ok(optionsFor(writer.id).includes('strongs'), writer.id);
+  assert.ok(optionsFor('native').includes('compact'));
+  assert.ok(!optionsFor('usfm').includes('compact'), 'USFM has no indentation to take out');
+  assert.ok(optionsFor('markdown').includes('notes') && optionsFor('csv').includes('notes'));
+  assert.ok(!optionsFor('zefania').includes('references'), 'Zefania writes none to leave out');
+  assert.throws(() => optionsFor('nonsense'), /nothing writes/);
+  assert.throws(() => write('native', selection(), { minify: true }), /unknown export option "minify"/);
+  assert.throws(() => write('csv', selection(), { names: 'english' }), /no englishName/);
+});
+
+test("Strong's numbers, headings and references can each be left out", () => {
+  const picked = selection();
+  picked.chapters = picked.chapters.map((row) => (row.book === 1 && row.chapter === 1
+    ? { ...row, verses: { ...row.verses, 1: { ...row.verses[1], text: 'In the beginning{H7225} God{H430} created.' } } }
+    : row));
+  const full = readBack('native', write('native', picked));
+  assert.match(full.get('1/1/1').text, /\{H7225\}/, 'kept by default');
+  assert.equal(full.get('1/1/1').title, 'The creation');
+  assert.equal(full.get('1/1/2').ref, 'Ps 23:1');
+
+  for (const format of ['native', 'usfm', 'usx', 'osis', 'zefania']) {
+    const back = readBack(format, write(format, picked, { strongs: false, headings: false, references: false }));
+    assert.equal(back.get('1/1/1').text.trim(), 'In the beginning God created.', `${format}: no codes`);
+    assert.equal(back.get('1/1/1').title, undefined, `${format}: no heading`);
+    assert.equal(back.get('1/1/2').ref, undefined, `${format}: no reference`);
+    assert.equal(back.size, 5, `${format}: every verse still there`);
+  }
+});
+
+test('compact output is the same document without the whitespace', () => {
+  const picked = selection();
+  for (const format of ['native', 'usx', 'osis', 'zefania']) {
+    const [loose] = write(format, picked);
+    const [tight] = write(format, picked, { compact: true });
+    assert.ok(tight.text.length < loose.text.length, `${format}: ${tight.text.length} against ${loose.text.length}`);
+    assert.equal(tight.text.trimEnd().split('\n').length, 1, `${format}: one line`);
+    assert.deepEqual([...readBack(format, [tight]).entries()].map(([k, v]) => [k, v.text.trim()]),
+      [...readBack(format, [loose]).entries()].map(([k, v]) => [k, v.text.trim()]), `${format}: reads back the same`);
+  }
+});
+
+test('notes go under the verse they are on, in Markdown and in a spreadsheet', () => {
+  const picked = {
+    ...selection(),
+    englishName: (id) => category.book(id).name,
+    notes: [
+      { book: 1, chapter: 1, verse: 2, to: 3, text: 'Formless and empty.\nCompare Jeremiah 4:23.', created: '2026-01-02' },
+      { book: 1, chapter: 1, verse: null, to: null, text: 'The chapter of beginnings.', created: '2026-01-01' },
+      { book: 19, chapter: 23, verse: 1, to: null, text: '   ', created: '2026-01-03' },
+    ],
+  };
+  const [genesis] = write('markdown', picked, { notes: true, noteLabel: 'Merknad' });
+  const text = genesis.text;
+  assert.match(text, /## Genesis 1\n\n> \*\*Merknad\*\* The chapter of beginnings\./, 'a chapter note under the chapter heading');
+  assert.match(text, /\*\*2\*\* And the earth[^\n]*\n\n> Ps 23:1\n\n> \*\*Merknad 2–3\*\* Formless and empty\.\n> Compare Jeremiah 4:23\./,
+    'a note on a run, after its verse and its reference, every line quoted');
+  assert.doesNotMatch(write('markdown', picked)[0].text, /Merknad|Note/, 'none unless asked for');
+
+  const [csv] = write('csv', picked, { notes: true });
+  const lines = csv.text.trim().split('\n');
+  assert.equal(lines[0], 'book,book_name,chapter,verse,text,title,note');
+  assert.match(lines[1], /,The chapter of beginnings\.$/, "a chapter's note on its first row");
+  assert.match(csv.text, /"Formless and empty\.\nCompare Jeremiah 4:23\."/, 'a note with a line break, quoted');
+  assert.match(lines.at(-1), /,$/, 'a blank note is no note');
+});
+
+test('book names can be the canon\'s English ones where they are labels', () => {
+  const picked = { ...selection(), bookName: () => 'Ammuna', englishName: (id) => category.book(id).name };
+  assert.match(write('markdown', picked)[0].text, /^# Ammuna/);
+  assert.match(write('markdown', picked, { names: 'english' })[0].text, /^# Genesis/);
+  assert.match(write('csv', picked, { names: 'english' })[0].text, /\n1,Genesis,1,1,/);
+});
+
+test('the copyright goes wherever the format has a place for it', () => {
+  const picked = selection();
+  for (const format of ['native', 'usfm', 'usx', 'osis', 'zefania', 'markdown']) {
+    for (const file of write(format, picked, { compact: optionsFor(format).includes('compact') })) {
+      assert.match(file.text, /Public domain\./, `${format}: ${file.name}`);
+    }
+  }
+  assert.doesNotMatch(write('csv', picked)[0].text, /Public domain/);
+  assert.deepEqual(lossOf('csv'), ['csv']);
+  assert.match(en['exp.loss.csv'], /copyright/);
+  const about = aboutText(picked.meta, { format: 'CSV', generated: '2026-09-30' });
+  assert.match(about, /Fixture Version \(FIX\)/);
+  assert.match(about, /Copyright\n\nPublic domain\./);
+  assert.match(aboutText({ identify: 'x', info: { name: 'X' } }), /states no copyright/);
 });

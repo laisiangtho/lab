@@ -1884,6 +1884,32 @@ body.drawer-dragging .sidebar{transition:none}
 .fd-opts[data-free="1"] .fd-opt{opacity:.45}
 .fd-opts[data-free="1"] input.fd-free{border-style:solid;background:var(--accent-fade);border-color:var(--accent-line)}
 .fd-acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+/* Two short questions side by side, so a dialog of drop-downs stays short. */
+.fd-group{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.fd-row[hidden],.fd-group[hidden],.fd-chip[hidden]{display:none}
+/* The platform's drop-down, dressed as the fields beside it. */
+.fd-select{
+  height:32px;padding:0 30px 0 10px;border-radius:var(--radius-m);border:1px solid var(--border);
+  background:var(--base-00) no-repeat right 10px center/10px 6px;
+  background-image:linear-gradient(45deg,transparent 50%,var(--text-faint) 50%),linear-gradient(-45deg,transparent 50%,var(--text-faint) 50%);
+  background-size:5px 5px,5px 5px;background-position:right 15px center,right 10px center;
+  color:var(--text-normal);font-family:var(--font-ui);font-size:var(--fs-ui-m);appearance:none;cursor:pointer;
+  min-width:0;width:100%;
+}
+.fd-select:focus{border-color:var(--accent-line);outline:none}
+.fd-select:disabled{opacity:.7;cursor:default}
+/* Independent switches: each says on or off by itself, and a row of them
+   takes one line where a column of tick boxes would take four. */
+.fd-chips{display:flex;flex-wrap:wrap;gap:6px}
+.fd-chip{
+  height:28px;padding:0 11px;border-radius:99px;border:1px solid var(--border);
+  background:transparent;color:var(--text-muted);font-family:var(--font-ui);font-size:var(--fs-ui-s);
+  cursor:pointer;transition:background var(--speed),color var(--speed),border-color var(--speed);
+}
+.fd-chip:hover{background:var(--bg-hover);color:var(--text-normal)}
+.fd-chip[aria-pressed="true"]{background:var(--accent-fade);border-color:var(--accent-line);color:var(--accent-2)}
+.fd-chip[aria-pressed="true"]::before{content:"✓ ";font-weight:700}
+@media (hover:none){.fd-chip{height:36px;padding:0 14px}.fd-select{height:40px}}
 
 /* A Strong's number, explained. The code, then the word, then what it means —
    which the popover could not say until there was a lexicon to ask. */

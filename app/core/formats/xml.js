@@ -29,8 +29,13 @@ const TITLES = new Set(['title', 's', 'ms', 'd', 'caption']);
  * `<para>` is a heading, a cross-reference line, or the text itself depending
  * on what it is styled as.
  */
-const PARA_TITLE = /^(s\d?|ms\d?|mt\d?|d|sr|sp)$/;
-const PARA_NOTE = /^(r|rq|ip|iot|io\d?|ili\d?|im|ie|is\d?|rem|lit)$/;
+const PARA_TITLE = /^(s\d?|ms\d?|d|sr|sp)$/;
+/** OSIS title types that name a book or a running head rather than a section. */
+const BOOK_TITLE = /^(main|runninghead)$/i;
+// A book's own title (`mt1`, `h`, `toc1`) names the book, not a section of it:
+// taken as a heading it became the heading of verse 1 — "Genesis" over "In the
+// beginning" in every USX import.
+const PARA_NOTE = /^(r|rq|ip|iot|io\d?|ili\d?|im|ie|is\d?|rem|lit|mt\d?|mte\d?|imt\d?|h|toc\d?)$/;
 
 /**
  * Which dialect a document is, by what it contains.
@@ -68,6 +73,8 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
   let muted = 0;
   let title = '';
   let capturing = null;
+  /** Book titles open and being skipped, so their close is told from a heading's. */
+  let bookTitles = 0;
   /** Strong's numbers waiting for their word to finish. */
   const tagged = [];
 
@@ -133,7 +140,10 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
 
     if (event.kind === 'close') {
       if (NOTES.has(tag) && muted) muted -= 1;
-      else if (TITLES.has(tag) && capturing !== null) { title = capturing; capturing = null; }
+      else if (TITLES.has(tag) && bookTitles && capturing === null) { bookTitles -= 1; muted -= 1; }
+      // A title before any book is the file's own (OSIS `<header><work><title>`),
+      // not a heading waiting for verse 1.
+      else if (TITLES.has(tag) && capturing !== null) { title = book === null ? '' : capturing; capturing = null; }
       else if (tag === 'para') {
         if (capturing !== null) { title = capturing; capturing = null; }
         else if (muted) muted -= 1;
@@ -146,7 +156,14 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
     }
 
     if (NOTES.has(tag)) { if (!event.empty) muted += 1; return; }
-    if (TITLES.has(tag)) { if (!event.empty) capturing = ''; return; }
+    if (TITLES.has(tag)) {
+      if (event.empty) return;
+      // OSIS names the book itself with a title too (`type="main"`); that one
+      // is not a heading, and read as one it headed verse 1 with "Genesis".
+      if (BOOK_TITLE.test(String(event.attrs.type ?? ''))) { bookTitles += 1; muted += 1; return; }
+      capturing = '';
+      return;
+    }
     // A word carrying a Strong's number, in either dialect's spelling of it.
     // The number is kept inline, in the notation `core/strongs.js` reads.
     if (tag === 'w' || (tag === 'char' && String(event.attrs.style ?? '').toLowerCase() === 'w')) {

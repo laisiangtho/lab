@@ -27,7 +27,7 @@
     "desktop:build": "electron-vite build",
     "desktop:package": "electron-vite build && electron-builder",
     "test": "node --test \"test/*.test.js\" \"test/core/*.test.js\"",
-    "test:e2e": "npm run build && node --test --test-concurrency=1 test/e2e/app.test.mjs test/e2e/restart.test.mjs test/e2e/layout.test.mjs test/e2e/locale.test.mjs",
+    "test:e2e": "npm run build && node --test --test-concurrency=1 test/e2e/app.test.mjs test/e2e/restart.test.mjs test/e2e/layout.test.mjs test/e2e/locale.test.mjs test/e2e/export.test.mjs",
     "test:perf": "npm run build && node test/e2e/perf.mjs",
     "test:desktop": "npm run desktop:build && node test/e2e/desktop.mjs",
     "test:all": "npm test && npm run test:e2e",

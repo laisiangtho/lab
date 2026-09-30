@@ -133,8 +133,13 @@ export function createLibrary({ store, categoryRaw, config }) {
    * @param {{ identify: string, format: string, books?: number[] }} job
    * @returns {Promise<{ files: { name: string, text: string }[], count: number }>}
    */
-  async function exportTranslation({ identify, format, books = null }) {
-    return call({ type: 'export', identify, format, books, category: categoryRaw }, identify);
+  async function exportTranslation({ identify, format, books = null, options = {}, notes = [] }) {
+    return call({ type: 'export', identify, format, books, options, notes, category: categoryRaw }, identify);
+  }
+
+  /** @returns {Promise<{ strongs: boolean, headings: boolean, references: boolean }>} */
+  async function probe(identify) {
+    return (await call({ type: 'probe', identify, category: categoryRaw }, identify)).has;
   }
 
   async function remove(identify) {
@@ -181,6 +186,7 @@ export function createLibrary({ store, categoryRaw, config }) {
     importTranslation,
     importPack,
     exportTranslation,
+    probe,
     remove,
     get catalog() { return catalog; },
     get origin() { return origin; },

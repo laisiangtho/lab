@@ -9,7 +9,7 @@
 import { strict as assert } from 'node:assert';
 import test from 'node:test';
 
-import { makeZip, openZip } from '../app/services/zip.js';
+import { gzipText, makeDeflatedZip, makeZip, openZip } from '../app/services/zip.js';
 
 const encoder = new TextEncoder();
 
@@ -105,4 +105,23 @@ test('something that is not a zip says so, and a broken entry names itself', asy
   view.setUint16(central + 10, 12, true);
   const [entry] = openZip(bytes);
   await assert.rejects(() => entry.text(), /cannot read \(method 12\)/);
+});
+
+test('a compressed export is smaller and reads back the same', async () => {
+  const long = 'In the beginning God created the heaven and the earth. '.repeat(400);
+  const plain = makeZip([{ name: 'a.txt', text: long }]);
+  const small = await makeDeflatedZip([{ name: 'a.txt', text: long }, { name: 'ကမ္ဘာ.txt', text: 'ကမ္ဘာဦး' }]);
+  assert.ok(small.size < plain.size / 4, `deflated ${small.size} bytes against ${plain.size} stored`);
+  const zip = openZip(await small.arrayBuffer());
+  assert.deepEqual(zip.map((e) => e.name), ['a.txt', 'ကမ္ဘာ.txt'], 'a Burmese name survives');
+  assert.equal(await zip[0].text(), long);
+  assert.equal(await zip[1].text(), 'ကမ္ဘာဦး');
+});
+
+test('gzip is a real gzip stream', async () => {
+  const blob = await gzipText('The LORD is my shepherd; I shall not want.');
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  assert.deepEqual([bytes[0], bytes[1]], [0x1f, 0x8b], 'the gzip magic number');
+  const back = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  assert.equal(back, 'The LORD is my shepherd; I shall not want.');
 });

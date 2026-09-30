@@ -5,10 +5,10 @@
 
 import { describe, FORMATS, sniff, slug } from '../../core/formats/index.js';
 import { classify, readMetadata } from '../../core/formats/pack.js';
-import { describeLoss, WRITERS } from '../../core/formats/write.js';
+import { aboutText, lossOf, optionsFor, WRITERS } from '../../core/formats/write.js';
 import { twoLetter } from '../../core/langcode.js';
 import { pickFile, saveText } from '../../services/transfer.js';
-import { makeZip, openZip } from '../../services/zip.js';
+import { gzipText, makeDeflatedZip, openZip } from '../../services/zip.js';
 import { fill, formatBytes, h, keepPlace } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { openMenu } from '../../shell/menu.js';
@@ -19,10 +19,13 @@ import { requestPersistence, storageStatus } from '../../services/store.js';
 const VIEWS = Object.freeze(['language', 'all', 'offline', 'mine']);
 const KEY = 'library';
 
+
+/** The feature record holding the export dialog's last answers. */
+const EXPORT_KEY = 'library.export';
 export default {
   id: 'library',
   setup(ctx) {
-    const { category, library, records, registry, shell, state } = ctx;
+    const { annotations, category, library, records, registry, shell, state } = ctx;
     const progress = new Map(); // identify -> text
     // The page repaints itself while it is open; an import can be started from
     // the command palette with the page shut, and then there is nothing to
@@ -300,39 +303,81 @@ export default {
       const held = (await ctx.store.list()).find((row) => row.identify === identify);
       if (!held) { shell.notify(L('exp.notHeld'), 'error'); return; }
       const name = held.info?.name ?? identify;
+      const notes = annotations.allNotes().filter((note) => String(note.text ?? '').trim());
+      const saved = exportPrefs();
+
+      // What the translation carries, asked of the worker while the dialog is
+      // already open: until it answers, every chip is offered.
+      let has = null;
+      let setLater = null;
+      let latest = null;
+      library.probe(identify).then((found) => {
+        has = found;
+        if (setLater && latest) setLater('live', summary(latest));
+      }).catch(() => { /* the chips stay offered; the export itself reports any fault */ });
+
+      const writerOf = (values) => WRITERS.find((w) => w.id === values.format);
+      const applies = (values, option) => optionsFor(values.format).includes(option);
+      /** How many files the answers produce before any packaging. */
+      const fileCount = (values) => {
+        const books = booksFor(values, []);
+        const count = books ? books.length : category.books.length;
+        return writerOf(values)?.single ? 1 : count;
+      };
+      const carries = (option) => option === 'notes' ? notes.length > 0 : !has || has[option];
 
       /** What the answers so far add up to, in one line. */
       const summary = (values) => {
+        latest = values;
         const books = booksFor(values, []);
         const list = books ?? category.books.map((book) => book.id);
         const chapters = list.reduce((n, id) => n + (category.hasBook(id) ? category.book(id).chapters : 0), 0);
-        const writer = WRITERS.find((w) => w.id === values.format);
         if (!list.length) return L('exp.summaryNone', { what: String(values.book ?? '').trim() });
+        const files = fileCount(values);
+        const packed = values.pack === 'zip'
+          ? L('exp.filesMany', { n: files + 1 })
+          : L('exp.oneFile');
+        const all = category.books.reduce((n, book) => n + book.chapters, 0);
+        const bytes = estimate(held.bytes ?? 0, values, chapters / all);
         return [
-          L('exp.summary', {
-            books: list.length,
-            chapters,
-            files: writer?.single ? L('exp.oneFile') : L('exp.filesMany', { n: list.length }),
-          }),
-          ...describeLoss(values.format),
-        ].join(' ');
+          L('exp.summary', { books: list.length, chapters, files: packed }),
+          bytes ? L('exp.about', { size: formatBytes(bytes) }) : '',
+          ...lossOf(values.format).map((id) => L(`exp.loss.${id}`)),
+        ].filter(Boolean).join(' ');
       };
 
+      const formatNow = saved.format;
+      const mine = (format) => saved.formats[format] ?? {};
       const answers = await shell.form({
         title: L('exp.title', { name }),
         confirm: L('exp.do'),
         fields: [
           {
-            id: 'format',
-            label: L('exp.format'),
-            type: 'choice',
-            value: 'native',
-            options: WRITERS.map((writer) => ({ id: writer.id, label: L(`src.fmt.${writer.id}`) })),
+            type: 'group',
+            fields: [
+              {
+                id: 'format',
+                label: L('exp.format'),
+                type: 'select',
+                value: formatNow,
+                options: WRITERS.map((writer) => ({ id: writer.id, label: L(`src.fmt.${writer.id}`) })),
+              },
+              {
+                id: 'pack',
+                label: L('exp.package'),
+                type: 'select',
+                value: mine(formatNow).pack ?? 'file',
+                options: [
+                  { id: 'file', label: L('exp.pack.file'), show: (v) => fileCount(v) === 1 },
+                  { id: 'gzip', label: L('exp.pack.gzip'), show: (v) => fileCount(v) === 1 },
+                  { id: 'zip', label: L('exp.pack.zip') },
+                ],
+              },
+            ],
           },
           {
             id: 'scope',
             label: L('exp.scope'),
-            hint: L('exp.scopeHint'),
             type: 'choice',
             value: 'all',
             options: [
@@ -344,34 +389,144 @@ export default {
             // exists only to point at it.
             free: { id: 'book', label: L('exp.book'), placeholder: L('exp.bookPlaceholder') },
           },
+          {
+            id: 'include',
+            label: L('exp.include'),
+            type: 'chips',
+            value: mine(formatNow).include ?? ['strongs', 'headings', 'references'],
+            options: ['strongs', 'headings', 'references', 'notes'].map((option) => ({
+              id: option,
+              label: L(`exp.inc.${option}`),
+              show: (v) => applies(v, option) && carries(option),
+            })),
+          },
+          {
+            type: 'group',
+            fields: [
+              {
+                id: 'output',
+                label: L('exp.output'),
+                type: 'select',
+                value: mine(formatNow).output ?? 'readable',
+                show: (v) => applies(v, 'compact'),
+                options: [
+                  { id: 'readable', label: L('exp.out.readable') },
+                  { id: 'compact', label: L('exp.out.compact') },
+                ],
+              },
+              {
+                id: 'names',
+                label: L('exp.names'),
+                type: 'select',
+                value: mine(formatNow).names ?? 'own',
+                show: (v) => applies(v, 'names'),
+                options: [
+                  { id: 'own', label: L('exp.names.own') },
+                  { id: 'english', label: L('exp.names.english') },
+                ],
+              },
+            ],
+          },
           { id: 'live', type: 'note', value: '' },
         ],
         // The live line is written on open and after every answer, so nobody
         // presses Export to find out what Export would do.
-        onChange: (values, set) => set('live', summary(values)),
+        onChange: (values, set) => { setLater = set; set('live', summary(values)); },
       });
       if (!answers) return;
 
       const wanted = booksFor(answers, []);
       if (wanted && !wanted.length) { shell.notify(L('exp.noBooks', { what: answers.book }), 'error'); return; }
+      await rememberExport(answers);
+
+      // Only what this format has a use for goes to the writer, and only what
+      // the reader could see: a chip hidden for this translation is not an
+      // answer, whatever it was left at last time.
+      const options = {};
+      for (const option of optionsFor(answers.format)) {
+        if (option === 'compact') options.compact = answers.output === 'compact';
+        else if (option === 'names') options.names = answers.names;
+        else options[option] = carries(option) ? answers.include.includes(option) : option !== 'notes';
+      }
+      if (options.notes) options.noteLabel = L('exp.noteLabel');
 
       progress.set(identify, L('exp.working'));
       repaint();
       try {
-        const { files } = await library.exportTranslation({ identify, format: answers.format, books: wanted });
+        const { files } = await library.exportTranslation({
+          identify, format: answers.format, books: wanted, options,
+          notes: options.notes ? notes.map(({ book, chapter, verse, to, text, created }) => ({ book, chapter, verse, to, text, created })) : [],
+        });
         if (!files.length) { shell.notify(L('exp.nothing'), 'error'); return; }
         const stem = `${identify}-${answers.format}`;
-        if (files.length === 1) saveText(files[0].name, files[0].text);
-        else saveText(`${stem}.zip`, makeZip(files));
+        let out;
+        if (answers.pack === 'zip' || files.length > 1) {
+          const about = aboutText(await ctx.store.getMeta(identify), {
+            format: L(`src.fmt.${answers.format}`), generated: new Date().toISOString().slice(0, 10),
+          });
+          out = { name: `${stem}.zip`, blob: await makeDeflatedZip([...files, { name: 'ABOUT.txt', text: about }]) };
+        } else if (answers.pack === 'gzip') {
+          out = { name: `${files[0].name}.gz`, blob: await gzipText(files[0].text) };
+        } else {
+          out = { name: files[0].name, blob: new Blob([files[0].text], { type: 'text/plain;charset=utf-8' }) };
+        }
+        saveText(out.name, out.blob);
         shell.notify(files.length === 1
-          ? L('exp.done', { name: files[0].name })
-          : L('exp.doneMany', { n: files.length, name: `${stem}.zip` }), 'ok');
+          ? L('exp.done', { name: out.name, size: formatBytes(out.blob.size) })
+          : L('exp.doneMany', { n: files.length, name: out.name, size: formatBytes(out.blob.size) }), 'ok');
       } catch (err) {
         shell.notify(`${name}: ${err.message}`, 'error');
       } finally {
         progress.delete(identify);
         repaint();
       }
+    }
+
+    /**
+     * The export choices last made, per format, so a reader who always wants
+     * compact JSON without Strong's numbers says so once. Kept as a feature
+     * record, so it travels in the settings export. Anything unrecognised is
+     * dropped rather than trusted: the record may come from a newer build.
+     */
+    function exportPrefs() {
+      const raw = records.get(EXPORT_KEY, null);
+      const formats = {};
+      const ids = new Set(WRITERS.map((w) => w.id));
+      for (const [format, prefs] of Object.entries(raw?.formats ?? {})) {
+        if (!ids.has(format) || !prefs || typeof prefs !== 'object') continue;
+        formats[format] = {
+          ...(['file', 'gzip', 'zip'].includes(prefs.pack) ? { pack: prefs.pack } : {}),
+          ...(['readable', 'compact'].includes(prefs.output) ? { output: prefs.output } : {}),
+          ...(['own', 'english'].includes(prefs.names) ? { names: prefs.names } : {}),
+          ...(Array.isArray(prefs.include)
+            ? { include: prefs.include.filter((id) => ['strongs', 'headings', 'references', 'notes'].includes(id)) }
+            : {}),
+        };
+      }
+      return { format: ids.has(raw?.format) ? raw.format : 'native', formats };
+    }
+
+    function rememberExport(answers) {
+      const prefs = exportPrefs();
+      prefs.format = answers.format;
+      prefs.formats[answers.format] = {
+        pack: answers.pack, output: answers.output, names: answers.names, include: [...answers.include],
+      };
+      return records.save(EXPORT_KEY, prefs);
+    }
+
+    /**
+     * Roughly how big the download will be, from the size of the stored copy.
+     * Said as "about": the ratios are measured on full Bibles and a single
+     * short book strays from them, which the notice after the save corrects.
+     */
+    function estimate(storedBytes, values, share) {
+      if (!storedBytes) return 0;
+      const RATIO = { native: 1, usfm: 0.8, usx: 1.6, osis: 1.4, zefania: 1.2, csv: 0.85, markdown: 0.85 };
+      let bytes = storedBytes * share * (RATIO[values.format] ?? 1);
+      if (values.output === 'compact' && optionsFor(values.format).includes('compact')) bytes *= 0.85;
+      if (values.pack !== 'file') bytes *= 0.3;
+      return Math.max(1024, Math.round(bytes));
     }
 
     /**

@@ -4,7 +4,8 @@
  * Request   { id, type: 'install', identify, url, category }   (category = raw category.json)
  *           { id, type: 'import', identify, text, format, info, category }
  *           { id, type: 'pack',   identify, files, info, category }
- *           { id, type: 'export', identify, format, books, category }
+ *           { id, type: 'export', identify, format, books, options, notes, category }
+ *           { id, type: 'probe', identify, category }
  * Progress  { id, type: 'progress', phase: 'download'|'convert'|'validate'|'write', received? }
  * Result    { id, type: 'done', identify, version, stats, diagnostics, report? }
  * Failure   { id, type: 'error', message }
@@ -21,6 +22,7 @@ import { parseCategory } from '../core/category.js';
 import { convert } from '../core/formats/index.js';
 import { readPack } from '../core/formats/pack.js';
 import { write } from '../core/formats/write.js';
+import { hasStrongs } from '../core/strongs.js';
 import { parseTranslation } from '../core/translation.js';
 import { openStore } from '../services/store.js';
 
@@ -31,7 +33,7 @@ self.addEventListener('message', async ({ data }) => {
   const { id, type } = data;
   const post = (msg) => self.postMessage({ id, ...msg });
   try {
-    const jobs = { install, import: importFile, pack: importPack, export: exportFiles };
+    const jobs = { install, import: importFile, pack: importPack, export: exportFiles, probe };
     if (!jobs[type]) throw new Error(`library worker: unknown request type ${type}`);
     storePromise ??= openStore();
     category ??= parseCategory(data.category);
@@ -128,7 +130,26 @@ async function importPack({ identify, files, info }, post) {
  * a whole Bible is thirty thousand rows and the reader should still be able to
  * scroll while it happens.
  */
-async function exportFiles({ identify, format, books }, post) {
+/**
+ * What a translation actually carries, so the export dialog offers to leave
+ * out only what is there: a chip for Strong's numbers on a text without any is
+ * a question with no meaning. Stops reading as soon as all three are found.
+ */
+async function probe({ identify }) {
+  const store = await storePromise;
+  const found = { strongs: false, headings: false, references: false };
+  const all = () => found.strongs && found.headings && found.references;
+  await store.scanChapters(identify, (row) => {
+    for (const verse of Object.values(row.verses ?? {})) {
+      if (!found.strongs && hasStrongs(String(verse?.text ?? ''))) found.strongs = true;
+      if (verse?.title) found.headings = true;
+      if (verse?.ref) found.references = true;
+    }
+  }, { while: () => !all() });
+  return { identify, has: found };
+}
+
+async function exportFiles({ identify, format, books, options = {}, notes = [] }, post) {
   post({ type: 'progress', phase: 'read' });
   const store = await storePromise;
   const meta = await store.getMeta(identify);
@@ -144,7 +165,9 @@ async function exportFiles({ identify, format, books }, post) {
     meta,
     chapters,
     bookName: (id) => meta.books?.[id]?.name ?? category.book(id).name,
-  });
+    englishName: (id) => category.book(id).name,
+    notes: wanted ? notes.filter((note) => wanted.has(note.book)) : notes,
+  }, options);
   return { identify, files, count: chapters.length };
 }
 

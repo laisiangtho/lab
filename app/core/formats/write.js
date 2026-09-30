@@ -21,17 +21,58 @@
  * merge. It does not keep USFM's paragraph structure, its poetry indentation,
  * its footnotes or its red letters, because it does not use them. So a file
  * written here is a faithful record of the verses and an impoverished record of
- * the typesetting, and `describeLoss` says so in words the export dialog shows
+ * the typesetting, and `lossOf` says so in words the export dialog shows
  * before anybody presses the button. A converter that implies a round trip
  * through this app is lossless would be lying.
  */
 
 import { bookCodes } from './books.js';
+import { extractStrongs } from '../strongs.js';
 
 /**
  * @typedef {{ meta: object, chapters: { book: number, chapter: number, verses: object }[],
- *             bookName?: (book: number) => string }} Selection
+ *             bookName?: (book: number) => string,
+ *             englishName?: (book: number) => string,
+ *             notes?: { book: number, chapter: number, verse: number|null, to: number|null, text: string }[] }} Selection
  */
+
+/**
+ * What an export may leave out or change. Every default is the whole file:
+ * an option only ever takes something away or rearranges it, so an export
+ * made without choosing anything is the fullest one.
+ *
+ *   strongs     keep Strong's numbers in the text
+ *   headings    keep section headings (verse titles)
+ *   references  keep cross-reference lines
+ *   notes       the reader's own notes, under the verses they are on
+ *   compact     no indentation or line breaks between elements (JSON, XML)
+ *   names       book names: 'own' (the translation's) or 'english' (the canon's)
+ *   noteLabel   the word a note is introduced by, in the reader's language
+ *
+ * The copyright and the translation's metadata are not an option. Wherever a
+ * format has a place for them they are written; a text travels with its terms.
+ */
+export const EXPORT_DEFAULTS = Object.freeze({
+  strongs: true, headings: true, references: true, notes: false, compact: false, names: 'own', noteLabel: 'Note',
+});
+
+/** Which options mean anything for a format: the rest are not offered. */
+const APPLIES = Object.freeze({
+  native: ['strongs', 'headings', 'references', 'compact'],
+  usfm: ['strongs', 'headings', 'references'],
+  usx: ['strongs', 'headings', 'references', 'compact'],
+  osis: ['strongs', 'headings', 'references', 'compact'],
+  zefania: ['strongs', 'headings', 'compact'],
+  csv: ['strongs', 'headings', 'notes', 'names'],
+  markdown: ['strongs', 'headings', 'references', 'notes', 'names'],
+});
+
+/** @returns {string[]} the option ids that change what `format` writes */
+export function optionsFor(format) {
+  const found = APPLIES[format];
+  if (!found) throw new Error(`formats: nothing writes "${format}"`);
+  return [...found];
+}
 
 /** The formats that can be written, in the order they are offered. */
 export const WRITERS = Object.freeze([
@@ -54,14 +95,27 @@ export const writerById = (id) => WRITERS.find((w) => w.id === id) ?? null;
  * @returns {{ name: string, text: string }[]} one entry per file: a whole Bible
  *          in USFM is 66 files, and in OSIS it is one.
  */
-export function write(format, selection) {
+export function write(format, selection, options = {}) {
   const writer = writerById(format);
   if (!writer) throw new Error(`formats: nothing writes "${format}"`);
-  const grouped = byBook(selection.chapters);
-  const name = (book) => selection.bookName?.(book)
+  for (const key of Object.keys(options)) {
+    if (!(key in EXPORT_DEFAULTS)) throw new Error(`formats: unknown export option "${key}"`);
+  }
+  const opts = { ...EXPORT_DEFAULTS, ...options };
+  if (!['own', 'english'].includes(opts.names)) throw new Error(`formats: book names must be "own" or "english", not "${opts.names}"`);
+  if (opts.names === 'english' && typeof selection.englishName !== 'function') {
+    throw new Error('formats: English book names were asked for and the selection has no englishName');
+  }
+  const grouped = byBook(shapeChapters(selection.chapters, opts));
+  const own = (book) => selection.bookName?.(book)
     ?? selection.meta.books?.[book]?.name
     ?? `Book ${book}`;
-  const parts = { ...selection, grouped, name };
+  const name = opts.names === 'english' ? (book) => selection.englishName(book) : own;
+  const notes = opts.notes ? notesByPlace(selection.notes ?? []) : null;
+  const join = opts.compact
+    ? (lines) => lines.map((line) => line.trimStart()).join('')
+    : (lines) => lines.join('\n');
+  const parts = { ...selection, grouped, name, own, notes, join, opts };
   switch (format) {
     case 'native': return [{ name: `${selection.meta.identify}.json`, text: nativeText(parts) }];
     case 'usfm': return grouped.map(([book, chapters]) => ({
@@ -84,16 +138,83 @@ export function write(format, selection) {
 }
 
 /**
- * What this app cannot carry, for the reader about to convert something.
- * @returns {string[]} plain sentences, or nothing when the format loses nothing
+ * The chapters with what was left out taken out, before any writer sees them,
+ * so no writer has its own idea of what "without headings" means.
  */
-export function describeLoss(format) {
-  const shared = 'paragraphing, poetry layout, footnotes and any typesetting the original carried';
+function shapeChapters(chapters, opts) {
+  if (opts.strongs && opts.headings && opts.references) return chapters;
+  return chapters.map((row) => ({
+    ...row,
+    verses: Object.fromEntries(Object.entries(row.verses ?? {}).map(([n, verse]) => {
+      const out = { ...verse };
+      if (!opts.strongs) out.text = extractStrongs(String(verse?.text ?? '')).text;
+      if (!opts.headings) delete out.title;
+      if (!opts.references) delete out.ref;
+      return [n, out];
+    })),
+  }));
+}
+
+/** Notes keyed "book.chapter" for a chapter note, "book.chapter.verse" for a verse or a run. */
+function notesByPlace(notes) {
+  const map = new Map();
+  for (const note of [...notes].sort((a, b) => a.book - b.book || a.chapter - b.chapter
+    || (a.verse ?? 0) - (b.verse ?? 0) || String(a.created ?? '').localeCompare(String(b.created ?? '')))) {
+    const text = String(note.text ?? '').trim();
+    if (!text) continue;
+    const key = note.verse == null ? `${note.book}.${note.chapter}` : `${note.book}.${note.chapter}.${note.verse}`;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push({ ...note, text });
+  }
+  return map;
+}
+
+/**
+ * The translation's particulars as plain text: what goes beside the files in
+ * a zip, so a format with nowhere to put a copyright line (a spreadsheet)
+ * still travels with it.
+ */
+export function aboutText(meta, { format, generated } = {}) {
+  const info = meta.info ?? {};
+  const lines = [
+    `${info.name ?? meta.identify}${info.shortname ? ` (${info.shortname})` : ''}`,
+    '',
+    ...(info.language?.text ? [`Language: ${info.language.text}`] : []),
+    ...(info.year ? [`Year: ${info.year}`] : []),
+    ...(info.publisher ? [`Publisher: ${info.publisher}`] : []),
+    `Identify: ${meta.identify}, version ${meta.version ?? '?'}`,
+    ...(format ? [`Format: ${format}`] : []),
+    ...(generated ? [`Written: ${generated}`] : []),
+    '',
+    'Copyright',
+    '',
+    info.copyright ? String(info.copyright) : 'The source file states no copyright. Ask the publisher before sharing it.',
+    '',
+  ];
+  return lines.join('\n');
+}
+
+/**
+ * What a format cannot carry, for the reader about to convert something.
+ *
+ * Returned as ids, one per sentence, and worded in the interface's locales
+ * (`exp.loss.<id>`): this file is pure and the words are the reader's.
+ *
+ *   layout     paragraphing, poetry layout and footnotes, which this app does not keep
+ *   csv        cross-references and the copyright line: a spreadsheet has nowhere for them
+ *   markdown   a document to read, not a file to import back
+ *   zefania    no element for cross-references, and the layout as above
+ *
+ * @returns {string[]} nothing when the format loses nothing
+ */
+export function lossOf(format) {
   switch (format) {
     case 'native': return [];
-    case 'csv': return ['Headings and cross-references are dropped; a spreadsheet has nowhere to put them.'];
-    case 'markdown': return ['This is something to read rather than a file to import back: verse numbers become labels.'];
-    default: return [`Verses, headings and cross-references are written; ${shared} is not, because this app does not keep it.`];
+    case 'csv': return ['csv'];
+    case 'markdown': return ['markdown'];
+    case 'zefania': return ['zefania'];
+    case 'usfm': case 'usx': case 'osis': return ['layout'];
+    default: throw new Error(`formats: nothing writes "${format}"`);
   }
 }
 
@@ -127,7 +248,7 @@ const usfmName = (book, identify) => {
  * The shape `parseTranslation` reads, so an export is re-importable and a
  * partial export is a smaller translation rather than a broken one.
  */
-function nativeText({ meta, grouped, name }) {
+function nativeText({ meta, grouped, own: name, opts }) {
   const book = {};
   for (const [id, chapters] of grouped) {
     const own = meta.books?.[id];
@@ -152,7 +273,7 @@ function nativeText({ meta, grouped, name }) {
     ...(meta.digit?.length ? { digit: [...meta.digit] } : {}),
     ...(meta.testament ? { testament: meta.testament } : {}),
     book,
-  }, null, 1)}\n`;
+  }, null, opts.compact ? 0 : 1)}\n`;
 }
 
 /** A verse with only the fields it actually has. */
@@ -172,6 +293,7 @@ function usfmText(book, chapters, { meta, name }) {
   const lines = [
     `\\id ${code} ${meta.info.name}`,
     `\\ide UTF-8`,
+    ...(meta.info.copyright ? [`\\rem ${oneLine(meta.info.copyright)}`] : []),
     `\\h ${name(book)}`,
     `\\toc1 ${name(book)}`,
     `\\toc2 ${name(book)}`,
@@ -195,12 +317,13 @@ function usfmText(book, chapters, { meta, name }) {
  * USX is USFM's XML sibling: the same markers as elements, verses as
  * milestones rather than containers.
  */
-function usxText(book, chapters, { meta, name }) {
+function usxText(book, chapters, { meta, name, join }) {
   const code = bookCodes(book).usfm;
   const out = [
     '<?xml version="1.0" encoding="utf-8"?>',
     '<usx version="3.0">',
     `  <book code="${code}" style="id">${esc(meta.info.name)}</book>`,
+    ...(meta.info.copyright ? [`  <para style="rem">${esc(oneLine(meta.info.copyright))}</para>`] : []),
     `  <para style="h">${esc(name(book))}</para>`,
     `  <para style="mt1">${esc(name(book))}</para>`,
   ];
@@ -217,12 +340,12 @@ function usxText(book, chapters, { meta, name }) {
     }
   }
   out.push('</usx>');
-  return `${out.join('\n')}\n`;
+  return `${join(out)}\n`;
 }
 
 // --- OSIS ------------------------------------------------------------------
 
-function osisText({ meta, grouped, name }) {
+function osisText({ meta, grouped, name, join }) {
   const work = meta.identify;
   const out = [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -252,12 +375,12 @@ function osisText({ meta, grouped, name }) {
     out.push('    </div>');
   }
   out.push('  </osisText>', '</osis>');
-  return `${out.join('\n')}\n`;
+  return `${join(out)}\n`;
 }
 
 // --- Zefania ---------------------------------------------------------------
 
-function zefaniaText({ meta, grouped, name }) {
+function zefaniaText({ meta, grouped, name, join }) {
   const out = [
     '<?xml version="1.0" encoding="utf-8"?>',
     `<XMLBIBLE biblename="${esc(meta.info.name)}" type="x-bible" revision="${meta.version ?? 1}">`,
@@ -281,18 +404,28 @@ function zefaniaText({ meta, grouped, name }) {
     out.push('  </BIBLEBOOK>');
   }
   out.push('</XMLBIBLE>');
-  return `${out.join('\n')}\n`;
+  return `${join(out)}\n`;
 }
 
 // --- delimited -------------------------------------------------------------
 
-function csvText({ grouped, name }) {
-  const rows = ['book,book_name,chapter,verse,text,title'];
+function csvText({ grouped, name, notes }) {
+  const rows = [`book,book_name,chapter,verse,text,title${notes ? ',note' : ''}`];
   for (const [book, chapters] of grouped) {
     for (const row of chapters) {
-      for (const [n, verse] of versesOf(row)) {
-        rows.push([book, name(book), row.chapter, n, verse.text, verse.title ?? ''].map(cell).join(','));
-      }
+      versesOf(row).forEach(([n, verse], index) => {
+        const cells = [book, name(book), row.chapter, n, verse.text, verse.title ?? ''];
+        if (notes) {
+          // A chapter note has no verse of its own and goes on the first row
+          // of the chapter, ahead of that verse's notes.
+          const here = [
+            ...(index === 0 ? notes.get(`${book}.${row.chapter}`) ?? [] : []),
+            ...(notes.get(`${book}.${row.chapter}.${n}`) ?? []),
+          ];
+          cells.push(here.map((note) => note.text).join('\n\n'));
+        }
+        rows.push(cells.map(cell).join(','));
+      });
     }
   }
   return `${rows.join('\n')}\n`;
@@ -306,18 +439,32 @@ function cell(value) {
 
 // --- Markdown --------------------------------------------------------------
 
-function markdownText(book, chapters, { meta, name }) {
-  const out = [`# ${name(book)}`, '', `> ${meta.info.name} (${meta.info.shortname}) · ${meta.info.language.text}`, ''];
+function markdownText(book, chapters, { meta, name, notes, opts }) {
+  const info = meta.info;
+  const out = [`# ${name(book)}`, '', `> ${info.name} (${info.shortname}) · ${info.language.text}`];
+  if (info.copyright) out.push('>', `> ${oneLine(info.copyright)}`);
+  out.push('');
+  const noteBlock = (note) => {
+    // A run says which verses it covers; a note on one verse sits right under it.
+    const where = note.verse != null && note.to && note.to !== note.verse ? ` ${note.verse}–${note.to}` : '';
+    const lines = note.text.split('\n');
+    return [`> **${opts.noteLabel}${where}** ${lines[0]}`, ...lines.slice(1).map((line) => (line ? `> ${line}` : '>')), ''];
+  };
   for (const row of chapters) {
     out.push(`## ${name(book)} ${row.chapter}`, '');
+    for (const note of notes?.get(`${book}.${row.chapter}`) ?? []) out.push(...noteBlock(note));
     for (const [n, verse] of versesOf(row)) {
       if (verse.title) out.push(`### ${verse.title}`, '');
       out.push(`**${n}${verse.merge ? `–${verse.merge}` : ''}** ${verse.text}`, '');
       if (verse.ref) out.push(`> ${verse.ref}`, '');
+      for (const note of notes?.get(`${book}.${row.chapter}.${n}`) ?? []) out.push(...noteBlock(note));
     }
   }
   return `${out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`;
 }
+
+/** A copyright notice on one line, for the formats that hold one line. */
+const oneLine = (text) => String(text).replace(/\s+/g, ' ').trim();
 
 // --- shared ----------------------------------------------------------------
 

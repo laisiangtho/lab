@@ -14,9 +14,21 @@ import { h, fill } from './dom.js';
 import { L } from './i18n.js';
 
 /**
- * @typedef {{ id: string, label: string, hint?: string, value?: string,
- *             placeholder?: string, type?: 'text'|'choice',
- *             options?: { id: string, label: string, sub?: string }[] }} Field
+ * @typedef {{ id: string, label: string, hint?: string, value?: string|string[],
+ *             placeholder?: string, type?: 'text'|'choice'|'select'|'chips'|'note'|'group',
+ *             fields?: Field[],
+ *             show?: (values: object) => boolean,
+ *             options?: { id: string, label: string, sub?: string,
+ *                         show?: (values: object) => boolean }[] }} Field
+ *
+ * `select` is a drop-down: one answer from several, in the space of one line.
+ * `chips` is several independent yes-or-no answers side by side; its value is
+ * the list of ids that are on. `group` lays its own fields out on one line.
+ *
+ * `show` hides a field, or an option, that means nothing given the answers so
+ * far — a choice about indentation for a format that has none. It is asked
+ * again after every answer. A select whose answer is hidden moves to its first
+ * shown option, so the values handed back are always ones that were on screen.
  */
 
 export function createFormDialog() {
@@ -39,7 +51,7 @@ export function createFormDialog() {
   element.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { e.stopPropagation(); finish(null); return; }
     // Enter finishes from anywhere but a place where it means a new line.
-    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') { e.preventDefault(); finish({ ...values }); }
+    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT') { e.preventDefault(); finish(answers()); }
   });
 
   function finish(result) {
@@ -58,8 +70,8 @@ export function createFormDialog() {
   function open(options) {
     fields = options.fields ?? [];
     values = {};
-    for (const field of fields) {
-      values[field.id] = field.value ?? '';
+    for (const field of flat(fields)) {
+      values[field.id] = field.type === 'chips' ? [...(field.value ?? [])] : field.value ?? '';
       // A choice may carry a second answer on the same line; it holds its own
       // value, and the row it shares tells nothing about it.
       if (field.free) values[field.free.id] = field.free.value ?? '';
@@ -70,9 +82,10 @@ export function createFormDialog() {
     lede.hidden = !options.lede;
     confirmButton.textContent = options.confirm ?? L('cmd.ok');
     cancelButton.textContent = options.cancel ?? L('cmd.cancel');
-    confirmButton.onclick = () => finish({ ...values });
+    confirmButton.onclick = () => finish(answers());
     cancelButton.onclick = () => finish(null);
     paint();
+    refresh();
     // Once on open, so a live line says something before anything is pressed.
     onChange?.({ ...values }, set);
     element.hidden = false;
@@ -84,36 +97,124 @@ export function createFormDialog() {
     return new Promise((resolve) => { settle = resolve; });
   }
 
-  /** Change a field's value from outside — what `onChange` uses to prefill. */
+  /** The values, with a chip list copied so the caller cannot change ours. */
+  const answers = () => Object.fromEntries(Object.entries(values)
+    .map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]));
+
+  /** Every field, the ones inside a group included. */
+  function flat(list) {
+    return list.flatMap((field) => (field.type === 'group' ? flat(field.fields ?? []) : [field]));
+  }
+
+  /**
+   * Change a field's value from outside — what `onChange` uses to prefill —
+   * and ask every `show` again, since what was set may be what they depend on.
+   */
   function set(id, value) {
     values[id] = value;
     const note = rows.querySelector(`p.fd-live[data-field="${id}"]`);
-    if (note) { note.textContent = value; return; }
+    if (note) { note.textContent = value; refresh(); return; }
     const input = rows.querySelector(`input[data-field="${id}"], [data-field="${id}"] input[type="text"]`);
     if (input && input.value !== value) input.value = value;
+    refresh();
+  }
+
+  /** Hide what means nothing now, and keep every select on an option it shows. */
+  function refresh() {
+    const now = answers();
+    for (const field of flat(fields)) {
+      const row = rows.querySelector(`[data-field="${field.id}"]`);
+      if (!row) continue;
+      row.hidden = field.show ? !field.show(now) : false;
+      for (const option of field.options ?? []) {
+        const el = row.querySelector(`[data-value="${CSS.escape(option.id)}"]`);
+        if (!el) continue;
+        el.hidden = option.show ? !option.show(now) : false;
+        // Safari lists a hidden <option> anyway; a disabled one it cannot pick.
+        if (el.tagName === 'OPTION') el.disabled = el.hidden;
+      }
+      if (field.type === 'select') {
+        const select = row.querySelector('select');
+        const shown = [...select.options].filter((o) => !o.hidden);
+        if (shown.length && !shown.some((o) => o.value === values[field.id])) {
+          values[field.id] = shown[0].value;
+          select.value = shown[0].value;
+        }
+        // One choice left is not a question; the row says what it will be.
+        select.disabled = shown.length <= 1;
+      }
+      if (field.type === 'chips') {
+        const shown = (field.options ?? []).filter((o) => !o.show || o.show(now));
+        if (!shown.length) row.hidden = true;
+      }
+    }
+    for (const group of rows.querySelectorAll('.fd-group')) {
+      group.hidden = [...group.children].every((child) => child.hidden);
+    }
   }
 
   function paint() {
-    fill(rows, fields.map((field) => {
-      // A line the dialog writes to itself as the answers change: what you
-      // will get, before you press the button that gets it.
-      if (field.type === 'note') {
-        return h('p', { class: 'fd-live', dataset: { field: field.id } }, values[field.id] ?? '');
-      }
-      const control = field.type === 'choice'
-        ? choice(field)
-        : h('input', {
-          type: 'text', spellcheck: 'false', value: values[field.id] ?? '',
-          placeholder: field.placeholder ?? '',
-          'aria-label': field.label,
-          oninput: (e) => { values[field.id] = e.currentTarget.value; onChange?.({ ...values }, set); },
-        });
-      return h('label', { class: 'fd-row', dataset: { field: field.id } },
-        h('span', { class: 'fd-label' },
-          h('span', { class: 'fd-name' }, field.label),
-          field.hint ? h('span', { class: 'fd-hint' }, field.hint) : null),
-        control);
-    }));
+    fill(rows, fields.map(row));
+  }
+
+  function row(field) {
+    // A line the dialog writes to itself as the answers change: what you
+    // will get, before you press the button that gets it.
+    if (field.type === 'note') {
+      return h('p', { class: 'fd-live', dataset: { field: field.id } }, values[field.id] ?? '');
+    }
+    if (field.type === 'group') {
+      return h('div', { class: 'fd-group' }, ...(field.fields ?? []).map(row));
+    }
+    const changed = () => { refresh(); onChange?.({ ...values }, set); };
+    let control;
+    if (field.type === 'choice') control = choice(field);
+    else if (field.type === 'select') control = select(field, changed);
+    else if (field.type === 'chips') control = chips(field, changed);
+    else {
+      control = h('input', {
+        type: 'text', spellcheck: 'false', value: values[field.id] ?? '',
+        placeholder: field.placeholder ?? '',
+        'aria-label': field.label,
+        oninput: (e) => { values[field.id] = e.currentTarget.value; changed(); },
+      });
+    }
+    // A chip row is a set of buttons, and a label round it would make a click
+    // anywhere on the row press the first chip.
+    return h(field.type === 'chips' ? 'div' : 'label', { class: 'fd-row', dataset: { field: field.id } },
+      h('span', { class: 'fd-label' },
+        h('span', { class: 'fd-name' }, field.label),
+        field.hint ? h('span', { class: 'fd-hint' }, field.hint) : null),
+      control);
+  }
+
+  /** A drop-down: the platform's own, so it is right on a phone and from a keyboard. */
+  function select(field, changed) {
+    const control = h('select', {
+      class: 'fd-select', 'aria-label': field.label,
+      onchange: (e) => { values[field.id] = e.currentTarget.value; changed(); },
+    }, ...(field.options ?? []).map((option) => h('option', {
+      value: option.id, dataset: { value: option.id },
+    }, option.label)));
+    control.value = values[field.id];
+    return control;
+  }
+
+  /** Independent switches in a row, each a pressed-or-not button. */
+  function chips(field, changed) {
+    return h('div', { class: 'fd-chips', role: 'group', 'aria-label': field.label },
+      ...(field.options ?? []).map((option) => h('button', {
+        type: 'button', class: 'fd-chip', dataset: { value: option.id },
+        'aria-pressed': String(values[field.id].includes(option.id)),
+        onclick: (e) => {
+          const on = !values[field.id].includes(option.id);
+          values[field.id] = on
+            ? [...values[field.id], option.id]
+            : values[field.id].filter((id) => id !== option.id);
+          e.currentTarget.setAttribute('aria-pressed', String(on));
+          changed();
+        },
+      }, option.label)));
   }
 
   /**
@@ -139,6 +240,7 @@ export function createFormDialog() {
         values[field.id] = option.id;
         for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.value === option.id));
         if (typed) { typed.value = ''; values[free.id] = ''; group.dataset.free = '0'; }
+        refresh();
         onChange?.({ ...values }, set);
       },
     }, h('span', { class: 'fd-opt-n' }, option.label),
@@ -153,6 +255,7 @@ export function createFormDialog() {
         oninput: (e) => {
           values[free.id] = e.currentTarget.value;
           group.dataset.free = e.currentTarget.value.trim() ? '1' : '0';
+          refresh();
           onChange?.({ ...values }, set);
         },
       });
