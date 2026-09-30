@@ -47,6 +47,11 @@
   --shadow-s:0 1px 2px rgba(0,0,0,.28);
   --shadow-m:0 6px 18px rgba(0,0,0,.36);
   --shadow-l:0 16px 48px rgba(0,0,0,.52),0 2px 8px rgba(0,0,0,.4);
+  /* A window over the workspace: a hairline of light round its edge and a
+     long, soft shadow under it, rather than a drawn border. */
+  --win-ring:0 0 0 1px rgba(255,255,255,.07);
+  --win-shadow:0 30px 60px -14px rgba(0,0,0,.62),0 10px 22px -8px rgba(0,0,0,.45);
+  --win-shadow-back:0 14px 30px -12px rgba(0,0,0,.5);
 
   --font-ui:"Inter var","Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
   --font-text:"Iowan Old Style","Source Serif 4","Charter","Palatino Linotype","Book Antiqua",Georgia,serif;
@@ -138,6 +143,9 @@ html[data-theme="light"]{
   --shadow-s:0 1px 2px rgba(0,0,0,.07);
   --shadow-m:0 6px 18px rgba(0,0,0,.10);
   --shadow-l:0 16px 48px rgba(0,0,0,.16),0 2px 8px rgba(0,0,0,.08);
+  --win-ring:0 0 0 1px rgba(15,23,42,.10);
+  --win-shadow:0 30px 60px -16px rgba(15,23,42,.28),0 10px 22px -10px rgba(15,23,42,.18);
+  --win-shadow-back:0 14px 30px -14px rgba(15,23,42,.2);
 
   --mark-bg:rgba(250,204,21,.26);
   --mark-line:#ca8a04;
@@ -1421,25 +1429,42 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
 .float-win{
   position:fixed;z-index:120;display:flex;flex-direction:column;
   min-width:340px;min-height:220px;
-  background:var(--bg-primary);border:1px solid var(--border-strong);
-  border-radius:var(--radius-l);box-shadow:var(--shadow-m);overflow:hidden;
+  background:var(--bg-primary);border:0;
+  border-radius:12px;box-shadow:var(--win-ring),var(--win-shadow-back);overflow:hidden;
+  animation:win-in .16s ease-out;
 }
-.float-win.is-front{box-shadow:var(--shadow-l);border-color:var(--base-40)}
-.float-win.is-max{border-radius:var(--radius-l)}
+.float-win.is-front{box-shadow:var(--win-ring),var(--win-shadow)}
+.float-win.is-max{border-radius:12px}
+/* One surface: the bar is the top of the sheet, not a band of another colour.
+   A handle at its centre says it can be taken hold of. */
 .float-bar{
-  height:34px;flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:0 6px 0 12px;
-  background:var(--tabstrip-bg);cursor:grab;user-select:none;
+  height:36px;flex:0 0 auto;display:flex;align-items:center;gap:2px;padding:0 6px 0 12px;
+  background:var(--bg-primary);cursor:grab;user-select:none;position:relative;
 }
+.float-bar::before,.cw-bar::before{
+  content:"";position:absolute;left:50%;top:5px;width:34px;height:4px;border-radius:99px;
+  transform:translateX(-50%);background:var(--base-30);opacity:0;transition:opacity var(--speed);
+  pointer-events:none;
+}
+.float-win:hover .float-bar::before,.composer:hover .cw-bar::before{opacity:.7}
+.float-bar.is-dragging::before,.cw-bar.is-dragging::before{opacity:1;background:var(--accent-line)}
+.float-win:not(.is-front) .float-name{color:var(--text-faint)}
+.float-bar .tb-btn{width:28px;height:28px;border-radius:8px;transition:background var(--speed),color var(--speed)}
+.float-bar .tb-btn:hover{background:var(--bg-hover);color:var(--text-normal)}
+.float-bar .tb-btn:last-child:hover{background:rgba(232,72,85,.16);color:var(--c-red)}
+.float-body .crumbs,.float-body .crumb-bar{border-top:0}
+@keyframes win-in{from{opacity:0;transform:translateY(6px) scale(.985)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.float-win,.composer{animation:none}}
 .float-bar.is-dragging{cursor:grabbing}
 .float-win svg{width:14px;height:14px;flex:0 0 auto}
 .float-name{
   flex:1;min-width:0;display:flex;align-items:center;gap:7px;
-  font-size:var(--fs-ui-s);font-weight:600;color:var(--text-muted);
+  font-size:var(--fs-ui-s);font-weight:600;color:var(--text-normal);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .float-body{flex:1;min-height:0;min-width:0;display:flex}
 .float-body .leaf{flex:1;min-width:0;min-height:0}
-.float-win .cw-resize[data-dir="e"]{top:34px}
+.float-win .cw-resize[data-dir="e"]{top:36px}
 /* Where a detached tab will land, and where a docked one came from. */
 .win-hint{
   position:fixed;z-index:205;pointer-events:none;
@@ -1455,8 +1480,9 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
    sit above the composer so the overflow menu can be a modal. */
 .composer{
   position:fixed;z-index:120;display:flex;flex-direction:column;min-width:340px;min-height:240px;
-  background:var(--bg-elevated);border:1px solid var(--border-strong);border-radius:var(--radius-l);
-  box-shadow:var(--shadow-l);overflow:hidden;
+  background:var(--bg-elevated);border:0;border-radius:12px;
+  box-shadow:var(--win-ring),var(--win-shadow);overflow:hidden;
+  animation:win-in .16s ease-out;
 }
 .composer[hidden]{display:none}
 .composer[data-max="1"]{
@@ -1465,8 +1491,9 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
   height:calc(100dvh - var(--statusbar-h) - var(--mac-inset) - var(--gutter) * 2)!important;
 }
 .cw-bar{
-  height:35px;flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:0 6px 0 10px;
-  background:var(--tabstrip-bg);cursor:grab;user-select:none;
+  height:40px;flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:0 8px 0 12px;
+  background:var(--bg-elevated);cursor:grab;user-select:none;position:relative;
+  border-bottom:1px solid var(--border);
 }
 .composer svg{width:14px;height:14px;flex:0 0 auto}
 .cw-mark{display:grid;place-items:center;color:var(--text-faint);flex:0 0 auto}
@@ -1477,20 +1504,23 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
 .cw-chip[hidden]{display:none}
 .cw-bar.is-dragging{cursor:grabbing}
 
-.cw-seg{display:flex;gap:1px;background:var(--base-20);border-radius:var(--radius-m);padding:2px}
+.cw-seg{display:flex;gap:1px;background:var(--bg-hover);border-radius:8px;padding:2px}
 .cw-seg button{
-  width:26px;height:20px;border-radius:4px;display:grid;place-items:center;color:var(--text-faint);
+  width:28px;height:22px;border-radius:6px;display:grid;place-items:center;color:var(--text-faint);
+  transition:background var(--speed),color var(--speed);
 }
 .cw-seg button:hover{color:var(--text-normal)}
 .cw-seg button.is-on{background:var(--surface-raised);color:var(--text-normal);box-shadow:var(--shadow-s)}
 .cw-tool{
-  width:26px;height:24px;border-radius:var(--radius-s);display:grid;place-items:center;color:var(--text-faint);
+  width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--text-faint);
+  transition:background var(--speed),color var(--speed);
 }
+.cw-bar .cw-tool:last-child:hover{background:rgba(232,72,85,.16);color:var(--c-red)}
 .cw-tool:hover{background:var(--bg-hover);color:var(--text-normal)}
 .cw-title{
   flex:1;min-width:0;background:none;border:0;outline:none;cursor:inherit;
-  font-size:var(--fs-ui-l);font-weight:600;color:var(--text-normal);
-  padding:2px 4px;border-radius:var(--radius-s);
+  font-size:var(--fs-ui-m);font-weight:600;color:var(--text-normal);letter-spacing:-.005em;
+  padding:4px 6px;border-radius:6px;
 }
 .cw-title:hover{background:var(--bg-hover)}
 .cw-title:focus{background:var(--bg-hover);outline:1px solid var(--accent-line);cursor:text}
@@ -1518,10 +1548,14 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
 .composer[data-mode="preview"] .cw-write{display:none}
 .cw-write textarea{
   width:100%;height:100%;border:0;outline:none;resize:none;background:transparent;
-  padding:10px 14px 40px;font-family:var(--font-mono);font-size:13.5px;line-height:1.72;
-  color:var(--base-80);tab-size:2;
+  padding:18px 22px 48px;font-family:var(--font-ui);font-size:15px;line-height:1.7;
+  color:var(--text-normal);tab-size:2;caret-color:var(--accent-2);
 }
-.cw-preview{padding:10px 16px 40px;font-size:var(--fs-ui-l);line-height:1.65;color:var(--text-muted)}
+.cw-write textarea::placeholder{color:var(--text-faint)}
+/* The rendered side sits a shade apart, so the two halves read as source and
+   page without a line having to say so. */
+.cw-preview{padding:18px 22px 48px;font-size:var(--fs-ui-l);line-height:1.7;color:var(--text-muted);background:var(--bg-primary)}
+.composer[data-mode="preview"] .cw-preview{background:var(--bg-elevated)}
 /* The note's id, length and save time cost no layout: they float over the
    editor, fade in on hover and after a save, and never take a click. */
 .cw-meta{
@@ -1532,7 +1566,7 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
 }
 .composer:hover .cw-meta,.cw-meta.is-shown{opacity:.92}
 .cw-resize{position:absolute;z-index:3}
-.cw-resize[data-dir="e"]{top:35px;bottom:14px;right:0;width:6px;cursor:ew-resize}
+.cw-resize[data-dir="e"]{top:40px;bottom:14px;right:0;width:6px;cursor:ew-resize}
 .cw-resize[data-dir="s"]{left:12px;right:12px;bottom:0;height:6px;cursor:ns-resize}
 .cw-resize[data-dir="se"]{right:0;bottom:0;width:14px;height:14px;cursor:nwse-resize}
 .cw-resize[data-dir="se"]::after{
@@ -1540,9 +1574,9 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
   background:repeating-linear-gradient(135deg,
     transparent 0 2.6px,var(--base-40) 2.6px 4px);
   clip-path:polygon(100% 0,100% 100%,0 100%);
-  opacity:.65;transition:opacity var(--speed);
+  opacity:0;transition:opacity var(--speed);
 }
-.composer:hover .cw-resize[data-dir="se"]::after{opacity:1}
+.composer:hover .cw-resize[data-dir="se"]::after,.float-win:hover .cw-resize[data-dir="se"]::after{opacity:.7}
 .composer[data-max="1"] .cw-resize{display:none}
 
 /* rendered markdown, shared by the preview and the manager */
