@@ -1,6 +1,9 @@
 # Packaging: out/ (from `npm run desktop:build`) → release/
 appId: org.laisiangtho.app
 productName: Lai Siangtho
+# Shown in the Windows file properties and the macOS About box. The code is
+# MIT (LICENSE); each translation keeps its own copyright, shown with it.
+copyright: Copyright © 2016–2026 Khen Solomon Lethil
 # Stamped by scripts/version.mjs; the build number of the day (see app/version.js).
 # buildVersion goes into the macOS and Windows metadata; buildNumber becomes the
 # package revision of the .deb and .rpm (26.9.29-11), so a second build on the

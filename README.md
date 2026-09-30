@@ -362,3 +362,7 @@ Export (Settings view, or the command palette) writes `lai-siangtho-settings-YYY
 Notes and bookmarks travel with it, under `data`. Translation text is not (several MB each). Import restores the reading state, merges the notes and bookmarks, and lists the translations that are not installed here, with one button to download them. A file from another app, or a newer `schema`, is refused with a message naming the problem.
 
 On desktop the export uses the browser download path, so the app's own save dialog appears; a target can route it through the native dialog instead by giving the feature a `saveFile` capability.
+
+## Licence
+
+The code is MIT (`LICENSE`). The scripture is not part of it: each translation belongs to its publisher, keeps its own copyright, and carries it into every export, where the metadata header is always written and cannot be switched off.
