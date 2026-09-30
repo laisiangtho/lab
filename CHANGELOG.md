@@ -147,6 +147,33 @@ newest first.
 
 ## Releases
 
+### 26.09.30.10 — 30 September 2026
+
+Found by running every command, document and pane on a desktop (dark,
+light, Norwegian) and a phone (English, Burmese), and every reading layout
+with Strong's numbers on and off, one and two panes:
+
+- Fixed: in the List layout, a word carrying a Strong's number stood on a
+  line of its own, apart from its verse.
+- Fixed: Ctrl/⌘ P while the quick switcher or any list was open fell
+  through to the browser and opened the Print dialog; it now opens the
+  palette in the list's place.
+- Fixed: with the ribbon hidden, its "Add a button" control still hung,
+  faded and pressable, off the top-left corner.
+- Escape closes a sidebar drawer on a phone (and a phone's back gesture,
+  where the browser sends it as Escape).
+- A message about a setting replaces the last one about the same setting:
+  "Strong's numbers: off" and "on" no longer stand one above the other.
+- An empty note opens where it can be written, not in Preview.
+- The Library's page and source buttons keep their names when their labels
+  are hidden, for screen readers and tooltips.
+- A language named in its own script is marked as that language, so it is
+  drawn in a face for that script.
+- The ribbon's setting described removing a button with an × that no longer
+  exists; it now says to drag it to the bin.
+- Data and formats says, in the reader's language, that its reference
+  sections are in English and why, and marks them as English.
+
 ### 26.09.30.9 — 30 September 2026
 
 - The Library takes the Cards page's shape: one band of tools, no title and

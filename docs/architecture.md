@@ -1122,6 +1122,25 @@ symptom appeared a long way from the cause.
   resize, and steps down only when it overflows, the way the Cards band does.
   `library.test.mjs` checks at six widths that no two of its tools overlap.
 
+- **A grid takes every child as a cell.** The List layout is a two-column
+  grid, the verse number and its text. A verse whose text was one string had
+  one element after the number; a verse carrying a Strong's number had
+  several, and each went into a cell of its own, so the tagged word stood
+  alone on a line. Everything after the number is now one `.vtext` element.
+  The existing tests read the text, never the layout, and no fixture combined
+  a tagged verse with the List layout until the crawl did.
+
+- **A shortcut the app ignores is a shortcut the browser takes.** The key
+  handler returned early whenever a dialog was open, so Ctrl+P inside the
+  quick switcher reached the browser and opened Print. The keys that open a
+  list now work from inside one and replace it.
+
+- **Look at the result with the fonts a reader has.** Every Burmese
+  screenshot taken in the development container was drawn with Unifont,
+  which cannot shape Burmese, so review of Burmese layout was review of the
+  wrong glyphs. Noto Sans Myanmar is now installed there before screenshots
+  are taken.
+
 ## 4. Catalog update flow
 
 1. First run: bundled catalog, labelled with its date as potentially outdated.

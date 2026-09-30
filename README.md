@@ -21,6 +21,7 @@ Phase 2 of the project. The Phase 1 single-file `index.html` is preserved as git
 | `npm run test:e2e` | The built web app driven in a browser, one file at a time: the ordered checks, the app across restarts, phone and title-bar layout (every page on a phone, in Burmese), the interface languages and projects studio, the Library, Strong's numbers and the rest of a translation's markup, and every card-studio panel on a desktop and on a phone |
 | `npm run test:desktop` | The packaged Electron application, started and inspected |
 | `npm run test:perf` | Timings at full size: three complete Bibles, the longest chapter, a whole-library search |
+| `npm run test:crawl` | Every palette command run on a desktop (dark, light, Norwegian) and a phone (English, Burmese), the screen inspected after each for errors, overflow, leaked strings, clipped labels, overlapping controls and unnamed buttons (a few minutes a run) |
 | `npm run test:all` | `npm test` then the browser suite |
 | `npm run aliases -- <identify> [--file PATH] [--apply]` | Alias overlay maintenance (dry run by default) |
 | `npm run icons -- [--apply \| --out DIR]` | Every PNG icon drawn again from `public/icons/icon.svg` (dry run by default; see `assets/icons/README.md`) |
