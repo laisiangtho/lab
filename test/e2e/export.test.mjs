@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
 import { openZip } from '../../app/services/zip.js';
-import { available, launch } from './harness.mjs';
+import { available, installFromLibrary, launch } from './harness.mjs';
 
 const ready = await available();
 const options = ready.ok ? {} : { skip: `end-to-end: ${ready.why}` };
@@ -22,9 +22,7 @@ test('exporting a translation', options, async (t) => {
   await app.open();
   await page.waitForSelector('.wl', { timeout: 20000 });
   await page.locator('.wl .btn.primary').click();
-  await page.waitForSelector('.library-item');
-  await page.locator('[data-identify="kjv1611"] .library-actions .btn').click();
-  await page.locator('[data-identify="kjv1611"] .badge-ok').waitFor({ timeout: 60000 });
+  await installFromLibrary(page, 'kjv1611');
 
   // A note of the reader's own, on Genesis 1:1, then a restart to load it.
   await page.evaluate(async () => {
@@ -42,10 +40,11 @@ test('exporting a translation', options, async (t) => {
   await page.locator('.modal-input').fill('Library');
   await page.waitForTimeout(250);
   await page.keyboard.press('Enter');
-  await page.waitForSelector('[data-identify="kjv1611"] .badge-ok');
+  // Home: what is on this device.
+  await page.waitForSelector('.library-item[data-identify="kjv1611"]');
 
   const openDialog = async () => {
-    await page.locator('[data-identify="kjv1611"] .library-actions button').last().click();
+    await page.locator('.library-item[data-identify="kjv1611"] .lib-act[aria-haspopup="menu"]').click();
     await page.locator('.menu .menu-item', { hasText: 'Export' }).click();
     await page.waitForSelector('.fd');
     await page.waitForTimeout(600);

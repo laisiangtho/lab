@@ -26,6 +26,10 @@ export const defaults = Object.freeze({
    */
   repoTreeUrl: 'https://api.github.com/repos/laisiangtho/bible/git/trees/master?recursive=1',
   repoFileUrl: 'https://raw.githubusercontent.com/laisiangtho/bible/refs/heads/master/{path}',
+  /** Translation sources the Library lists besides the catalog (see core/sources.js). */
+  getbibleListUrl: 'https://api.getbible.net/v2/translations.json',
+  ebibleListUrl: 'https://ebible.org/Scriptures/translations.csv',
+  ebibleFilesUrl: 'https://ebible.org/Scriptures/',
   /**
    * Where the web build is published. A link copied to a verse points here,
    * so a link made in the desktop app opens for somebody without it.

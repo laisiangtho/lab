@@ -14,6 +14,9 @@ export function createPlatform() {
       openExternal: (url) => bridge.openExternal(url),
       appInfo: () => bridge.appInfo(),
       checkUpdate: () => bridge.checkUpdate(),
+      // Downloads from this app's own process, which no site's rules for web
+      // pages apply to: eBible.org, and any address the reader types.
+      fetchBytes: (url) => bridge.fetchBytes(url),
       // Only where the window buttons are an overlay the app can colour.
       ...(bridge.frame === 'overlay' ? { windowFrame: (frame) => bridge.setWindowFrame(frame) } : {}),
     }),

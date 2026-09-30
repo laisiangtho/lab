@@ -18,9 +18,12 @@ export const basePolicy = Object.freeze({
   'script-src': ["'self'"],
   'style-src': ["'self'"],
   'img-src': ["'self'", 'data:'],
-  // The catalog and its files, and GitHub's list of them (the guide's data
-  // has no index of its own; see app/core/guidedata.js).
-  'connect-src': ["'self'", 'https://raw.githubusercontent.com', 'https://api.github.com'],
+  // Any https address. The Library imports from an address the reader types,
+  // and lists getBible and eBible.org besides the catalog, so no fixed list of
+  // hosts is right. What keeps the page safe is unchanged: scripts come only
+  // from the app itself (script-src 'self'), so nothing here can be sent
+  // anywhere by code the app did not ship. Plain http is still refused.
+  'connect-src': ["'self'", 'https:'],
   'worker-src': ["'self'"],
   'object-src': ["'none'"],
   'base-uri': ["'none'"],

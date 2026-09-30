@@ -7,6 +7,8 @@ import { describe, FORMATS, sniff, slug } from '../../core/formats/index.js';
 import { classify, readMetadata } from '../../core/formats/pack.js';
 import { aboutText, lossOf, optionsFor, WRITERS } from '../../core/formats/write.js';
 import { twoLetter } from '../../core/langcode.js';
+import { onDevice } from '../../core/sources.js';
+import { createSources } from '../../services/sources.js';
 import { pickFile, saveText } from '../../services/transfer.js';
 import { gzipText, makeDeflatedZip, openZip } from '../../services/zip.js';
 import { fill, formatBytes, h, keepPlace } from '../../shell/dom.js';
@@ -15,8 +17,16 @@ import { openMenu } from '../../shell/menu.js';
 import { L, when } from '../../shell/i18n.js';
 import { requestPersistence, storageStatus } from '../../services/store.js';
 
-/** How the list is arranged. The choice is remembered. */
-const VIEWS = Object.freeze(['language', 'all', 'offline', 'mine']);
+/** Where Get more can take a translation from, in the order they are offered. */
+const SOURCE_IDS = Object.freeze(['catalog', 'getbible', 'ebible', 'url', 'file']);
+const SOURCE_ICON = Object.freeze({ catalog: 'library', getbible: 'db', ebible: 'book', url: 'link', file: 'files' });
+/**
+ * How many rows of a long list are drawn before typing narrows it. eBible.org
+ * lists over a thousand translations; drawing them all is seconds of work to
+ * show a column nobody scrolls to the bottom of.
+ */
+const LIST_CAP = 150;
+/** The feature record: which source Get more was last on. */
 const KEY = 'library';
 
 
@@ -31,28 +41,12 @@ export default {
     // the command palette with the page shut, and then there is nothing to
     // repaint and nothing that needs to be.
     let repaint = () => {};
-    let query = '';
-    const held = records.get(KEY, null);
-    let view = VIEWS.includes(held?.view) ? held.view : VIEWS[0];
-    const setView = (next) => {
-      view = next;
-      records.save(KEY, { view: next }).catch(() => { /* a view is not worth a toast */ });
-    };
-
-    // How the library lists itself is a setting; the page also offers it, which
-    // is where a reader who is already looking at the list will change it.
-    registry.setting({
-      id: 'library.view',
-      section: 'storage',
-      order: 10,
-      build: (ui) => ui.choice({
-        name: L('set.libraryView'),
-        hint: L('set.libraryViewHint'),
-        options: VIEWS.map((id) => [id, L(`lib.view.${id}`)]),
-        value: view,
-        onChange: (next) => { setView(next); ui.refresh(); },
-      }),
-    });
+    const saved = records.get(KEY, null);
+    const sources = createSources({ store: ctx.store, platform: ctx.platform, config: ctx.config });
+    /** The open Library's way to show one source, for commands run from elsewhere. */
+    let openSource = null;
+    /** Set while the Library is open: shows what is on this device, where a file just added now is. */
+    let showHome = null;
 
     async function check() {
       try {
@@ -111,8 +105,8 @@ export default {
      * USFM file knows it is Genesis and has no idea what translation it belongs
      * to; a spreadsheet of verses knows neither.
      */
-    async function importFile() {
-      const file = await pickFile({
+    async function importFile(given = null) {
+      const file = given ?? await pickFile({
         accept: '.zip,.json,.usfm,.sfm,.usfx,.usx,.osis,.xml,.zef,.csv,.tsv,.txt,text/*,application/zip',
       });
       if (!file) return;
@@ -182,6 +176,7 @@ export default {
           result.report?.skipped ? L('imp.skipped', { n: result.report.skipped }) : '',
         ].filter(Boolean).join(' · ');
         shell.notify(L('imp.done', { name: answers.name || identify, notes }), 'ok');
+        showHome?.();
       } catch (err) {
         shell.notify(`${file.name}: ${err.message}`, 'error');
       } finally {
@@ -200,27 +195,14 @@ export default {
      * calls Genesis, instead of asking a reader who would have to go and look.
      */
     async function importArchive(file) {
-      let entries = [];
+      let files;
+      let entries;
       try {
-        entries = openZip(file.bytes);
+        ({ files, entries } = await readArchive(file.bytes, file.name));
       } catch (err) {
         shell.notify(`${file.name}: ${err.message}`, 'error');
         return;
       }
-      // Only the text files: a bundle carries fonts and signatures too, and
-      // inflating a 4 MB font to look at it would be work for nothing.
-      const wanted = entries.filter((entry) => entry.size > 0 && entry.size < 80 * 1024 * 1024
-        && !/\.(?:ttf|otf|woff2?|png|jpe?g|gif|pdf|zip|epub|mobi)$/i.test(entry.name));
-      const files = [];
-      for (const entry of wanted) {
-        try {
-          files.push({ name: entry.name.split('/').pop(), text: await entry.text() });
-        } catch {
-          // One unreadable member is not a reason to refuse the archive; the
-          // assembler reports what it did not use.
-        }
-      }
-      if (!files.length) { shell.notify(L('imp.emptyZip', { file: file.name }), 'error'); return; }
 
       const found = packDescribe(files, file.name);
       const answers = await shell.form({
@@ -257,6 +239,7 @@ export default {
           result.diagnostics.length ? L('lbl.differs', { n: result.diagnostics.length }) : '',
         ].filter(Boolean).join(' · ');
         shell.notify(L('imp.done', { name: answers.name || identify, notes }), 'ok');
+        showHome?.();
       } catch (err) {
         shell.notify(`${file.name}: ${err.message}`, 'error');
       } finally {
@@ -264,6 +247,31 @@ export default {
         repaint();
       }
     }
+
+    /**
+     * The text files in a zip, as the pack importer takes them. Only text: a
+     * bundle carries fonts and signatures too, and inflating a 4 MB font to
+     * look at it would be work for nothing.
+     */
+    async function readArchive(bytes, name) {
+      const entries = openZip(bytes);
+      const wanted = entries.filter((entry) => entry.size > 0 && entry.size < 80 * 1024 * 1024
+        && !/\.(?:ttf|otf|woff2?|png|jpe?g|gif|pdf|zip|epub|mobi)$/i.test(entry.name));
+      const files = [];
+      for (const entry of wanted) {
+        try {
+          files.push({ name: entry.name.split('/').pop(), text: await entry.text() });
+        } catch {
+          // One unreadable member is not a reason to refuse the archive; the
+          // assembler reports what it did not use.
+        }
+      }
+      if (!files.length) throw new Error(L('imp.emptyZip', { file: name }));
+      return { files, entries };
+    }
+
+    /** The texts of a downloaded zip, for a source that already said what it holds. */
+    const archiveTexts = async (bytes, name) => (await readArchive(bytes, name)).files;
 
     /**
      * What is in this archive, for the dialog — read from the bundle's own
@@ -611,7 +619,8 @@ export default {
      * somewhere in the middle and no mark on them.
      */
     const suggested = (row) => {
-      const code = twoLetter(row.entry?.language.name ?? row.entry?.language.text ?? '');
+      const code = twoLetter(row.entry?.language.name ?? row.entry?.language.text
+        ?? row.held?.info?.language?.iso?.['639-1'] ?? row.held?.info?.language?.name ?? row.language?.code ?? '');
       return Boolean(code) && wanted.has(code);
     };
 
@@ -643,15 +652,250 @@ export default {
         let disposed = false;
         const run = () => render().catch((err) => shell.notify(err.message, 'error'));
         repaint = run;
+        /**
+         * Two pages in one tab. "On this device" is the home: only what is
+         * here, so it stays short and calm. "Get more" is the studio for
+         * bringing translations in, one source at a time. The home is where
+         * the Library opens whenever something is here; with nothing here,
+         * there is nothing to show but where to get it.
+         */
+        let page = null;
+        let source = SOURCE_IDS.includes(saved?.source) ? saved.source : 'catalog';
+        let query = '';
+        /** A source's list once read, by id: { rows, fetchedAt } or { error }. */
+        const lists = new Map();
 
         const filter = h('input', {
-          type: 'search', spellcheck: 'false', value: query,
+          type: 'search', spellcheck: 'false',
           placeholder: L('lib.filter'), 'aria-label': L('lib.filter'),
           oninput: (e) => { query = e.currentTarget.value; run(); },
         });
+        const note = h('p', { class: 'muted' });
+        const tabs = h('nav', { class: 'lib-tabs', role: 'tablist' });
+        const tools = h('div', { class: 'lib-tools' });
+        const rail = h('div', { class: 'lib-rail', role: 'tablist', 'aria-label': L('lib.sources') });
+        const body = h('div', { class: 'library-body' });
+        const main = h('div', { class: 'lib-main' }, tools, body);
+        const studio = h('div', { class: 'lib-studio' }, rail, main);
 
-        /** Name, abbreviation, language or identify — whatever the reader types. */
-        function matches(row) {
+        /** An icon button: what it does is its title. */
+        const action = (glyph, label, onclick) => h('button', {
+          class: 'lib-act', title: label, 'aria-label': label, onclick,
+        }, icon(glyph));
+
+        el.replaceChildren(h('section', { class: 'doc library' },
+          h('header', { class: 'doc-head' }, h('h1', { class: 'inline-title' }, L('doc.library')), note, tabs),
+          studio));
+
+        const go = (next) => {
+          page = next;
+          query = '';
+          filter.value = '';
+          run();
+        };
+        const pick = (next) => {
+          source = next;
+          query = '';
+          filter.value = '';
+          records.save(KEY, { source: next }).catch(() => { /* a remembered source is not worth a toast */ });
+          run();
+        };
+
+        async function render() {
+          const [rows, storage] = await Promise.all([library.status(), storageStatus()]);
+          if (disposed) return;
+          const here = rows.filter((row) => row.held);
+          page ??= here.length ? 'home' : 'more';
+          studio.dataset.page = page;
+
+          fill(tabs,
+            tab('home', 'book', L('lib.tab.home'), here.length),
+            tab('more', 'download', L('lib.tab.more'), null));
+
+          const storageLine = [
+            L('lib.storageUsed', { size: formatBytes(storage.usage) }),
+            storage.persisted === false
+              ? [' · ', L('lib.notPersistent'), ' ', h('button', { class: 'link-btn', onclick: () => keep().then(run) }, L('lib.keep'))]
+              : null,
+          ];
+          if (page === 'home') {
+            fill(note, ...storageLine);
+            paintHome(here);
+          } else {
+            const catalog = library.catalog;
+            fill(note, source === 'catalog'
+              ? [library.origin === 'bundled'
+                ? [L('lib.bundled'), ' ', h('button', { class: 'link-btn', onclick: () => check().then(run) }, L('lib.checkNow'))]
+                : L('lib.catalog', { version: catalog.version, updated: when.date(catalog.updated), checked: when.dateTime(library.fetchedAt) }),
+              ' · ', ...storageLine]
+              : storageLine);
+            await paintMore(rows, here);
+          }
+        }
+
+        function tab(id, glyph, label, count) {
+          return h('button', {
+            class: 'lib-tab', role: 'tab', dataset: { page: id }, 'aria-selected': String(page === id),
+            onclick: () => go(id),
+          }, icon(glyph), h('span', {}, label), count === null ? null : h('span', { class: 'lib-tab-n' }, String(count)));
+        }
+
+        // --- On this device ----------------------------------------------------
+
+        function paintHome(here) {
+          fill(tools,
+            h('div', { class: 'field' }, icon('search'), filter),
+            h('span', { class: 'grow' }),
+            action('plus', L('imp.cmd'), () => importFile().catch((err) => shell.notify(err.message, 'error'))),
+            action('link', L('lib.fromUrl'), () => { page = 'more'; pick('url'); }),
+            action('sync', L('cmd.checkUpdates'), check));
+          fill(rail);
+          const shown = here.filter(matchesHeld);
+          const updates = here.filter((row) => row.state === 'update').length;
+          keepPlace(body, () => fill(body,
+            !here.length
+              ? h('div', { class: 'lib-empty' },
+                h('span', { class: 'lib-empty-mark' }, icon('library')),
+                h('p', { class: 'lib-empty-t' }, L('lib.emptyHome')),
+                h('button', { class: 'btn primary', onclick: () => go('more') }, icon('download'), L('lib.getMore')))
+              : [
+                updates ? h('p', { class: 'lib-banner' }, icon('sync'), L('lib.updatesWaiting', { n: updates })) : null,
+                shown.length ? groups(shown, (row) => homeItem(row)) : h('p', { class: 'empty-hint' }, L('lib.noHits', { query: query.trim() })),
+              ]));
+        }
+
+        function matchesHeld(row) {
+          const q = query.trim().toLowerCase();
+          if (!q) return true;
+          const info = row.held?.info ?? {};
+          return [row.identify, info.name, info.shortname, info.language?.text, row.entry?.name]
+            .filter(Boolean).join(' ').toLowerCase().includes(q);
+        }
+
+        function homeItem(row) {
+          const info = row.held.info ?? {};
+          const busy = progress.get(row.identify);
+          const origin = row.state === 'local' ? formatName(row.held?.source) : null;
+          return h('li', { class: `library-item state-${row.state}`, dataset: { identify: row.identify } },
+            mark(info.shortname || row.identify),
+            h('div', { class: 'library-meta' },
+              h('strong', {}, row.entry ? `${row.entry.shortname} · ${row.entry.name}` : ownTitle(row)),
+              h('span', { class: 'muted' }, [info.language?.text, row.held ? held(row.held) : null].filter(Boolean).join(' · ')),
+              row.state === 'local' ? h('span', { class: 'badge' }, L('lib.yours')) : null,
+              origin && row.held?.source !== 'native' ? h('span', { class: 'badge badge-src' }, origin) : null,
+              row.state === 'unlisted' ? h('span', { class: 'badge' }, L('lib.unlisted')) : null,
+              row.state === 'update' ? h('span', { class: 'badge badge-hint' }, `v${row.installedVersion} → v${row.entry.version}`) : null),
+            h('div', { class: 'library-actions' }, busy
+              ? h('span', { class: 'muted' }, busy)
+              : [
+                row.state === 'update'
+                  ? h('button', { class: 'btn soft', dataset: { place: `install:${row.identify}` }, onclick: () => act(row.identify, 'install') }, icon('sync'), L('lib.update'))
+                  : null,
+                h('button', {
+                  class: 'lib-act', title: L('lib.read'), 'aria-label': L('lib.read'),
+                  onclick: () => { shell.workspace.setPaneTranslation(0, row.identify); const { book, chapter } = state.get(); shell.openChapter(book, chapter); },
+                }, icon('book-open')),
+                h('button', {
+                  class: 'lib-act', title: L('lib.more'), 'aria-label': L('lib.more'), 'aria-haspopup': 'menu',
+                  dataset: { place: `menu:${row.identify}` },
+                  onclick: (e) => rowMenu(e.currentTarget, row),
+                }, icon('more')),
+              ]));
+        }
+
+        /** A translation's short name, as a small square: the eye finds a row by it. */
+        function mark(text) {
+          const letters = [...String(text).replace(/[^\p{L}\p{N}]/gu, '')].slice(0, 3).join('') || '·';
+          return h('span', { class: 'lib-mark', 'aria-hidden': 'true' }, letters);
+        }
+
+        /** Rows by language, the reader's own languages first. */
+        function groups(rows, draw) {
+          const by = new Map();
+          for (const row of rows) {
+            const lang = row.held?.info?.language?.text ?? row.entry?.language.text ?? row.language?.name ?? L('lib.unlistedGroup');
+            if (!by.has(lang)) by.set(lang, []);
+            by.get(lang).push(row);
+          }
+          const mine = (list) => (list.some(suggested) ? 0 : 1);
+          return [...by.entries()]
+            .sort(([a, x], [b, y]) => mine(x) - mine(y) || a.localeCompare(b))
+            .map(([lang, list]) => h('div', { class: 'library-group' },
+              h('h2', {}, lang, h('span', { class: 'lib-group-n' }, String(list.length))),
+              h('ul', { class: 'library-list' }, list.map(draw))));
+        }
+
+        // --- Get more ----------------------------------------------------------
+
+        async function paintMore(rows, here) {
+          const heldRows = here.map((row) => row.held);
+          fill(rail, ...SOURCE_IDS.map((id) => h('button', {
+            class: 'lib-src', role: 'tab', dataset: { source: id }, 'aria-selected': String(source === id),
+            onclick: () => pick(id),
+          }, icon(SOURCE_ICON[id]), h('span', { class: 'lib-src-t' },
+            h('b', {}, L(`lib.src.${id}`)),
+            h('span', {}, sourceCount(id, rows))))));
+
+          if (source === 'url') { paintUrl(); return; }
+          if (source === 'file') { paintFile(); return; }
+
+          fill(tools,
+            h('div', { class: 'field' }, icon('search'), filter),
+            h('span', { class: 'grow' }),
+            source === 'catalog'
+              ? action('sync', L('cmd.checkUpdates'), () => check().then(run))
+              : action('sync', L('lib.refreshList'), () => loadList(source, true)));
+
+          if (source === 'catalog') {
+            const listed = rows.filter((row) => row.entry && matchesEntry(row));
+            keepPlace(body, () => fill(body, listed.length
+              ? groups(listed, (row) => catalogItem(row))
+              : h('p', { class: 'empty-hint' }, L('lib.noHits', { query: query.trim() }))));
+            return;
+          }
+
+          const got = lists.get(source);
+          if (!got) {
+            fill(body, h('p', { class: 'lib-loading' }, L('lib.loadingList', { source: L(`lib.src.${source}`) })));
+            loadList(source, false);
+            return;
+          }
+          if (got.error) {
+            fill(body, h('div', { class: 'lib-empty' },
+              h('span', { class: 'lib-empty-mark' }, icon('alert')),
+              h('p', { class: 'lib-empty-t' }, got.error),
+              h('button', { class: 'btn', onclick: () => loadList(source, true) }, icon('sync'), L('lib.tryAgain'))));
+            return;
+          }
+          const matching = got.rows.filter(matchesSourceRow);
+          const shown = matching.slice(0, LIST_CAP);
+          keepPlace(body, () => fill(body,
+            h('p', { class: 'lib-listed' }, L('lib.listed', { n: got.rows.length, when: when.date(got.fetchedAt) }),
+              source === 'ebible' && !sources.viaApp ? [' ', h('span', { class: 'lib-web-note' }, L('lib.webLimit'))] : null),
+            shown.length ? groups(shown, (row) => sourceItem(row, heldRows)) : h('p', { class: 'empty-hint' }, L('lib.noHits', { query: query.trim() })),
+            matching.length > shown.length ? h('p', { class: 'lib-more-hint' }, L('lib.capped', { n: shown.length, of: matching.length })) : null));
+        }
+
+        function sourceCount(id, rows) {
+          if (id === 'catalog') return L('lib.count', { n: rows.filter((row) => row.entry).length });
+          if (id === 'url') return L('lib.src.urlSub');
+          if (id === 'file') return L('lib.src.fileSub');
+          const got = lists.get(id);
+          return got?.rows ? L('lib.count', { n: got.rows.length }) : L('lib.src.notRead');
+        }
+
+        async function loadList(id, refresh) {
+          lists.set(id, lists.get(id)?.rows ? lists.get(id) : null);
+          if (refresh) fill(body, h('p', { class: 'lib-loading' }, L('lib.loadingList', { source: L(`lib.src.${id}`) })));
+          try {
+            lists.set(id, await sources.list(id, { refresh }));
+          } catch (err) {
+            lists.set(id, { error: err.message });
+          }
+          if (!disposed && page === 'more' && source === id) run();
+        }
+
+        function matchesEntry(row) {
           const q = query.trim().toLowerCase();
           if (!q) return true;
           const e = row.entry;
@@ -659,157 +903,149 @@ export default {
             .filter(Boolean).join(' ').toLowerCase().includes(q);
         }
 
-        /**
-         * The page is built once and only the list is replaced afterwards.
-         * Rebuilding the whole document on every keystroke moved the filter
-         * field in the document, and moving a focused element takes the focus
-         * with it — the caret jumped out of the box on every letter typed.
-         */
-        const note = h('p', { class: 'muted' });
-        const count = h('span', { class: 'muted lib-count' });
-        const views = h('div', { class: 'rp-seg lib-views' }, VIEWS.map((id) => h('button', {
-          dataset: { view: id }, 'aria-pressed': String(id === view),
-          onclick: () => { setView(id); paintViews(); run(); },
-        }, L(`lib.view.${id}`))));
-        const list = h('div', { class: 'library-body' });
-
-        /** An icon button in the tools row: what it does is its title. */
-        const action = (glyph, label, onclick) => h('button', {
-          class: 'lib-act', title: label, 'aria-label': label, onclick,
-        }, icon(glyph));
-
-        const paintViews = () => {
-          for (const button of views.children) button.setAttribute('aria-pressed', String(button.dataset.view === view));
-        };
-
-        el.replaceChildren(h('section', { class: 'doc library' },
-          h('header', { class: 'doc-head' },
-            h('h1', { class: 'inline-title' }, L('doc.library')),
-            note,
-            h('div', { class: 'lib-tools' },
-              h('div', { class: 'field' }, icon('search'), filter),
-              views,
-              h('span', { class: 'grow' }),
-              count,
-              // Two icons rather than two sentences. Add and refresh are drawn
-              // the same way everywhere, they take a quarter of the room, and
-              // the row still reads at a glance in a language this build has
-              // never been translated into.
-              action('plus', L('imp.cmd'), () => importFile().catch((err) => shell.notify(err.message, 'error'))),
-              action('sync', L('cmd.checkUpdates'), check))),
-          list));
-
-        async function render() {
-          const [rows, storage] = await Promise.all([library.status(), storageStatus()]);
-          if (disposed) return;
-          const catalog = library.catalog;
-          const header = library.origin === 'bundled'
-            ? L('lib.bundled')
-            : L('lib.catalog', {
-              version: catalog.version,
-              updated: when.date(catalog.updated),
-              checked: when.dateTime(library.fetchedAt),
-            });
-
-          const mode = view;
-          const shown = rows.filter(matches).filter((row) => {
-            if (mode === 'offline') return row.state !== 'available';
-            // What the reader imported themselves, which is the one group
-            // nothing else in this list can be filtered down to.
-            if (mode === 'mine') return row.state === 'local';
-            return true;
-          });
-          const byName = (a, b) => (a.entry?.name ?? a.identify).localeCompare(b.entry?.name ?? b.identify);
-
-          const groups = new Map();
-          if (mode === 'language') {
-            for (const row of shown) {
-              const lang = row.entry?.language.text ?? L('lib.unlistedGroup');
-              if (!groups.has(lang)) groups.set(lang, []);
-              groups.get(lang).push(row);
-            }
-          } else {
-            groups.set('', [...shown].sort(byName));
-          }
-          // The reader's own languages come first, whatever the arrangement.
-          const ordered = [...groups.entries()].sort(([a, listA], [b, listB]) => {
-            const mine = (l) => (l.some(suggested) ? 0 : 1);
-            return mine(listA) - mine(listB) || a.localeCompare(b);
-          });
-
-          fill(note,
-            `${header} `,
-            // The bundled seed carries a dozen translations and the catalog
-            // carries five times as many, so a reader whose first check never
-            // landed is looking at a short list with no idea it is short. The
-            // sentence said so; it needed the press that fixes it beside it.
-            library.origin === 'bundled'
-              ? h('button', { class: 'link-btn', onclick: () => check().then(run) }, L('lib.checkNow'))
-              : null,
-            ` · ${L('lib.storageUsed', { size: formatBytes(storage.usage) })}`,
-            storage.persisted === false
-              ? [' · ', L('lib.notPersistent'), ' ',
-                h('button', { class: 'link-btn', onclick: () => keep().then(run) }, L('lib.keep'))]
-              : null);
-          count.textContent = L('lib.count', { n: shown.length });
-          // Installing or removing repaints this list; the reader stays where
-          // they were looking, with the focus still on the button they pressed.
-          keepPlace(list, () => fill(list, (shown.length
-            ? ordered.map(([lang, group]) => h('div', { class: 'library-group' },
-              lang ? h('h2', {}, lang) : null,
-              h('ul', { class: 'library-list' }, group.map((row) => item(row)))))
-            : h('p', { class: 'empty-hint' }, mode === 'mine' && !query.trim()
-              ? L('lib.noneYours')
-              : L('lib.noHits', { query: query.trim() })))));
+        function matchesSourceRow(row) {
+          const q = query.trim().toLowerCase();
+          if (!q) return true;
+          return [row.id, row.name, row.shortname, row.language.name, row.language.code, row.license]
+            .filter(Boolean).join(' ').toLowerCase().includes(q);
         }
 
-        function item(row) {
+        function catalogItem(row) {
           const e = row.entry;
           const busy = progress.get(row.identify);
-          const actions = {
-            available: [[L('lib.install'), 'install']],
-            installed: [[L('lib.remove'), 'remove']],
-            update: [[L('lib.update'), 'install'], [L('lib.remove'), 'remove']],
-            unlisted: [[L('lib.remove'), 'remove']],
-            local: [[L('lib.remove'), 'remove']],
-          }[row.state];
+          const here = Boolean(row.held);
           return h('li', { class: `library-item state-${row.state}`, dataset: { identify: row.identify } },
+            mark(e.shortname),
             h('div', { class: 'library-meta' },
-              // A translation of the reader's own has no catalog entry, but it
-              // has the name they gave it: showing its identify instead made
-              // an import look as if the name had been lost.
-              h('strong', {}, e ? `${e.shortname} · ${e.name}` : ownTitle(row)),
-              h('span', { class: 'muted' }, e
-                ? [e.year, e.publisher].filter(Boolean).join(' · ')
-                : L(row.state === 'local' ? 'lib.yours' : 'lib.unlisted')),
-              row.state === 'local' ? h('span', { class: 'badge badge-ok' }, formatName(row.held?.source)) : null,
-              row.state === 'update' ? h('span', { class: 'badge' }, `v${row.installedVersion} → v${e.version}`) : null,
-              row.state === 'installed' ? h('span', { class: 'badge badge-ok' }, L('lib.offline')) : null,
-              // What is actually on the device, for a row that has something on it.
-              row.held ? h('span', { class: 'muted lib-held' }, held(row.held)) : null,
-              row.state === 'available' && suggested(row) ? h('span', { class: 'badge badge-hint' }, L('lib.suggested')) : null),
+              h('strong', {}, `${e.shortname} · ${e.name}`),
+              h('span', { class: 'muted' }, [e.year, e.publisher].filter(Boolean).join(' · ')),
+              here && row.state !== 'update' ? h('span', { class: 'badge badge-ok' }, icon('check'), L('lib.onDevice')) : null,
+              row.state === 'update' ? h('span', { class: 'badge badge-hint' }, `v${row.installedVersion} → v${e.version}`) : null,
+              !here && suggested(row) ? h('span', { class: 'badge badge-hint' }, L('lib.suggested')) : null),
             h('div', { class: 'library-actions' }, busy
               ? h('span', { class: 'muted' }, busy)
-              : [
-                // The one press most readers want, and everything else behind
-                // the menu: a row with five buttons on it is a row nobody reads.
-                // A soft button, not a solid one: the list is a column of these,
-                // and sixty solid accent buttons outshout the names beside them.
-                ...actions.slice(0, 1).map(([label, action]) => h('button', {
-                  class: action === 'remove' ? 'btn' : 'btn soft',
-                  dataset: { place: `${action}:${row.identify}` },
-                  onclick: () => act(row.identify, action),
-                }, label)),
-                row.held ? h('button', {
-                  class: 'lib-act', title: L('lib.more'), 'aria-label': L('lib.more'),
-                  'aria-haspopup': 'menu',
-                  dataset: { place: `menu:${row.identify}` },
-                  onclick: (e) => rowMenu(e.currentTarget, row),
-                }, icon('more')) : null,
-              ]));
+              : !here
+                ? h('button', { class: 'btn soft', dataset: { place: `install:${row.identify}` }, onclick: () => act(row.identify, 'install') }, icon('download'), L('lib.install'))
+                : row.state === 'update'
+                  ? h('button', { class: 'btn soft', dataset: { place: `install:${row.identify}` }, onclick: () => act(row.identify, 'install') }, icon('sync'), L('lib.update'))
+                  : h('button', { class: 'lib-act', title: L('lib.more'), 'aria-label': L('lib.more'), 'aria-haspopup': 'menu', onclick: (ev) => rowMenu(ev.currentTarget, row) }, icon('more'))));
         }
 
-        /** Everything that can be done to one translation that is on this device. */
+        function sourceItem(row, heldRows) {
+          const found = onDevice(row, heldRows);
+          const busy = progress.get(row.identify);
+          return h('li', { class: `library-item src-item${found.exact ? ' state-installed' : ''}`, dataset: { identify: row.identify } },
+            mark(row.shortname),
+            h('div', { class: 'library-meta' },
+              h('strong', {}, row.name),
+              h('span', { class: 'muted' }, [row.shortname, row.language.code, row.year, row.license].filter(Boolean).join(' · ')),
+              found.exact ? h('span', { class: 'badge badge-ok' }, icon('check'), L('lib.onDevice')) : null,
+              found.same ? h('span', { class: 'badge badge-hint', title: L('lib.sameAsHint') }, L('lib.sameAs', { name: found.same.info?.shortname || found.same.identify })) : null),
+            h('div', { class: 'library-actions' }, busy
+              ? h('span', { class: 'muted' }, busy)
+              : found.exact
+                ? null
+                : h('button', { class: 'btn soft', onclick: () => installFrom(row) }, icon('download'), L('lib.get'))));
+        }
+
+        function paintUrl() {
+          const input = h('input', {
+            type: 'url', inputmode: 'url', spellcheck: 'false', placeholder: 'https://…', 'aria-label': L('lib.urlLabel'),
+            onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); fetchUrl(input.value); } },
+          });
+          fill(tools);
+          fill(body, h('div', { class: 'lib-panel' },
+            h('h2', {}, L('lib.src.url')),
+            h('p', { class: 'muted' }, L('lib.urlHint')),
+            h('div', { class: 'lib-url' }, h('div', { class: 'field' }, icon('link'), input),
+              h('button', { class: 'btn primary', onclick: () => fetchUrl(input.value) }, icon('download'), L('lib.urlGo'))),
+            sources.viaApp ? null : h('p', { class: 'lib-web-note' }, L('lib.webLimit'))));
+          input.focus();
+        }
+
+        function paintFile() {
+          fill(tools);
+          fill(body, h('div', { class: 'lib-panel' },
+            h('h2', {}, L('lib.src.file')),
+            h('p', { class: 'muted' }, L('lib.fileHint')),
+            h('button', { class: 'btn primary', onclick: () => importFile().catch((err) => shell.notify(err.message, 'error')) }, icon('plus'), L('lib.fileGo'))));
+        }
+
+        async function fetchUrl(value) {
+          const url = String(value ?? '').trim();
+          if (!url) return;
+          let parsed;
+          try { parsed = new URL(url); } catch { shell.notify(L('lib.urlBad', { url }), 'error'); return; }
+          const name = decodeURIComponent(parsed.pathname.split('/').pop() || parsed.host);
+          shell.notify(L('lib.urlFetching', { name }));
+          try {
+            const got = await sources.download(parsed.href, name);
+            await importFile({ name, size: got.bytes.byteLength, bytes: got.bytes, text: got.text() });
+          } catch (err) {
+            shell.notify(err.message, 'error');
+          }
+        }
+
+        /** A translation from getBible or eBible.org, straight in: the source already said what it is. */
+        async function installFrom(row) {
+          progress.set(row.identify, L('lib.downloading'));
+          run();
+          try {
+            const got = await sources.download(row.url, row.name);
+            progress.set(row.identify, L('lib.converting'));
+            run();
+            const info = { name: row.name, language: row.language.code, source: row.source };
+            const result = row.kind === 'zip'
+              ? await library.importPack({ files: await archiveTexts(got.bytes, row.name), identify: row.identify, info })
+              : await library.importTranslation({ text: got.text(), format: 'getbible', identify: row.identify, info });
+            shell.notify(L('lib.gotFrom', {
+              name: row.name, source: L(`lib.src.${row.source}`),
+              notes: `${L('lbl.books', { n: result.stats.books })}, ${L('lbl.verses', { n: result.stats.verses })}`,
+            }), 'ok');
+          } catch (err) {
+            shell.notify(`${row.name}: ${err.message}`, 'error');
+          } finally {
+            progress.delete(row.identify);
+            run();
+          }
+        }
+
+        /**
+         * This used to read "65 books · 50 differences", which raises two
+         * questions and answers neither: is a book missing, and different how?
+         * Both are knowable, so both are said.
+         */
+        function held(record) {
+          const all = category.books.length;
+          const diag = record.diagnostics ?? {};
+          const books = record.stats
+            ? (record.stats.books === all ? L('lbl.books', { n: all }) : L('lbl.ofBooks', { n: record.stats.books, all }))
+            : null;
+          return [
+            record.bytes ? formatBytes(record.bytes) : null,
+            books,
+            diag.missing && !record.stats ? L('lbl.booksMissing', { n: diag.missing }) : null,
+            diag.short ? L('lbl.chaptersShort', { n: diag.short }) : null,
+            diag.extra ? L('lbl.chaptersExtra', { n: diag.extra }) : null,
+            !diag.missing && !diag.short && !diag.extra && diag.total
+              ? L('lbl.differs', { n: diag.total }) : null,
+          ].filter(Boolean).join(' · ');
+        }
+
+        openSource = (id) => { page = 'more'; pick(id); };
+        showHome = () => go('home');
+        const offChange = library.on('change', run);
+        const offProgress = library.on('progress', ({ detail }) => {
+          const phase = { download: L('lib.downloading'), convert: L('lib.converting'), validate: L('lib.validating'), write: L('lib.saving') }[detail.phase];
+          progress.set(detail.identify, detail.received ? `${phase} ${formatBytes(detail.received)}` : `${phase}…`);
+          run();
+        });
+        run();
+        return () => { disposed = true; repaint = () => {}; openSource = null; showHome = null; offChange(); offProgress(); };
+      },
+    });
+
+    /** Everything that can be done to one translation that is on this device. */
     function rowMenu(anchor, row) {
       const name = row.entry?.name ?? row.held?.info?.name ?? row.identify;
       openMenu(anchor, [
@@ -825,9 +1061,6 @@ export default {
           icon: 'info',
           run: () => shell.openTranslationInfo(anchor, row.held),
         },
-        // Only for a translation that is here: the report reads the chapters
-        // on this device, and there are none for one that has not been
-        // installed.
         ...(row.held && registry.hasCommand('report.open') ? [{
           id: 'report',
           title: L('lib.report', { name }),
@@ -845,43 +1078,5 @@ export default {
         },
       ]);
     }
-
-    /** The stored copy in one line: how big it is, and whether it holds the whole canon. */
-        /**
-         * This used to read "65 books · 50 differences", which raises two
-         * questions and answers neither: is a book missing, and different how?
-         * Both are knowable, so both are said.
-         */
-        function held(record) {
-          const all = category.books.length;
-          const diag = record.diagnostics ?? {};
-          const books = record.stats
-            ? (record.stats.books === all ? L('lbl.books', { n: all }) : L('lbl.ofBooks', { n: record.stats.books, all }))
-            : null;
-          return [
-            record.bytes ? formatBytes(record.bytes) : null,
-            books,
-            // "4 of 66 books" already says 62 are missing; saying both is
-            // saying the same thing twice in a line that has to stay short.
-            diag.missing && !record.stats ? L('lbl.booksMissing', { n: diag.missing }) : null,
-            diag.short ? L('lbl.chaptersShort', { n: diag.short }) : null,
-            diag.extra ? L('lbl.chaptersExtra', { n: diag.extra }) : null,
-            // A record written by an older build has only the total; it still
-            // says something rather than nothing.
-            !diag.missing && !diag.short && !diag.extra && diag.total
-              ? L('lbl.differs', { n: diag.total }) : null,
-          ].filter(Boolean).join(' · ');
-        }
-
-        const offChange = library.on('change', run);
-        const offProgress = library.on('progress', ({ detail }) => {
-          const phase = { download: L('lib.downloading'), convert: L('lib.converting'), validate: L('lib.validating'), write: L('lib.saving') }[detail.phase];
-          progress.set(detail.identify, detail.received ? `${phase} ${formatBytes(detail.received)}` : `${phase}…`);
-          run();
-        });
-        run();
-        return () => { disposed = true; repaint = () => {}; offChange(); offProgress(); };
-      },
-    });
   },
 };

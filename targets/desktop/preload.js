@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('lai', Object.freeze({
   openExternal: (url) => ipcRenderer.invoke('lai:open-external', url),
   appInfo: () => ipcRenderer.invoke('lai:app-info'),
   checkUpdate: () => ipcRenderer.invoke('lai:check-update'),
+  /** @param {string} url https only; resolves { bytes: Uint8Array, type } */
+  fetchBytes: (url) => ipcRenderer.invoke('lai:fetch-bytes', url),
   /** @param {{ color: string, symbolColor: string, height: number }} frame  '#rrggbb', '#rrggbb', px */
   setWindowFrame: (frame) => ipcRenderer.invoke('lai:window-frame', frame),
 }));

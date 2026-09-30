@@ -8,7 +8,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { available, launch } from './harness.mjs';
+import { available, installFromLibrary, launch } from './harness.mjs';
 
 const ready = await available();
 const options = ready.ok ? {} : { skip: `end-to-end: ${ready.why}` };
@@ -18,11 +18,7 @@ test('the app in a browser', options, async (t) => {
   const { page } = app;
   t.after(() => app.close());
 
-  const install = async (identify) => {
-    const button = page.locator(`[data-identify="${identify}"] button`, { hasText: 'Make available offline' });
-    if (await button.count()) await button.click();
-    await page.locator(`[data-identify="${identify}"] .badge-ok`).waitFor({ timeout: 60000 });
-  };
+  const install = (identify) => installFromLibrary(page, identify);
   /** Back to reading: a document tab has no crumb bar to switch translations from. */
   const toChapter = async () => {
     await page.locator('.tabstrip .tab[data-kind="chapter"]').first().click();
@@ -1151,6 +1147,10 @@ test('the app in a browser', options, async (t) => {
     await page.locator('.modal-input').fill('Library');
     await page.waitForTimeout(250);
     await page.keyboard.press('Enter');
+    await page.waitForSelector('.lib-tab[aria-selected="true"]');
+    // The whole catalog is the long list; what is on this device is short.
+    await page.locator('.lib-tab[data-page="more"]').click();
+    await page.locator('.lib-src[data-source="catalog"]').click();
     await page.waitForSelector('.library-item');
     await page.waitForTimeout(400);
     const scroller = '.leaf > .leaf-scroll';
@@ -1166,10 +1166,14 @@ test('the app in a browser', options, async (t) => {
       el.scrollTop = Math.round((el.scrollHeight - el.clientHeight) / 2);
     }, scroller);
     await page.waitForTimeout(200);
+    // Opening a row's menu may bring the row into view; the place to keep is
+    // where the list is once the menu is open.
+    await page.locator('.library-item .lib-act[aria-haspopup="menu"]').first().click();
+    await page.waitForSelector('.popover.menu');
     const before = await page.evaluate((s) => document.querySelector(s).scrollTop, scroller);
     assert.ok(before > 40, `scrolled down the list (${before})`);
     // Removing a translation repaints the list; the reader stays where they were.
-    await page.locator('.library-item .btn', { hasText: 'Remove' }).first().click();
+    await page.locator('.popover.menu .menu-item', { hasText: 'Remove' }).click();
     await page.waitForTimeout(1500);
     const after = await page.evaluate((s) => document.querySelector(s).scrollTop, scroller);
     assert.ok(Math.abs(after - before) < 60, `the page did not jump to the top (${before} → ${after})`);

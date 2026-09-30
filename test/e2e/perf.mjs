@@ -44,7 +44,7 @@ for (const identify of ['kjv1611', 'judson1835', 'ddb1931']) {
   await time(`install ${identify}`, async () => {
     await page.locator(`[data-identify="${identify}"] button`, { hasText: 'Make available offline' }).click();
     await page.locator(`[data-identify="${identify}"] .badge-ok`).waitFor({ timeout: 300000 });
-    return page.locator(`[data-identify="${identify}"] .lib-held`).innerText();
+    return page.locator(`[data-identify="${identify}"] .library-meta .muted`).first().innerText();
   });
 }
 

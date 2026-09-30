@@ -172,6 +172,22 @@ class TranslationStore {
       { id, count: Object.keys(entries ?? {}).length, bytes: bytes ?? 0, fetchedAt }));
   }
 
+  /**
+   * A source's translation list, kept so the Library opens on it at once and
+   * works without a connection; refreshed when the reader asks. Kept in the
+   * catalog store beside the catalog, under `source:<id>`.
+   */
+  async sourceList(id) {
+    const row = await request(this.#tx('catalog').objectStore('catalog').get(`source:${id}`));
+    return row ? { rows: row.rows, fetchedAt: row.fetchedAt } : null;
+  }
+
+  async putSourceList(id, rows) {
+    const tx = this.#tx('catalog', 'readwrite');
+    tx.objectStore('catalog').put({ id: `source:${id}`, rows, fetchedAt: new Date().toISOString() });
+    await done(tx);
+  }
+
   /** Every downloaded guide file: { path, sha, lang, topic, entries, modified, fetchedAt }. */
   async guideFiles() {
     return request(this.#tx('guide').objectStore('guide').getAll());

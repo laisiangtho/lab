@@ -24,6 +24,7 @@
  */
 
 import { fromDelimited, sniffDelimiter } from './csv.js';
+import { fromGetBible, sniffGetBible } from './getbible.js';
 import { fromUsfm } from './usfm.js';
 import { fromXml, sniffXml } from './xml.js';
 import { directionOf, languageName } from '../langcode.js';
@@ -99,8 +100,15 @@ const delimited = {
   convert: fromDelimited,
 };
 
+const getbible = {
+  id: 'getbible',
+  ext: ['.json'],
+  sniff: sniffGetBible,
+  convert: fromGetBible,
+};
+
 /** Every adapter, in the order they are offered. */
-export const FORMATS = Object.freeze([native, usfm, xml, delimited]);
+export const FORMATS = Object.freeze([native, usfm, xml, delimited, getbible]);
 
 export const formatById = (id) => FORMATS.find((f) => f.id === id) ?? null;
 
@@ -151,6 +159,10 @@ export function describe(text, format, name = '') {
     } catch {
       // Not readable as JSON: the import will say so properly.
     }
+  } else if (format === 'getbible') {
+    out.name = /"translation"\s*:\s*"([^"]*)"/.exec(head)?.[1] ?? '';
+    out.identify = (/"abbreviation"\s*:\s*"([^"]*)"/.exec(head)?.[1] ?? '').toLowerCase();
+    out.language = /"lang"\s*:\s*"([^"]*)"/.exec(head)?.[1] ?? '';
   } else if (format === 'usfm') {
     out.identify = (/\\id\s+([A-Z0-9]{3})/i.exec(head)?.[1] ?? '').toLowerCase();
     out.name = /\\(?:toc1|h)\s+(.+)/i.exec(head)?.[1]?.trim() ?? '';

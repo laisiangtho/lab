@@ -11,7 +11,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { available, launch } from './harness.mjs';
+import { available, installFromLibrary, launch } from './harness.mjs';
 
 const ready = await available();
 const options = ready.ok ? {} : { skip: `end-to-end: ${ready.why}` };
@@ -38,11 +38,7 @@ test('the app across a restart', options, async (t) => {
     await page.waitForSelector('#app .body-row');
     await page.waitForTimeout(800);
   };
-  const install = async (identify) => {
-    const button = page.locator(`[data-identify="${identify}"] button`, { hasText: 'Make available offline' });
-    if (await button.count()) await button.click();
-    await page.locator(`[data-identify="${identify}"] .badge-ok`).waitFor({ timeout: 60000 });
-  };
+  const install = (identify) => installFromLibrary(page, identify);
 
   let firstRun;
 

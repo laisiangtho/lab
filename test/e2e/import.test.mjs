@@ -30,10 +30,12 @@ test('the import dialog, typed into', options, async (t) => {
   await app.open();
   await page.waitForSelector('.wl', { timeout: 20000 });
   await page.locator('.wl .btn.primary').click();
-  await page.waitForSelector('.library-item');
+  await page.waitForSelector('.lib-tab[aria-selected="true"]');
+  await page.locator('.lib-tab[data-page="more"]').click();
+  await page.locator('.lib-src[data-source="file"]').click();
 
   const chooser = page.waitForEvent('filechooser');
-  await page.locator('.lib-act[title="Add your own"]').click();
+  await page.locator('.lib-panel .btn.primary').click();
   await (await chooser).setFiles({ name: 'bhs.xml', mimeType: 'text/xml', buffer: Buffer.from(BHS) });
   await page.waitForSelector('.fd');
   const box = (id) => page.locator(`.fd-row[data-field="${id}"] input`);

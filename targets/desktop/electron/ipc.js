@@ -8,6 +8,9 @@ import { basename } from 'node:path';
 
 import { rendererUrl } from './window.js';
 
+/** The largest file fetch-bytes will download: a whole Bible zip is well under this. */
+const MAX_DOWNLOAD = 150 * 1024 * 1024;
+
 /** Where releases are published; the packaging config points at the same repository. */
 const RELEASES_URL = 'https://api.github.com/repos/laisiangtho/lab/releases/latest';
 
@@ -71,6 +74,36 @@ export function registerIpc() {
     const latest = String(release.tag_name ?? '').replace(/^v/, '');
     if (!latest) throw new Error('update check: the latest release has no version');
     return { current, latest, url: release.html_url, newer: isNewer(latest, current) };
+  });
+
+  /**
+   * Download a file the reader asked for — a translation from eBible.org, or
+   * one at a web address they typed — from this process rather than the page.
+   * A page is held to what each site allows pages to fetch, and many Bible
+   * sites allow none; this process is not. https only, and no more than
+   * MAX_DOWNLOAD bytes, so a wrong address cannot fill the disk.
+   */
+  handle('lai:fetch-bytes', async (_event, url) => {
+    const u = new URL(String(url));
+    if (u.protocol !== 'https:') throw new Error(`fetch-bytes: refusing non-https URL ${u.href}`);
+    const response = await fetch(u.href, { headers: { 'user-agent': `${app.getName()}/${app.getVersion()}` }, redirect: 'follow' });
+    if (!response.ok) throw new Error(`HTTP ${response.status} for ${u.href}`);
+    const declared = Number(response.headers.get('content-length') ?? 0);
+    if (declared > MAX_DOWNLOAD) throw new Error(`${u.href} is ${Math.round(declared / 1048576)} MB, more than a translation can be`);
+    const reader = response.body.getReader();
+    const chunks = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_DOWNLOAD) { await reader.cancel(); throw new Error(`${u.href} is more than ${MAX_DOWNLOAD / 1048576} MB, more than a translation can be`); }
+      chunks.push(value);
+    }
+    const out = new Uint8Array(total);
+    let at = 0;
+    for (const chunk of chunks) { out.set(chunk, at); at += chunk.byteLength; }
+    return { bytes: out, type: response.headers.get('content-type') ?? '' };
   });
 
   // `runtime` is a display string: shared code prints it without knowing what

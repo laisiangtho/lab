@@ -123,6 +123,16 @@ export async function launch(options = {}) {
     return route.fulfill({ status: 200, headers, body: JSON.stringify(body) });
   });
 
+  // The Library's other sources, getBible and eBible.org, answered from the
+  // fixtures too: a test never reaches the real sites.
+  await context.route(/^https:\/\/(api\.getbible\.net|ebible\.org)\//, async (route) => {
+    const url = route.request().url();
+    requests.push(url);
+    const found = await data.sourceFile(url);
+    if (!found) return route.fulfill({ status: 404, headers: { 'access-control-allow-origin': '*' }, body: '' });
+    return route.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': found.type }, body: found.body });
+  });
+
   const page = await context.newPage();
   const problems = [];
   const missing = [];
@@ -229,6 +239,38 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
     translations,
     packs,
     /** What the app would get from the catalog repository for this URL. */
+    /** getBible's list and file, eBible.org's list and zip. */
+    async sourceFile(url) {
+      const genesis = Array.from({ length: 31 }, (_, i) => ({ chapter: 1, verse: i + 1, text: `World English ${i + 1}: in the beginning God made the heavens and the earth.` }));
+      if (url === 'https://api.getbible.net/v2/translations.json') {
+        return { type: 'application/json', body: JSON.stringify({
+          web: { translation: 'World English Bible', abbreviation: 'web', lang: 'en', language: 'English', direction: 'LTR', distribution_license: 'Public Domain', url: 'https://api.getbible.net/v2/web.json' },
+          kjv: { translation: 'King James Version', abbreviation: 'kjv', lang: 'en', language: 'English', direction: 'LTR', distribution_license: 'Public Domain', url: 'https://api.getbible.net/v2/kjv.json' },
+        }) };
+      }
+      if (url === 'https://api.getbible.net/v2/web.json') {
+        return { type: 'application/json', body: JSON.stringify({
+          translation: 'World English Bible', abbreviation: 'web', lang: 'en', language: 'English', direction: 'LTR',
+          books: [{ nr: 1, name: 'Genesis', chapters: [{ chapter: 1, name: 'Genesis 1', verses: genesis }] }],
+        }) };
+      }
+      if (url === 'https://ebible.org/Scriptures/translations.csv') {
+        return { type: 'text/csv', body: [
+          'languageCode,translationId,languageName,languageNameInEnglish,title,shortTitle,Redistributable,Copyright,UpdateDate,textDirection,downloadable',
+          'heb,hebwlc,עברית,Hebrew,Westminster Leningrad Codex,WLC,True,Public Domain,2023-05-01,rtl,True',
+        ].join('\n') };
+      }
+      if (url === 'https://ebible.org/Scriptures/hebwlc_usfx.zip') {
+        const { makeZip } = await import('../../app/services/zip.js');
+        const verses = Array.from({ length: 31 }, (_, i) => `<v id="${i + 1}"/>בְּרֵאשִׁית ${i + 1}<ve/>`).join('');
+        const blob = makeZip([
+          { name: 'hebwlc_usfx.xml', text: `<usfx><book id="GEN"><c id="1"/>${verses}</book></usfx>` },
+          { name: 'hebwlcmetadata.xml', text: '<DBLMetadata><identification><name>Westminster Leningrad Codex</name><abbreviation>WLC</abbreviation></identification><language><iso>heb</iso><name>Hebrew</name><scriptDirection>RTL</scriptDirection></language></DBLMetadata>' },
+        ]);
+        return { type: 'application/zip', body: Buffer.from(await blob.arrayBuffer()) };
+      }
+      return null;
+    },
     forUrl(url) {
       if (url.includes('api.github.com/') && url.includes('/git/trees/')) {
         return { truncated: false, tree: Object.keys(guide).map((path) => ({ path, type: 'blob', sha: `sha-${path}`, size: 100 })) };
@@ -310,4 +352,26 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
       locale: { book: 'book', code },
     };
   }
+}
+
+/**
+ * Make a catalog translation available offline from the Library, wherever it
+ * is open. Once something is on the device the Library opens on its home,
+ * which lists only what is here; a translation still to get is under Get
+ * more, in the catalog.
+ */
+export async function installFromLibrary(page, identify, { timeout = 60000 } = {}) {
+  // The page draws after reading the store; asking before it has would find
+  // neither the row nor the tabs.
+  await page.waitForSelector('.lib-tab[aria-selected="true"]');
+  await page.waitForTimeout(150);
+  const row = page.locator(`.library-item[data-identify="${identify}"]`);
+  if (!(await row.count())) {
+    await page.locator('.lib-tab[data-page="more"]').click();
+    await page.locator('.lib-src[data-source="catalog"]').click();
+    await row.first().waitFor();
+  }
+  const button = page.locator(`[data-identify="${identify}"] button`, { hasText: 'Make available offline' });
+  if (await button.count()) await button.click();
+  await page.locator(`[data-identify="${identify}"] .badge-ok`).first().waitFor({ timeout });
 }
