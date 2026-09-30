@@ -48,11 +48,22 @@ missing. If a run fails part way, running it again reuses the draft.
 
 | Platform | Files | First run |
 |---|---|---|
-| Windows | NSIS installer `…-win-x64-setup.exe` and a portable `…-win-x64-portable.exe`, both `x64` | Unsigned: SmartScreen warns; *More info → Run anyway*. |
+| Windows | NSIS installer `LaiSiangtho.win.x64.exe` and a portable `LaiSiangtho.win.x64.portable.exe` | Unsigned: SmartScreen warns; *More info → Run anyway*. |
 | macOS | `.dmg` and `.zip`, `arm64` and `x64` | Ad-hoc signed only, not notarized: refused on first open until *System Settings → Privacy & Security → Open Anyway*, or `xattr -cr "/Applications/Lai Siangtho.app"`. |
 | Linux | AppImage, `.deb`, `.rpm`, `.tar.gz`, `x64` | Nothing to allow. |
 
-File names carry the stamped version: `lai-siangtho-26.9.29.11-mac-arm64.dmg`.
+Files are named `LaiSiangtho.<os>.<arch>.<ext>` — `LaiSiangtho.mac.arm64.dmg`,
+`LaiSiangtho.linux.x64.deb` — with no spaces and no version. The tag carries
+the version, and the unchanging names give each installer a link that always
+serves the newest release:
+
+```
+https://github.com/laisiangtho/lab/releases/latest/download/LaiSiangtho.win.x64.exe
+```
+
+Every file listed in the workflow's matrix must exist after a build, so a
+renamed artifact fails the release rather than publishing without it.
+
 The release is titled with its tag (`v26.09.29.11`). Its notes are the commits
 since the previous release tag, one line each with a short hash, leaving out
 merges and the `release:` commits, followed by a collapsed paragraph on first
@@ -92,8 +103,8 @@ window buttons drawn over its corner (see `targets/desktop/electron/window.js`).
 | `.deb` | The software centre (App Center, GNOME Software, Discover), or `sudo apt remove lai-siangtho` (`purge` also drops its settings files) |
 | `.rpm` | The software centre, or `sudo dnf remove lai-siangtho` |
 | AppImage, `.tar.gz` | Deleting the file or folder |
-| Windows `-setup.exe` | *Settings → Apps → Installed apps → Lai Siangtho → Uninstall* |
-| Windows `-portable.exe` | Deleting the file |
+| Windows `LaiSiangtho.win.x64.exe` | *Settings → Apps → Installed apps → Lai Siangtho → Uninstall* |
+| Windows `….portable.exe` | Deleting the file |
 | macOS | Dragging *Lai Siangtho* from Applications to the Bin |
 
 Software centres list the `.deb` and `.rpm` only because the packages install

@@ -217,7 +217,7 @@ jobs:
           - os: macos-latest
             files: release/*.dmg release/*.zip
           - os: windows-latest
-            files: release/*-setup.exe release/*-portable.exe
+            files: release/LaiSiangtho.win.x64.exe release/LaiSiangtho.win.x64.portable.exe
           - os: ubuntu-latest
             files: release/*.AppImage release/*.deb release/*.rpm release/*.tar.gz
     runs-on: ${{ matrix.os }}

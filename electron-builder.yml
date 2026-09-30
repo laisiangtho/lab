@@ -20,10 +20,12 @@ files:
   - out/**
   - package.json
 asar: true
-# No spaces in file names: a release asset named "Lai Siangtho 26.9.29.dmg" is
-# renamed by GitHub on upload. ${version}.${buildNumber} is the stamped version
-# (26.9.29.11), the same for a local package and a released one.
-artifactName: ${name}-${version}.${buildNumber}-${os}-${arch}.${ext}
+# LaiSiangtho.<os>.<arch>.<ext>: no spaces (GitHub renames an asset that has
+# them) and no version. The version is the release's tag and title; a name
+# without it stays the same from release to release, so
+# releases/latest/download/LaiSiangtho.win.x64.exe is a link that always
+# fetches the newest. <os> is mac, win or linux.
+artifactName: LaiSiangtho.${os}.${arch}.${ext}
 mac:
   # Both architectures from one machine: the app has no native modules, so the
   # Intel build is a repackaging rather than a compile.
@@ -51,10 +53,12 @@ win:
     - target: portable
       arch: [x64]
   icon: assets/icon.png
+# The installer is the one most readers want and has the plain name; the
+# portable build is the same .exe otherwise, so it says what it is.
 nsis:
-  artifactName: ${name}-${version}.${buildNumber}-${os}-${arch}-setup.${ext}
+  artifactName: LaiSiangtho.win.${arch}.${ext}
 portable:
-  artifactName: ${name}-${version}.${buildNumber}-${os}-${arch}-portable.${ext}
+  artifactName: LaiSiangtho.win.${arch}.portable.${ext}
 # The 1.0.x AppImage runtime is static: it carries its own FUSE library and
 # needs only the fusermount helper every desktop distribution has. The default
 # (0.0.0) runtime needs libfuse.so.2, which Ubuntu 22.04+ and Fedora no longer
@@ -73,6 +77,10 @@ rpm:
   fpm:
     - assets/linux/org.laisiangtho.app.metainfo.xml=/usr/share/metainfo/org.laisiangtho.app.metainfo.xml
 linux:
+  # x64 written out: electron-builder spells the same architecture x86_64 for
+  # an AppImage and amd64 for a .deb, and one name should say one thing. An
+  # arm64 Linux build would need its own name here.
+  artifactName: LaiSiangtho.linux.x64.${ext}
   # AppImage: one file, any distribution, nothing installed.
   # deb / rpm: installed by the system's own installer, with a menu entry, an
   #   uninstaller and — on Ubuntu 24.04+ — the AppArmor profile that lets the
