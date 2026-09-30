@@ -24,14 +24,49 @@ const WORD = /[\p{L}\p{N}_]/u;
 
 export const MATCH_MODES = Object.freeze(['terms', 'word', 'regex']);
 
+/**
+ * How one UTF-16 unit folds, remembered: a verse is folded for every search,
+ * and calling normalize() for each of its characters was most of the time a
+ * search took — about a second a Bible. Scripture uses a few hundred distinct
+ * characters, so the tables stay small. One table per case setting.
+ */
+const FOLDED = [new Map(), new Map()];
+const ASCII = /^[\x00-\x7f]*$/;
+
+function foldUnit(unit, matchCase) {
+  const table = FOLDED[matchCase ? 1 : 0];
+  let out = table.get(unit);
+  if (out === undefined) {
+    const stripped = unit.normalize('NFD').replace(LATIN_MARKS, '');
+    out = matchCase ? stripped : stripped.toLowerCase();
+    table.set(unit, out);
+  }
+  return out;
+}
+
+/**
+ * The folded text alone, and whether each character folded to exactly one —
+ * then an offset in the folded text is the same offset in the original, and
+ * no map is needed. Plain ASCII, most of an English Bible, is only lowercased.
+ */
+function foldFast(text, matchCase) {
+  if (ASCII.test(text)) return { folded: matchCase ? text : text.toLowerCase(), aligned: true };
+  let folded = '';
+  let aligned = true;
+  for (let i = 0; i < text.length; i += 1) {
+    const unit = foldUnit(text[i], matchCase);
+    if (unit.length !== 1) aligned = false;
+    folded += unit;
+  }
+  return { folded, aligned };
+}
+
 /** Fold for comparison, and record where each folded character came from. */
 function fold(text, matchCase = false) {
   const out = [];
   const map = [];
   for (let i = 0; i < text.length; i += 1) {
-    const stripped = text[i].normalize('NFD').replace(LATIN_MARKS, '');
-    const decomposed = matchCase ? stripped : stripped.toLowerCase();
-    for (const ch of decomposed) { out.push(ch); map.push(i); }
+    for (const ch of foldUnit(text[i], matchCase)) { out.push(ch); map.push(i); }
   }
   map.push(text.length);
   return { folded: out.join(''), map };
@@ -60,7 +95,11 @@ export function createMatcher(query, { mode = 'terms', matchCase = false } = {})
     mode,
     /** @returns ranges in the ORIGINAL string, or null when a term is missing */
     test(text) {
-      const { folded, map } = fold(text, matchCase);
+      const fast = foldFast(text, matchCase);
+      // Most verses miss: find out before building an offset map.
+      for (const term of terms) if (!fast.folded.includes(term)) return null;
+      const { folded, map } = fast.aligned ? { folded: fast.folded, map: null } : fold(text, matchCase);
+      const original = (i) => (map ? map[i] : i);
       const ranges = [];
       for (const term of terms) {
         let from = 0;
@@ -70,7 +109,7 @@ export function createMatcher(query, { mode = 'terms', matchCase = false } = {})
           if (at === -1) break;
           from = at + term.length;
           if (whole && !onWordBoundary(folded, at, from)) continue;
-          ranges.push({ start: map[at], end: map[from] });
+          ranges.push({ start: original(at), end: original(from) });
           found = true;
         }
         if (!found) return null;

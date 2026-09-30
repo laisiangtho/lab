@@ -1,9 +1,10 @@
 /**
  * Search worker: scans installed translations chapter by chapter.
  *
- * No index is built at install time. A chapter cursor keeps memory flat, and
- * results stream back in batches so the first hits appear while the rest of the
- * translation is still being read. A newer query cancels an older one.
+ * No index is built at install time. Chapters are read a page at a time, so
+ * memory holds a page rather than a translation, and results stream back in
+ * batches so the first hits appear while the rest of the translation is still
+ * being read. A newer query cancels an older one.
  *
  * What comes back is counted as it goes: how many verses matched, in how many
  * chapters, in how many books, and where — so the reader is told the shape of

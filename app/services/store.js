@@ -25,6 +25,9 @@ const DIAGNOSTIC_LIMIT = 400;
  *   upgrade started elsewhere, or the browser dropping the database. Everything
  *   after that point would fail one call at a time, so the caller is told once.
  */
+/** Chapters read per request when a translation is scanned (see #scanRange). */
+const SCAN_PAGE = 100;
+
 export async function openStore({ name = DB_NAME, onLost = null } = {}) {
   if (typeof indexedDB === 'undefined') throw new Error('IndexedDB is not available in this environment');
   const db = await new Promise((resolve, reject) => {
@@ -213,19 +216,32 @@ class TranslationStore {
     }
   }
 
-  #scanRange(range, visit, carryOn) {
-    return new Promise((resolve, reject) => {
-      const tx = this.#tx('chapters');
-      const request = tx.objectStore('chapters').openCursor(range);
-      request.onsuccess = () => {
-        const cursor = request.result;
-        if (!cursor) { resolve(); return; }
-        if (carryOn && !carryOn()) { resolve(); return; }
-        visit(cursor.value);
-        cursor.continue();
-      };
-      request.onerror = () => reject(request.error);
-    });
+  /**
+   * A range of chapters, a page at a time: each `getAll` returns up to
+   * SCAN_PAGE records, and the next page starts after the last key read.
+   *
+   * It was a cursor, one round trip a chapter — 1.35 s to read one Bible's
+   * 1,189 chapters for a search, nearly all of it waiting on the database,
+   * not matching text. A page keeps what the cursor was for: memory holds a
+   * page, not a translation, and a newer search can stop this one between
+   * pages. The key is the record's own [identify, book, chapter].
+   */
+  async #scanRange(range, visit, carryOn) {
+    let lower = range.lower;
+    let lowerOpen = range.lowerOpen;
+    for (;;) {
+      if (carryOn && !carryOn()) return;
+      const page = IDBKeyRange.bound(lower, range.upper, lowerOpen, range.upperOpen);
+      const records = await request(this.#tx('chapters').objectStore('chapters').getAll(page, SCAN_PAGE));
+      for (const record of records) {
+        if (carryOn && !carryOn()) return;
+        visit(record);
+      }
+      if (records.length < SCAN_PAGE) return;
+      const last = records[records.length - 1];
+      lower = [last.identify, last.book, last.chapter];
+      lowerOpen = true;
+    }
   }
 
   /** Notes and bookmarks: small records, read whole and filtered by the caller. */
