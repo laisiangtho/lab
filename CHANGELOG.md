@@ -139,6 +139,13 @@ newest first.
 
 ## Releases
 
+### 26.09.30.5 — 30 September 2026
+
+- Detached tab windows and the note composer redrawn: one surface instead of
+  a dark title band, a soft shadow instead of a drawn border, quieter window
+  buttons, and notes written in the interface face rather than a typewriter
+  one.
+
 ### 26.09.30.4 — 30 September 2026
 
 - **Guide.** A new pane that answers "how do I…" in English, Norwegian or
