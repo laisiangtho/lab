@@ -583,12 +583,95 @@ in every interface language.
   (`features/guide/pane.js` with `core/guide.js`, about 10 KB) is a separate
   chunk imported on first mount. `ask …` and `? …` in the palette queue their
   question until it has loaded.
+- **Downloaded answers.** See 3d-x-a. They join the index as entries like
+  any other, the reader's language first and English for a topic not yet
+  translated, at a slightly higher prior than built-in topics, since each was
+  written for one question.
+- **Numbers in a topic.** A topic named with a number ("1 John", "2 Kings")
+  carries it as a `must` term; a question without that number scores the
+  entry at half, so "what is John about" finds John and not 3 John.
 - **Not done yet.** Downloadable study packs (a topical index, a dictionary,
   cross-reference sets) keyed by reference, so answers can quote the reader's
   own translation; and an opt-in connection to a generative model with the
   reader's own key. Both were weighed and deliberately left for later: the
   first needs pack formats and hosting, the second needs a network and trust
   the rest of the app does not ask for.
+
+## 3d-x-a. Guide data
+
+Answers the guide can download, one topic to a file, from the catalog
+repository (`laisiangtho/bible`, folder `guide/`).
+
+- **Format.** schema.org `FAQPage` in JSON-LD: the format websites already
+  publish questions and answers in, readable by any JSON-LD or schema.org
+  tool and by a person in a text editor. `name` is the topic, each
+  `Question`'s `name` and `alternateName` the ways it is asked,
+  `acceptedAnswer.text` the answer, and `potentialAction.target` a
+  `laisiangtho:` URI for the button (`command/…`, `doc/…`, `pane/…`,
+  `palette/…`, `passage/<book>/<chapter>[/<verse>]`). Anything else
+  schema.org allows is accepted and ignored. The contract is in
+  `core/guidedata.js`, and `scripts/guide-check.mjs` checks a folder with the
+  same parser before it is published.
+- **Layout, and no index.** `guide/<language>/<any folders>/<topic>.json`.
+  Every file under `guide/` that is not Markdown is data; the language is the
+  folder, and a file whose `inLanguage` disagrees is refused. There is no
+  index to keep in step: the app asks GitHub for the repository's tree
+  (`/git/trees/master?recursive=1`, one request) and takes the paths under
+  `guide/`. A file that is neither data nor Markdown is reported, not skipped
+  silently.
+- **Updating.** The tree gives each file's content hash; only files whose hash
+  changed are fetched again, files that disappeared are removed, and a file
+  that no longer parses keeps its previous copy and is reported. Files are
+  kept in the `guide` store (IndexedDB version 6) and read offline from then
+  on. Settings → Study removes them.
+- **Limits.** GitHub answers 60 anonymous requests an hour per address; the
+  update costs one request for the tree plus one per changed file on
+  `raw.githubusercontent.com`, which is not counted against that limit. When
+  the limit is reached the pane says so and when to try again. A tree GitHub
+  reports as truncated is an error rather than a partial update.
+
+## 3d-x-b. Where translations come from
+
+The Library lists more than the catalog. `core/sources.js` reads each
+source's own list into one row shape (`source`, `id`, `identify`, `name`,
+`shortname`, `language`, `direction`, `license`, `year`, `url`, `kind`) and
+`services/sources.js` fetches and keeps the lists (catalog store,
+`source:<id>`).
+
+| Source | List | A translation |
+|---|---|---|
+| Lai Siangtho | `book.json` | this app's JSON, through the library worker |
+| getBible | `api.getbible.net/v2/translations.json` | one JSON file, read by the `getbible` import format |
+| eBible.org | `ebible.org/Scriptures/translations.csv`, redistributable rows only, columns found by name | `<id>_usfx.zip`, read by the archive importer |
+| A web address | — | anything the importer reads, through the same dialog as a file |
+
+- **Names on the device.** A source's id is prefixed (`gb-kjv`, `eb-engkjv`),
+  so two sources never overwrite each other.
+- **Already here.** `onDevice(row, held)` answers two questions: is this
+  exact one here (same `identify`), and is the same translation here from
+  somewhere else — same language, and the same name once case, punctuation,
+  a parenthesis and a year are set aside. The Library marks both.
+- **Cross-origin.** getBible and the catalog allow pages to read them;
+  eBible.org and most web servers do not. The desktop app downloads through
+  its main process (`lai:fetch-bytes`: https only, at most 150 MB, streamed),
+  where no such rule applies. The web version reports which host refused and
+  offers the file route; it does not try a proxy.
+- **Content policy.** `connect-src` is `'self' https:` on both targets, so
+  a web address the reader types can be fetched at all. Scripts and styles
+  are still `'self'` only; what is fetched is data, parsed by the importers,
+  never run.
+
+## 3d-xii. Icons
+
+Every PNG icon — the desktop packaging set in `assets/`, and the favicon,
+home-screen and maskable icons in `public/icons/` — is drawn from
+`public/icons/icon.svg` by `scripts/icons.mjs`, which renders the SVG in
+Chromium at each size. They are generated on demand and committed, not drawn
+during the build: the build then needs no browser, and a packaging machine
+gets the same bytes as a developer's. `assets/icons/source.sha256` is the hash
+of the SVG they were drawn from, and `test/icons.test.js` fails when the SVG
+has changed without the icons being drawn again, when a file is missing or of
+the wrong size, and when the web manifest names an icon that is not there.
 
 ## 3d-xi. Compare, verse links, memory verses, the reading log
 
@@ -1110,11 +1193,11 @@ All three are git-ignored.
 
 ## 9. Security (desktop)
 
-- Renderer: `contextIsolation`, `sandbox`, no `nodeIntegration`; preload exposes only `saveFile`, `openExternal`, `appInfo`, `checkUpdate` and the window-frame hint.
-- IPC handlers reject senders whose frame origin is not the app's; inputs are validated; `openExternal` accepts `https:` only.
+- Renderer: `contextIsolation`, `sandbox`, no `nodeIntegration`; preload exposes only `saveFile`, `openExternal`, `appInfo`, `checkUpdate`, `fetchBytes` and the window-frame hint.
+- IPC handlers reject senders whose frame origin is not the app's; inputs are validated; `openExternal` and `fetchBytes` accept `https:` only, and `fetchBytes` stops at 150 MB.
 - `app://` handler normalises paths and refuses anything outside `out/renderer/` (traversal requests return 404/403).
 - Navigation away from the app origin is blocked; `window.open` to `https:` opens in the system browser.
-- Production CSP on both targets: scripts and styles from `'self'`; `connect-src` limited to `'self'` and `https://raw.githubusercontent.com`.
+- Production CSP on both targets: scripts and styles from `'self'`; `connect-src` is `'self'` and `https:` (see 3d-x-b) — fetched data is parsed, never executed.
 
 ---
 

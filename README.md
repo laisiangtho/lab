@@ -10,7 +10,7 @@ Phase 2 of the project. The Phase 1 single-file `index.html` is preserved as git
 
 | Command | Result |
 |---|---|
-| `npm install` | Install the four dev dependencies (no runtime dependencies) |
+| `npm install` | Install the five dev dependencies (no runtime dependencies) |
 | `npm run dev` | Web dev server |
 | `npm run build` | Web build → `dist/web/` (static, deployable to any HTTPS host) |
 | `npm run preview` | Serve `dist/web/` locally, service worker included |
@@ -23,11 +23,13 @@ Phase 2 of the project. The Phase 1 single-file `index.html` is preserved as git
 | `npm run test:perf` | Timings at full size: three complete Bibles, the longest chapter, a whole-library search |
 | `npm run test:all` | `npm test` then the browser suite |
 | `npm run aliases -- <identify> [--file PATH] [--apply]` | Alias overlay maintenance (dry run by default) |
+| `npm run icons -- [--apply \| --out DIR]` | Every PNG icon drawn again from `public/icons/icon.svg` (dry run by default; see `assets/icons/README.md`) |
+| `node scripts/guide-check.mjs <folder>` | Check guide data (a `guide/` folder) the way the app reads it; exits 1 on any problem |
 | `npm run version:stamp -- --apply` | Stamp today's date and the next build number |
 | `node scripts/release-plan.mjs "release:all"` | What a release commit would release (see `docs/releasing.md`) |
 | `node scripts/release-notes.mjs` | The notes the next release would get: commits since the last release tag |
 
-The three test commands beyond `npm test` need a browser driver, which is not a dependency of the project: `npm i --no-save playwright-core` and a Chromium build (or `CHROMIUM_PATH`). Without it they say why and skip. A test that needs the desktop application also needs a display; on a machine without one, `xvfb-run -a node test/e2e/desktop.mjs`.
+The three test commands beyond `npm test`, and `npm run icons`, need a Chromium build to drive through `playwright-core` (found on the usual paths, or set `CHROMIUM_PATH`). Without it they say why and skip. A test that needs the desktop application also needs a display; on a machine without one, `xvfb-run -a node test/e2e/desktop.mjs`.
 
 Node ≥ 20.19. Vite is pinned to 7.x because electron-vite 5 supports Vite 5–7; with Vite 8 the `electron` module gets bundled into the main process instead of being externalized.
 
@@ -97,7 +99,9 @@ targets/
   desktop/                index.html, main.js, platform.js, theme.css,
                           preload.js, electron/ (main process)
 public/                   category.json, book.json, icons — served at '/'
-assets/                   desktop packaging icon (icon.png, 1024×1024)
+assets/                   packaging icons, drawn from public/icons/icon.svg
+scripts/icons.mjs         redraws every PNG icon from the SVG
+scripts/guide-check.mjs   checks guide data the way the app reads it
 scripts/aliases.mjs       alias overlay tool (Node standard library only)
 test/                     unit tests, architecture boundary tests, fixtures
 docs/architecture.md      decisions, data findings, trade-offs
@@ -196,12 +200,13 @@ Everything Phase 1 offered is here, each as its own feature, so a build can leav
 | **Export and convert** | any translation on this device, written out as any of those formats: the whole thing, a testament, one of the canon's own groupings, or books you name. The dialog is two drop-downs, a row of chips and a line of summary. Format and how it is saved — one file, one file gzipped, or a compressed zip — share a line; the chips leave out Strong's numbers, headings or cross-references (each offered only when the translation has it) or add your own notes (Markdown and spreadsheets); JSON and XML can be written compact; Markdown and spreadsheets can use English book names. The summary says how many books, chapters and files, roughly how big, and what the format cannot carry, before you press rather than after. The copyright goes into every format with a place for it, and every zip carries `ABOUT.txt` beside the files. The last choices are remembered per format. |
 | **Strong's numbers** | carried in from tagged editions (USFM, USFX, USX, OSIS) and shown where a translation has them. Press one and the lexicon says the word, how it is said, what part of speech it is and what it means. The lexicon is fetched the first time you ask and kept for reading offline — and only the testament you asked about. |
 | **Your own translations** | the library takes a file you have: this app's JSON, USFM, Zefania, OSIS, USFX, or a spreadsheet of book, chapter, verse and text. It reads the file, tells you what it thinks it is and fills in the name, short name and language, and you correct whatever is wrong and press Import. It also takes a whole published archive — an eBible.org zip is the scripture, the translation's own book names, its metadata and its copyright, and all of it comes in together. It is then checked against the canon exactly as a published translation is, and gets the same report of where it differs. Nothing is uploaded anywhere. The library lists them under **Yours**. |
+| **Library** | two pages. *On this device* is the home: only what is here, each with its short name, where it came from, whether an update is waiting, a button to read it and a menu for the rest (export, about, report, remove). *Get more* is where translations come from, one source at a time — the Lai Siangtho catalog, getBible, eBible.org, a web address, or a file. Every list marks what is already here, and a translation that is here under another source's name is marked *Same as … on this device*, so the King James Version is not downloaded three times. eBible.org and most web addresses refuse to be read by a web page; the desktop app downloads them itself, and the web version says so instead of failing quietly. |
 | **Projects** | the work the reading is for: a sermon, a lesson, a series, a chapter. A project is an ordered list of passages, Markdown notes and tasks; passages are kept as references, so the verses are quoted from whichever translation is open and a project sent to somebody else reads correctly in theirs. It exports as its own file to come back whole, and as Markdown for anyone who does not use this app. There is a pane for it beside the reading. |
 | **Compare** | one verse in every translation on this device, in one sheet: each in its own script and direction, the one being read first, a merged verse saying which verses it covers, a missing one saying so. The arrows (and ← →) step through the passage; each row copies or opens that translation. From a verse number, or `compare jn 3:16` in the palette. |
 | **Links to a verse** | *Copy link* in the verse bar gives an address that opens on that verse — `…/#/43/3/16`, or `#/19/23/1-3` for a run. From the desktop app it points at the web build, so it opens for anyone. The verse stays in the address while its chapter is open, so a reload lands on it again. |
 | **Memory verses** | learning passages by heart. *Memorize* in the verse bar (or `memorize ps 23:1-3`) adds one; the Memory verses page lists them with how far each has come and when it is next due. Practice shows the verse with words hidden — a third, then half, then only first letters, then all — press a gap to see its word, Space to show the verse, then Again, Hard or Got it (1, 2, 3). Got it brings it back in 1, 3, 7, 14, 30 and 90 days; Again in ten minutes. Burmese is hidden by syllable. The words come from the translation the verse was added in. |
 | **Reading streak** | the Plan pane counts the days in a row with reading, the chapters of the last seven days, and how much of the Bible has been read at least once. A chapter counts after half a minute in front of the reader with the window on screen, or when it is ticked in a plan. |
-| **Guide** | a pane that answers “how do I…” in your own words — English, Norwegian or Burmese — from what the app knows about itself: topics written for it, and every command, palette verb, document and setting in the build, each with the button that does it. A passage is answered with the passage; a question it cannot answer says so and offers to search the Bible for those words. It starts switched off: `? …` or `ask …` in the palette opens it, as does its command. Nothing generates text and nothing leaves the device. It learns which answers you use (and which you mark *Not this*) and ranks them accordingly; Settings → Study forgets that. Its code loads the first time it opens. |
+| **Guide** | a pane that answers “how do I…” in your own words — English, Norwegian or Burmese — from what the app knows about itself: topics written for it, and every command, palette verb, document and setting in the build, each with the button that does it. A passage is answered with the passage; a question it cannot answer says so and offers to search the Bible for those words. It starts switched off: `? …` or `ask …` in the palette opens it, as does its command. Nothing generates text. More answers — an introduction to every book of the Bible, and help written topic by topic — can be downloaded from the `guide/` folder of the catalog repository when the reader asks for them; that is the only time it goes online. It learns which answers you use (and which you mark *Not this*) and ranks them accordingly; Settings → Study forgets that. Its code loads the first time it opens. |
 | **Export a passage** | any passage, with your notes in it: Markdown to paste into a document, a citation to drop into a paragraph, the plain text, a Markdown file, or a sheet set for paper. |
 
 Notes are written in a small Markdown: headings, emphasis, code, quotes, lists, links, `[[Genesis 1]]` wikilinks and `#tags`. Notes are rendered as DOM nodes, never as HTML strings.
@@ -348,7 +353,7 @@ The Settings page is where they are seen rather than remembered: a column of sec
 | Typography | the four sizes, and a reset |
 | Study | what the Books pane, Search, the composer and the card studio each own — contributed by those features rather than duplicated here |
 | Keyboard | the shortcut document |
-| Storage | what is installed, what the browser has room for, how the Library lists itself, update checking, and — last, always — resetting every setting and erasing everything on this device |
+| Storage | what is installed, what the browser has room for, update checking, and — last, always — resetting every setting and erasing everything on this device |
 | Your material | notes, bookmarks, projects, and moving them to another device |
 
 Anything that cannot be undone asks first, in the app's own dialog, with the cancel focused. Everything on the page is also in the command palette, which is how it is found by name rather than by looking. The reading position is coalesced (250 ms); every other change is written at once, since a write started from `pagehide` is not reliably finished by the browser. Writes are coalesced (250 ms), so chapter stepping does not cost a transaction each time.

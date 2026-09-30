@@ -17,6 +17,9 @@ newest first.
 - Translations from the Lai Siangtho catalog (64 at present), downloaded once
   and read offline from then on; the catalog itself is checked for changes and
   a newer translation file is offered as an update.
+- More translations from getBible and eBible.org, or from any web address or
+  file, listed side by side in the Library; whatever is already on the device
+  — under any source's name — is marked, so nothing is downloaded twice.
 - Parallel reading: any number of translations side by side, levelled verse by
   verse — a translation that merges verses 17–18 stays level with one that
   does not — with synchronised scrolling that follows the verse.
@@ -143,6 +146,24 @@ newest first.
 ---
 
 ## Releases
+
+### 26.09.30.8 — 30 September 2026
+
+- The Library is two pages. *On this device* shows only what is here, with
+  a button to read each and a menu for the rest. *Get more* brings
+  translations in, one source at a time: the Lai Siangtho catalog, getBible,
+  eBible.org, a web address, or a file. Every list marks what is already
+  here, including the same translation from another source.
+- getBible's JSON is a format the importer reads.
+- The desktop app downloads from eBible.org and other sites itself; the web
+  version says when a site does not allow a web page to download from it.
+- The guide can download more answers: an introduction to each of the 66
+  books and help written topic by topic, kept offline once fetched. The data
+  is schema.org FAQPage JSON-LD in the catalog repository's `guide/` folder.
+- "What is John about" finds John, not 3 John.
+- Every PNG icon is drawn from the SVG by `npm run icons`, and a test notices
+  when they fall out of step. The ribbon in the icons is red, as in the SVG.
+- The Library's list-or-grid setting is gone with the page it arranged.
 
 ### 26.09.30.7 — 30 September 2026
 
