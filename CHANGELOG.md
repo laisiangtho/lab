@@ -63,6 +63,11 @@ newest first.
 - Reading plans (the whole Bible in a year, the New Testament in 90 days, the
   Gospels in 40, Psalms in 30), a verse of the day and a way back to where
   reading stopped.
+- A reading streak, chapters this week, and how much of the Bible has been
+  read.
+- Memory verses with spaced practice and words hidden as a verse sticks.
+- Any verse compared across every translation on the device, and a link that
+  opens on a verse.
 - Study board: verses and thoughts as cards on a canvas.
 - Ink: freehand marking over the text, kept per chapter.
 - Projects, as a studio: a sermon, a lesson or a series as an ordered list of
@@ -138,6 +143,21 @@ newest first.
 ---
 
 ## Releases
+
+### 26.09.30.6 — 30 September 2026
+
+- **Compare a verse in every translation** on the device, in one sheet, from
+  a verse number or `compare jn 3:16`; step through the passage with the
+  arrows, copy one translation or all of them.
+- **Links to a verse.** Copy link in the verse bar gives an address that
+  opens on that verse (`#/43/3/16`, or a run `#/19/23/1-3`); from the desktop
+  app it points at the web app, so it opens for anyone.
+- **Memory verses.** Add a passage with Memorize; practise the ones due with
+  words hidden — more as it sticks — and Again, Hard or Got it; spaced over
+  1, 3, 7, 14, 30 and 90 days. Burmese is hidden by syllable.
+- **Reading streak.** The Plan pane shows days in a row with reading,
+  chapters this week, and how much of the Bible has been read.
+- The guide knows about all four.
 
 ### 26.09.30.5 — 30 September 2026
 
