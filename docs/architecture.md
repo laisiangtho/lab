@@ -199,7 +199,7 @@ Layout:
 
 ## 3c. Search, notes and bookmarks
 
-- **Search**: no install-time index. A worker walks an IndexedDB cursor over `chapters` and streams matches in batches; a newer query cancels the older one. Measured in Chromium on the full data: one translation ≈ 1.0 s (5.2 MB, 1,189 chapters, 31k verses), two ≈ 2.0 s. An inverted index would cut query time at the cost of build time and storage; revisit if the wait becomes a problem.
+- **Search**: no install-time index. A worker reads `chapters` a page of a hundred at a time (`getAll` over a key range) and streams matches in batches; a newer query cancels the older one between pages. Measured in Chromium on the full data (5.2 MB, 1,189 chapters, 31k verses): one translation ≈ 0.2 s in the worker, 0.6 s to a settled screen; three ≈ 1.1 s and 1.3 s. An inverted index would cut query time at the cost of build time and storage; revisit if the wait becomes a problem.
 - **Matching** (`core/search.js`): words ANDed, `"phrases"` literal, case and Latin-accent folding only (Myanmar, Arabic and Hebrew marks are meaning-bearing and kept). Fold positions map back to the original string so highlight ranges are correct.
 - **Notes and bookmarks** (`core/annotations.js`) key on book/chapter/verse, never on a translation: an annotation belongs to the verse, so it shows in every translation. Notes: chapter-level or verse-level, several per verse, random ids. Bookmarks: one per verse, id derived from the passage. Both validate against `category.json` (unknown book, chapter out of range, unknown colour are errors).
 - Stored in IndexedDB v3 (`notes`, `marks`), held in memory for the reading surface to consult per verse, and carried in the export under `data`. Import merges by id — nothing is dropped.
@@ -549,14 +549,14 @@ rather than a step in this feature.
 
 ## 3e. Search
 
-No index is built at install time; the scan is a cursor over `chapters` in a worker.
+No index is built at install time; the scan reads `chapters` in pages, in a worker.
 
 - **Matching** (`app/core/search.js`) has three modes and one flag — offered to the reader as two independent switches (whole words, regular expression) plus case, since a pattern sets its own boundaries and the two cannot both apply: plain terms (ANDed, `"quoted"` as a phrase), whole words (a term must sit on a word boundary, tested with `\p{L}\p{N}_`), and a regular expression compiled as written. Case folds unless the reader asks otherwise. Plain and whole-word matching fold to NFD and strip Latin combining marks only; a pattern is matched against the text as written, since folding would change what it means. A pattern that cannot compile raises the reason, without the flags the reader never typed.
-- **Scope**: a set of translations and a set of books. `store.scanChapters(identify, visit, { books, while })` opens one cursor per book when a set is given — the key is `[identify, book, chapter]`, so each book is one contiguous range — and asks `while()` between records, which is how a newer query abandons an older one mid-translation.
+- **Scope**: a set of translations and a set of books. `store.scanChapters(identify, visit, { books, while })` reads one key range per book when a set is given — the key is `[identify, book, chapter]`, so each book is one contiguous range — a hundred records to a request, and asks `while()` between records, which is how a newer query abandons an older one mid-translation.
 - **Counting is not limited**: the worker counts every match and keeps only the first `limit` rows (2,000). So the answer states how many verses matched, in how many chapters and books, and the tree lists every book that matched. Opening a book whose verses were past the limit searches that one book again, which is cheap.
 - Results stream in batches of 40, each carrying the counts so far; the pane repaints at most once a frame.
 
-Measured on three full-size translations: one translation 1.6 s, the same as a regular expression 0.3 s, all three 4.2 s, one book 0.17 s.
+Measured on three full-size translations: one translation 1.6 s, the same as a regular expression 0.3 s, all three 4.2 s, one book 0.17 s. The gap between plain words and a regular expression was the clue: a regular expression reads the text as written, and plain words folded every character with its own `normalize()` call — about a second a Bible. With folds remembered per character, ASCII only lowercased and the offset map built only for a verse that matches, one translation takes 0.2 s in the worker (0.6 s to a settled screen) and all three 1.1 s (1.3 s). `test/search-fold.test.js` holds the fast fold to the original's results.
 
 ---
 

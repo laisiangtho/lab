@@ -67,7 +67,7 @@ app/                      shared UI — never imports from targets/
     transfer.js           JSON download / file picker (no native dialog needed)
     aliases.js            lazy overlay loader
   workers/library.worker.js   download → validate → split → write
-  workers/search.worker.js    chapter-cursor scan, streamed results
+  workers/search.worker.js    paged chapter scan, streamed results
   shell/                  the app itself: chrome, workspace, reading surface
     chrome.js             ribbon, sidebars, top band, status bar, toasts
     workspace.js          tabs, panes (leaves), row alignment, synced scrolling
@@ -126,7 +126,7 @@ Parallel alignment works on blocks, not pixels: each verse, its section headings
 
 ## Search, notes and bookmarks
 
-**Search** scans the chapters of the translations that are offline; no index is built at install time. The scan runs in a worker over an IndexedDB cursor, so memory stays flat and results stream in as they are found; a new query abandons the running one.
+**Search** scans the chapters of the translations that are offline; no index is built at install time. The scan runs in a worker, reading chapters from IndexedDB a hundred at a time, so memory holds a page rather than a translation and results stream in as they are found; a new query abandons the running one.
 
 What comes back is the shape of the answer, not the first forty lines of it: **how many verses matched, in how many chapters, in how many books**, and then those books as a tree to open. Counting carries on past the display limit, so a common word reports all nine thousand of its verses and shows the first two thousand; opening a book whose verses were past that limit searches that one book again, which costs a fraction of the first scan.
 
@@ -142,7 +142,7 @@ Under them, the scope: which translations — none chosen means the one being re
 
 Every choice is remembered. Plain and whole-word matching fold case and Latin accents (`etait` finds `était`) while leaving Myanmar, Arabic and Hebrew marks alone, and match offsets map back to the original string so highlighting lands on the right characters. A regular expression is matched against the text as written, since folding it would change what the pattern means.
 
-A search limited to a few books opens one cursor per book instead of reading the whole translation and discarding most of it: one book of a full-size Bible answers in about 170 ms, where the whole of one translation takes about 1.6 s and three take about 4 s.
+A search limited to a few books reads only those books' key ranges instead of reading the whole translation and discarding most of it. On full-size Bibles the whole of one translation answers in about 0.6 s and three in about 1.3 s; one book is a fraction of that. Most of a search used to be folding text one character at a time (1.6 s for one translation); folds are now remembered per character, plain ASCII is only lowercased, and a verse's offset map is built only when it matches.
 
 ### Going somewhere quickly
 
@@ -263,6 +263,8 @@ Interface strings live in `app/shell/i18n.js` and nowhere else — features incl
 ## Narrow windows and touch
 
 Under 900 px a sidebar comes in as a drawer over the text with a scrim behind it; under 760 px the status bar gives way to a floating navigation pill, the band carries the app's mark, and the tab strip shows only the active tab — press it for the list of the others. A window grown back to a column layout puts the drawer away.
+
+A page lays itself out by the width of the pane it is in, not the window's: a wide window with both sidebars open leaves the page about 400 px, and there Settings puts its menu above the settings, the graph's bar wraps, the card studio drops its size readout, and the one tab the strip keeps shrinks to an ellipsis rather than pushing the new-tab button out of sight.
 
 ## When something goes wrong
 
