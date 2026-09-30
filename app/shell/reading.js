@@ -104,11 +104,16 @@ export function chapterNote(p) {
           class: 'vnum', type: 'button',
           onclick: (e) => p.onVerse?.(key, e.currentTarget, { extend: e.shiftKey }),
         }, label),
-        verseText(verse.text, p),
-        noteCount ? h('button', {
-          class: 'verse-note-dot', title: L('lbl.notes', { n: noteCount }), 'aria-label': L('lbl.notes', { n: noteCount }),
-          onclick: (e) => p.onVerse?.(key, e.currentTarget, { extend: e.shiftKey }),
-        }, icon('note')) : null),
+        // One element for everything after the number. In the list layout the
+        // verse is a two-column grid, and a verse whose text is several pieces —
+        // a word carrying a Strong's number is its own element — put each piece
+        // in a cell of its own: the tagged word stood alone on a line.
+        h('span', { class: 'vtext' },
+          verseText(verse.text, p),
+          noteCount ? h('button', {
+            class: 'verse-note-dot', title: L('lbl.notes', { n: noteCount }), 'aria-label': L('lbl.notes', { n: noteCount }),
+            onclick: (e) => p.onVerse?.(key, e.currentTarget, { extend: e.shiftKey }),
+          }, icon('note')) : null)),
       verse.ref && !compare && p.xrefs !== false ? refsLine(verse.ref, meta, p.resolver, p.onRef, p.onPeek) : null));
   }
   note.append(chapterEl);

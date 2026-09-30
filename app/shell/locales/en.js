@@ -63,7 +63,7 @@ export default {
   'val.default': 'Default',
   'set.ribbonResetHint': 'Put back the buttons this build ships with.',
   'set.ribbonItems': 'Ribbon buttons',
-  'set.ribbonItemsHint': 'Drag one up or down the rail to move it; the × on a button takes it off. {n} on it now.',
+  'set.ribbonItemsHint': 'Drag a button up or down the rail to move it, or onto the bin at its foot to take it off. {n} on it now.',
   'cmd.cancel': 'Cancel',
   'cmd.ok': 'OK',
   'cmd.reset': 'Reset',
@@ -539,6 +539,7 @@ export default {
   'rp.saved': '{name} saved',
 
   'doc.formats.lede': 'Every file this app reads and writes, where it comes from, and what it keeps on this device. Nothing here is private to the app: the text is public JSON, and your own material leaves as a file you own.',
+  'doc.formats.inEnglish': 'What follows is in English: it describes files whose field names are English, and is easiest to check against them as it is.',
   'doc.t.formats': 'What the files look like, and how to add your own',
   'lbl.versesHeld': 'verses held',
   'lbl.departures': 'departures from the canon',

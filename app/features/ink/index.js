@@ -48,7 +48,7 @@ export default {
         state.set({ ink: on });
         if (!on) unmount();
         else sync();
-        shell.notify(L('msg.state', { what: L('cmd.ink'), value: L(on ? 'val.on' : 'val.off') }));
+        shell.notify(L('msg.state', { what: L('cmd.ink'), value: L(on ? 'val.on' : 'val.off') }), 'info', { about: 'ink' });
       },
     });
 

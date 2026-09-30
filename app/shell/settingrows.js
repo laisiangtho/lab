@@ -55,8 +55,12 @@ export function createRows({ refresh = () => {} } = {}) {
     // The segment keeps its own mark. A row that waited to be rebuilt before it
     // showed what was pressed is a row that looks broken every time the change
     // it makes does not happen to alter the rest of the panel.
-    const buttons = options.map(([id, text, glyph]) => h('button', {
+    // An option may name its own language (a language named in itself): the
+    // browser then picks a face for that script, where without it a Burmese
+    // name in an English interface came out as tiny, broken glyphs.
+    const buttons = options.map(([id, text, glyph, lang]) => h('button', {
       dataset: { value: String(id) },
+      ...(lang ? { lang } : {}),
       'aria-pressed': String(id === value),
       title: glyph ? text : undefined,
       'aria-label': glyph ? text : undefined,

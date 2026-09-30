@@ -775,6 +775,8 @@ export default {
         function tab(id, glyph, label, count) {
           return h('button', {
             class: 'lib-tab', role: 'tab', dataset: { page: id }, 'aria-selected': String(page === id),
+            // Its label is hidden in a narrow band; its name must not be.
+            title: label, 'aria-label': count === null ? label : `${label} (${count})`,
             onclick: () => go(id),
           }, icon(glyph), h('span', {}, label), count === null ? null : h('span', { class: 'lib-tab-n' }, String(count)));
         }
@@ -871,7 +873,7 @@ export default {
           const heldRows = here.map((row) => row.held);
           fill(rail, ...SOURCE_IDS.map((id) => h('button', {
             class: 'lib-src', role: 'tab', dataset: { source: id }, 'aria-selected': String(source === id),
-            title: `${L(`lib.src.${id}`)} — ${sourceCount(id, rows)}`,
+            title: `${L(`lib.src.${id}`)} — ${sourceCount(id, rows)}`, 'aria-label': L(`lib.src.${id}`),
             onclick: () => pick(id),
           }, icon(SOURCE_ICON[id]), h('span', { class: 'lib-src-t' }, L(`lib.src.${id}`)))));
 

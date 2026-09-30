@@ -90,6 +90,19 @@ export function createChrome(root, ctx) {
     h('span', {}, L('app.name')));
 
   const scrim = h('div', { class: 'scrim-mobile', onclick: () => closeDrawers() });
+  // Escape closes a drawer too — the way out for a keyboard, and for the back
+  // gesture a phone's browser sends as one. Only once nothing smaller is open
+  // over it: a menu or a dialog in the drawer takes the Escape first.
+  // What was open is read before anything handles the key (capture), since
+  // the menu's own handler closes it first and would leave nothing to see.
+  let smallerOpen = false;
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') smallerOpen = Boolean(document.querySelector('.scrim:not([hidden]), .popover:not([hidden]), .menu:not([hidden])'));
+  }, true);
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || smallerOpen || !document.body.classList.contains('has-drawer')) return;
+    closeDrawers();
+  });
   const mobileBar = h('nav', { class: 'mobile-bar', role: 'toolbar' },
     mobileButton('library', 'side.left', () => toggleSide('left')),
     mobileButton('chev', 'cmd.prev', () => run('passage.prev-chapter'), 'flip'),
@@ -938,12 +951,23 @@ export function createChrome(root, ctx) {
    * A passing message. One that carries an action — "a new version is ready",
    * and the button that takes it — stays long enough to be read and acted on,
    * and can be dismissed by hand.
-   * @param {{ action?: { label: string, run: () => void } }} [options]
+   *
+   * A message about something that has a state — a setting switched on, a
+   * layout chosen — says `about` what, and replaces the last one about the
+   * same thing: pressed twice quickly, "Strong's numbers: off" and "on" stood
+   * one above the other, the older one wrong. The same message twice is shown
+   * once, for the same reason.
+   * @param {{ action?: { label: string, run: () => void }, about?: string }} [options]
    */
-  function notify(message, kind = 'info', { action = null } = {}) {
+  function notify(message, kind = 'info', { action = null, about = null } = {}) {
+    for (const old of [...toasts.children]) {
+      if ((about && old.dataset.about === about) || old.dataset.message === message) old.remove();
+    }
     const cls = kind === 'error' ? 'toast err' : kind === 'ok' ? 'toast ok' : 'toast';
-    const toast = h('div', { class: cls, role: kind === 'error' ? 'alert' : 'status' },
-      icon(kind === 'error' ? 'alert' : 'info'), h('span', {}, message));
+    const toast = h('div', {
+      class: cls, role: kind === 'error' ? 'alert' : 'status',
+      dataset: { message, ...(about ? { about } : {}) },
+    }, icon(kind === 'error' ? 'alert' : 'info'), h('span', {}, message));
     if (action) {
       toast.append(
         h('button', { class: 'toast-act', onclick: () => { toast.remove(); action.run(); } }, action.label),

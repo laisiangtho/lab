@@ -75,7 +75,7 @@ export default {
   'val.default': 'Standard',
   'set.ribbonResetHint': 'Sett tilbake knappene denne versjonen leveres med.',
   'set.ribbonItems': 'Knapper på båndet',
-  'set.ribbonItemsHint': 'Dra en knapp opp eller ned for å flytte den; × på en knapp fjerner den. {n} på båndet nå.',
+  'set.ribbonItemsHint': 'Dra en knapp opp eller ned for å flytte den, eller til søppelbøtta nederst for å fjerne den. {n} på båndet nå.',
   'cmd.cancel': 'Avbryt',
   'cmd.ok': 'OK',
   'cmd.reset': 'Tilbakestill',
@@ -551,6 +551,7 @@ export default {
   'rp.saved': '{name} lagret',
 
   'doc.formats.lede': 'Alle filer denne appen leser og skriver, hvor de kommer fra, og hva den lagrer på denne enheten. Ingenting her er lukket for appen: teksten er offentlig JSON, og ditt eget materiale tas ut som en fil du eier.',
+  'doc.formats.inEnglish': 'Resten er på engelsk: den beskriver filer der feltnavnene er engelske, og er lettest å sjekke mot dem slik den er.',
   'doc.t.formats': 'Hvordan filene ser ut, og hvordan du legger til dine egne',
   'lbl.versesHeld': 'vers lagret',
   'lbl.departures': 'avvik fra kanon',

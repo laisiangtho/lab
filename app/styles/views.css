@@ -611,6 +611,13 @@ body[data-shell="on"] {
 }
 .nm-tools .rp-seg::-webkit-scrollbar { height: 0; }
 
+/* A Burmese name marked as such anywhere in the interface — a language
+   option, a translation's own name — in a face that has the script. By the
+   attribute, not by :lang(), so a Burmese interface's Latin keeps its face. */
+body :is([lang="my"], [lang^="my-"], [lang="mya"]):not(.chapter, .chapter *, .pd-text, .pd-text *, .note, .note *) {
+  font-family: "Myanmar Text", "Noto Sans Myanmar", "Padauk", "Myanmar MN", var(--font-ui);
+}
+
 /* The reader's correction to a translation's text direction */
 .tri-dir { margin-top: 12px; }
 .tri-dir-label { display: block; color: var(--text-faint); font-size: var(--fs-ui-s); margin-bottom: 5px; }
@@ -1093,6 +1100,7 @@ label.set-row:hover { background: var(--bg-hover); }
 .wl-link:hover { color: var(--text-normal); text-decoration: underline; text-underline-offset: 3px; }
 /* Long addresses in the formats document wrap rather than push the page. */
 .fm-sec p { overflow-wrap: anywhere; }
+.fm-lang { margin: 14px 0 0; padding: 9px 12px; border-radius: 10px; background: var(--bg-secondary); color: var(--text-muted); font-size: var(--fs-ui-s); line-height: 1.55; }
 /* The example beside a palette verb, in the shortcuts list. */
 .verb-eg { display: block; margin-top: 1px; font-family: var(--font-mono); font-style: normal; font-size: var(--fs-ui-s); color: var(--text-faint); }
 

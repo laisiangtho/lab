@@ -174,7 +174,7 @@ export default {
           const hint = shown.review ? `${L('set.languageHint')} ${L('set.languageReview')}` : L('set.languageHint');
           return ui.choice({
             name: L('set.language'), hint,
-            options: [['device', L('set.languageDevice')], ...Object.entries(LOCALES).map(([id, { name }]) => [id, name])],
+            options: [['device', L('set.languageDevice')], ...Object.entries(LOCALES).map(([id, { name }]) => [id, name, null, id])],
             value: current.locale ?? 'device',
             onChange: async (value) => {
               state.set({ locale: value === 'device' ? null : value });

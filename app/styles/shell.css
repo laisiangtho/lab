@@ -1271,7 +1271,7 @@ body.study-in-margin .outline-study{display:none}
 
 /* ---- status bar ----------------------------------------------------------*/
 body[data-ribbon="off"] .ribbon{width:0;flex:0 0 0;overflow:visible}
-body[data-ribbon="off"] .rib-rail{display:none}
+body[data-ribbon="off"] .rib-rail,body[data-ribbon="off"] .rib-foot{display:none}
 body[data-ribbon="off"] .rib-head{
   position:fixed;inset-inline-start:0;top:var(--mac-inset);width:var(--ribbon-w);z-index:46;
 }

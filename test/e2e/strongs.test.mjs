@@ -64,6 +64,22 @@ test("Strong's numbers and the rest of the markup", options, async (t) => {
     assert.doesNotMatch(await bodyText(), RAW, 'the stored notation never shows');
   });
 
+  await t.test('in the list layout a tagged word stays inside its verse', async () => {
+    // The list layout is a two-column grid: the number, and the text. A verse
+    // whose text was several pieces put the tagged word in a cell of its own.
+    const layoutOf = () => page.evaluate(() => { const c = document.querySelector('.chapter').classList; return c.contains('list') ? 'list' : c.contains('flow') ? 'flow' : 'paragraph'; });
+    for (let i = 0; i < 3 && (await layoutOf()) !== 'list'; i += 1) await palette('Verse layout');
+    assert.equal(await layoutOf(), 'list');
+    const cells = await page.locator('.chapter.list .verse').evaluateAll((verses) => verses.map((v) => v.children.length));
+    assert.ok(cells.length && cells.every((n) => n === 2), `every verse is a number and one text (${[...new Set(cells)]})`);
+    const [word, text] = await page.evaluate(() => {
+      const verse = document.querySelector('.chapter.list .verse');
+      return [verse.querySelector('.strongs').getBoundingClientRect().top, verse.querySelector('.vtext').getBoundingClientRect().top];
+    });
+    assert.ok(Math.abs(word - text) < 12, 'the tagged word is on the first line of its verse');
+    for (let i = 0; i < 3 && (await layoutOf()) !== 'paragraph'; i += 1) await palette('Verse layout');
+  });
+
   await t.test('the translation says what it carries', async () => {
     await page.locator('.tr-btn[aria-label="About this translation"]').first().click();
     await page.waitForSelector('.tri-facts');
@@ -115,6 +131,13 @@ test("Strong's numbers and the rest of the markup", options, async (t) => {
     assert.equal(await page.locator('.chapter .verse-title').count(), 0, 'and it is remembered');
     await palette('Section headings');
     assert.ok(await page.locator('.chapter .verse-title').count());
+  });
+
+  await t.test('pressed twice, the message is the newest one, not both', async () => {
+    await palette("Strong's numbers");
+    await palette("Strong's numbers");
+    const said = await page.locator('.toast').allInnerTexts();
+    assert.equal(said.filter((text) => /Strong/.test(text)).length, 1, `one message about it: ${JSON.stringify(said)}`);
   });
 
   await t.test('nothing was logged', () => {

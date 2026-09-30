@@ -49,7 +49,7 @@ export function createModal() {
     shown = [...offered, ...filter(items, input.value).slice(0, 200)];
     selected = Math.min(selected, Math.max(shown.length - 1, 0));
     list.replaceChildren(...shown.map((item, i) => h('div', {
-      class: `mi${i === selected ? ' is-sel' : ''}`, role: 'option', dataset: { index: i },
+      class: `mi${i === selected ? ' is-sel' : ''}`, role: 'option', dataset: { index: i, ...(typeof item.id === 'string' ? { id: item.id } : {}) },
       onclick: () => pick(item),
     },
       icon(item.icon ?? 'book'),

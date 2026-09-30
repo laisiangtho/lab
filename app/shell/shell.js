@@ -374,13 +374,13 @@ export function createShell(root, ctx) {
     const LAYOUTS = workspace.layouts;
     const next = LAYOUTS[(LAYOUTS.indexOf(ctx.state.get().layout) + 1) % LAYOUTS.length];
     ctx.state.set({ layout: next });
-    shell.notify(L('msg.state', { what: L('cmd.layout'), value: L(`val.${next}`) }));
+    shell.notify(L('msg.state', { what: L('cmd.layout'), value: L(`val.${next}`) }), 'info', { about: 'layout' });
   }
 
   function toggleFlag(key, label) {
     const value = !ctx.state.get()[key];
     ctx.state.set({ [key]: value });
-    shell.notify(L('msg.state', { what: label, value: L(value ? 'val.on' : 'val.off') }));
+    shell.notify(L('msg.state', { what: label, value: L(value ? 'val.on' : 'val.off') }), 'info', { about: label });
   }
 
   async function showAbout() {
@@ -393,7 +393,7 @@ export function createShell(root, ctx) {
   function toggleMode() {
     const next = MODES[(MODES.indexOf(ctx.state.get().mode) + 1) % MODES.length];
     ctx.state.set({ mode: next });
-    shell.notify(L('msg.state', { what: L('cmd.mode'), value: L(`val.${next}`) }));
+    shell.notify(L('msg.state', { what: L('cmd.mode'), value: L(`val.${next}`) }), 'info', { about: 'mode' });
   }
 
   /**
@@ -405,7 +405,7 @@ export function createShell(root, ctx) {
   function toggleShown(key, nameKey) {
     const next = !ctx.state.get()[key];
     ctx.state.set({ [key]: next });
-    shell.notify(L('msg.state', { what: L(nameKey), value: L(next ? 'val.on' : 'val.off') }));
+    shell.notify(L('msg.state', { what: L(nameKey), value: L(next ? 'val.on' : 'val.off') }), 'info', { about: key });
   }
 
   function toggleStrongs() {
@@ -414,7 +414,7 @@ export function createShell(root, ctx) {
     const present = document.querySelector('.chapter .strongs');
     shell.notify(present
       ? L('msg.state', { what: L('cmd.strongs'), value: L(next ? 'val.on' : 'val.off') })
-      : L('msg.noStrongs'));
+      : L('msg.noStrongs'), 'info', { about: 'strongs' });
   }
 
   /**
@@ -493,7 +493,7 @@ export function createShell(root, ctx) {
     ctx.state.set({ theme: next });
     applyTheme(next);
     chrome.refreshThemeIcon();
-    shell.notify(L('msg.state', { what: L('cmd.theme'), value: L(`val.${next}`) }));
+    shell.notify(L('msg.state', { what: L('cmd.theme'), value: L(`val.${next}`) }), 'info', { about: 'theme' });
   }
 
   // --- modal users --------------------------------------------------------
@@ -698,9 +698,22 @@ export function createShell(root, ctx) {
    * page as one line.
    */
   function wireKeys() {
+    // The two keys that open a list of things to go to still work from inside
+    // one: Mod+P in the quick switcher opens the palette in its place. Ignored,
+    // they fell through to the browser, and Ctrl+P printed the page.
+    const FROM_A_LIST = new Set(['shell.palette', 'shell.switcher']);
     window.addEventListener('keydown', (e) => {
-      if (modal.isOpen) return;
       const mod = e.ctrlKey || e.metaKey;
+      if (modal.isOpen) {
+        if (!mod || e.altKey) return;
+        const combo = `Mod+${e.shiftKey ? 'Shift+' : ''}${e.key.length === 1 ? e.key.toLowerCase() : e.key}`;
+        const command = ctx.registry.commands().find((c) => c.keys === combo && FROM_A_LIST.has(c.id));
+        if (!command) return;
+        e.preventDefault();
+        modal.close();
+        command.run();
+        return;
+      }
       // Typing in a field takes the plain keys, but not the ones held with
       // Control or Command: a writer who wants the palette should not have to
       // leave the note first. The combinations the field itself owns —

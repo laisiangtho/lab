@@ -11,7 +11,7 @@ import { formatSections } from './formats.js';
 import { fill, h } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { keyLabel } from '../../shell/keys.js';
-import { L, when } from '../../shell/i18n.js';
+import { L, when, currentLocale } from '../../shell/i18n.js';
 import { BUILT_AT, VERSION } from '../../version.js';
 
 export { keyLabel };
@@ -156,7 +156,9 @@ export default {
       mount(el) {
         const facts = h('div', { class: 'fm-facts' });
 
-        const section = ({ heading, body, sample }) => h('section', { class: 'fm-sec' },
+        // English by design (see formats.js), and marked so: the right fonts
+        // and hyphenation, and a screen reader that reads it as English.
+        const section = ({ heading, body, sample }) => h('section', { class: 'fm-sec', lang: 'en', dir: 'ltr' },
           h('h2', {}, heading),
           ...body.map((text) => h('p', {}, text)),
           sample
@@ -177,6 +179,8 @@ export default {
             h('h1', { class: 'inline-title' }, L('doc.formats')),
             h('p', { class: 'doc-lede' }, L('doc.formats.lede')),
             facts,
+            // Said once, in the reader's language, before the page turns English.
+            currentLocale() === 'en' ? null : h('p', { class: 'fm-lang' }, L('doc.formats.inEnglish')),
             ...formatSections({ config: ctx.config }).map(section)));
 
         async function paint() {

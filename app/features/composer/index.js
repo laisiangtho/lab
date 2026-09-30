@@ -121,6 +121,10 @@ export default {
       text.value = editing?.text ?? '';
       element.hidden = false;
       place();
+      // Preview alone has nowhere to type: a note with nothing in it yet opens
+      // where it can be written, whatever view was used last. The reader's
+      // choice is not changed, only this opening of it.
+      if (!text.value.trim() && element.dataset.mode === 'preview') element.dataset.mode = window.innerWidth <= 760 ? 'write' : 'split';
       paint();
       if (focus) text.focus();
     }
