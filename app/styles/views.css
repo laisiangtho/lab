@@ -676,7 +676,7 @@ label.set-row:hover { background: var(--bg-hover); }
 .set-text { display: flex; flex-direction: column; gap: 2px; flex: 1 1 200px; min-width: 0; }
 .set-name { color: var(--text-normal); font-size: var(--fs-ui-m); font-weight: 500; }
 .set-hint { color: var(--text-faint); font-size: var(--fs-ui-s); line-height: 1.45; }
-.set-row .btn, .set-row .accent-row { flex: 0 0 auto; }
+.set-row .btn, .set-row .accent-row { flex: 0 0 auto; max-width: 100%; }
 /* A choice wider than its row wraps its options rather than running under the
    panel's edge: the language choice on a phone showed two of its four, and the
    two it hid were the languages someone looking for their own would want. */
@@ -882,7 +882,10 @@ label.set-row:hover { background: var(--bg-hover); }
 .set-sliders .rp-row { padding: 6px 0; }
 .set-sliders .rp-row + .rp-row { border-top: 1px solid var(--border); }
 .settings-import h3 { margin: 16px 0 6px; font-size: var(--fs-ui-l); font-weight: 600; }
-@media (max-width: 720px) {
+/* By the width of the pane, not the window: with both sidebars open a wide
+   window leaves the page 400 px, and the menu beside the settings left them
+   130 px — a choice ran out of its panel. */
+@container leaf (max-width: 720px) {
   .set-layout { grid-template-columns: 1fr; gap: 14px; }
   .set-nav { position: static; flex-direction: row; flex-wrap: wrap; }
   .set-nav-item { background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--border); font-size: var(--fs-ui-s); }
@@ -1238,11 +1241,11 @@ label.set-row:hover { background: var(--bg-hover); }
   font-variant-numeric: tabular-nums;
 }
 .cd-hint[data-warn="true"] { color: var(--c-orange); }
-/* A phone: the readout is the band's least necessary part and goes, so the
+/* A narrow pane: the readout is the band's least necessary part and goes, so the
    tools can go behind their menu and the actions stay whole; and the foot line
    of a studio sits above the floating bar, not under it. */
+@container leaf (max-width: 760px) { .cd-readout { display: none; } }
 @media (max-width: 760px) {
-  .cd-readout { display: none; }
   .pj-progress, .cd-hint { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 }
 /* The answer beside the question: a frame dragged smaller than its text is a

@@ -726,6 +726,9 @@ body.is-dragging-tab,body.is-dragging-tab *{cursor:grabbing!important}
   box-shadow:-7px 0 12px -9px rgba(0,0,0,.55),7px 0 12px -9px rgba(0,0,0,.55);
 }
 .tab:not(.is-active):hover{color:var(--text-muted)}
+/* The one tab that stays when even it does not fit beside the buttons: it
+   gives up its minimum and its name ends in an ellipsis (see fitStrip). */
+.tab[data-squeezed]{min-width:0}
 .tab .t-name{flex:1 1 auto;min-width:0;text-align:start;overflow:hidden;text-overflow:ellipsis}
 .nav-group{display:flex;gap:2px;flex:0 0 auto}
 .tb-btn[disabled]{opacity:.32;pointer-events:none}
@@ -1303,10 +1306,11 @@ body[data-status="off"] .statusbar{display:none}
 .ov-act:hover{background:var(--bg-hover);color:var(--text-normal)}
 .ov-act[disabled]{opacity:.35;pointer-events:none}
 .ov-bar label{display:flex;align-items:center;gap:6px;color:var(--text-faint);flex:0 0 auto}
-/* A phone: the bar wraps instead of running its controls off the edge, and
-   the hint (double-click to open) goes, since a touch screen has no
-   double-click to explain. */
-@media (max-width:760px){
+/* A narrow pane — a phone, or a window with both sidebars open: the bar wraps
+   instead of running its controls off the edge. The hint (double-click to
+   open) goes on a touch screen, which has no double-click to explain, and in
+   a narrow pane, where it would take a line of its own. */
+@container leaf (max-width:760px){
   .ov-bar{height:auto;flex-wrap:wrap;row-gap:6px;padding:6px 10px}
   .ov-bar .ov-hint,.ov-bar .spacer{display:none}
 }

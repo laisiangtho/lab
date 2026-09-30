@@ -193,3 +193,51 @@ test('every page fits a phone, in the longest language', options, async (t) => {
   assert.deepEqual(faults, []);
   assert.deepEqual(app.problems, []);
 });
+
+test('a wide window with both sidebars open leaves a narrow page', options, async (t) => {
+  // 1024 px with both sidebars left the middle about 400 px. Pages laid out by
+  // the window's width kept their desktop arrangement in it: Settings kept its
+  // menu beside the settings and left them 130 px, the graph's buttons ran off
+  // the pane, and the tab strip pushed its own new-tab button out of sight.
+  const app = await launch({ viewport: { width: 1024, height: 900 } });
+  const { page } = app;
+  t.after(() => app.close());
+  await firstRun(app);
+  await page.locator('[data-identify="kjv1611"] .library-actions .btn').click();
+  await page.locator('[data-identify="kjv1611"] .badge-ok').waitFor({ timeout: 60000 });
+
+  const cut = () => page.evaluate(() => {
+    const out = [];
+    for (const el of document.querySelectorAll('#app button, #app input')) {
+      const r = el.getBoundingClientRect();
+      if (!r.width || r.top > innerHeight || r.bottom < 0 || el.closest('[hidden]')) continue;
+      for (let p = el.parentElement; p && p.id !== 'app'; p = p.parentElement) {
+        const ps = getComputedStyle(p);
+        if (!/(hidden|clip)/.test(ps.overflowX) || /(auto|scroll)/.test(ps.overflowX)) continue;
+        const pr = p.getBoundingClientRect();
+        if (r.right > pr.right + 1 || r.left < pr.left - 1) out.push(`${el.className} cut by ${p.className}`);
+        break;
+      }
+    }
+    return out;
+  });
+  const open = async (title) => {
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill(title);
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(800);
+  };
+
+  const middle = await page.evaluate(() => document.querySelector('.leaf').getBoundingClientRect().width);
+  assert.ok(middle < 520, `both sidebars are open and the page is narrow (${Math.round(middle)}px)`);
+  for (const title of ['Settings', 'Cards', 'Link graph']) {
+    await open(title);
+    assert.deepEqual(await cut(), [], `${title}: nothing cut off`);
+  }
+  await open('Settings');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.set-layout')).gridTemplateColumns.split(' ').length), 1,
+    'the settings menu goes above the settings, not beside them');
+  await t.test('nothing went wrong on the way', () => assert.deepEqual(app.problems, []));
+});

@@ -38,7 +38,7 @@ export function fitStrip(strip, {
 }) {
   const down = axis === 'y';
   if (!strip.isConnected || (down ? strip.clientHeight : strip.clientWidth) === 0) return 0;
-  for (const item of items) item.hidden = false;
+  for (const item of items) { item.hidden = false; delete item.dataset.squeezed; }
   if (more) more.hidden = true;
 
   const style = getComputedStyle(strip);
@@ -72,6 +72,13 @@ export function fitStrip(strip, {
     for (let i = last; i >= 0 && !fits(); i -= 1) {
       if (items[i] !== active) items[i].hidden = true;
     }
+  }
+  // Everything else is hidden and the active item still does not fit: it is
+  // the one on screen, so it shrinks rather than pushing the buttons out.
+  // Measured after the rest, so the squeeze never hides a tab that fits.
+  if (!fits()) {
+    const kept = items.find((item) => !item.hidden);
+    if (kept) kept.dataset.squeezed = 'true';
   }
   const hidden = items.filter((item) => item.hidden).length;
   strip.dataset.overflow = 'true';
