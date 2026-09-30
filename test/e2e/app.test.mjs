@@ -411,7 +411,8 @@ test('the app in a browser', options, async (t) => {
     });
     assert.deepEqual(await fits(), { onScreen: true, scrolls: false });
     // The interface size changes the height of every row in the panel.
-    const slider = page.locator('.rpanel .rp-row').nth(4).locator('input[type=range]');
+    // The interface size is the panel's last slider, whatever rows sit above it.
+    const slider = page.locator('.rpanel .rp-row:has(input[type=range])').last().locator('input[type=range]');
     await slider.evaluate((n) => { n.value = '17'; n.dispatchEvent(new Event('input', { bubbles: true })); });
     await page.waitForTimeout(400);
     assert.deepEqual(await fits(), { onScreen: true, scrolls: false }, 'at the largest interface size too');
@@ -1156,29 +1157,37 @@ test('the app in a browser', options, async (t) => {
     const scroller = '.leaf > .leaf-scroll';
     // A short window, so the list is longer than the room and there is a place
     // to lose.
-    await page.setViewportSize({ width: 1100, height: 420 });
-    await page.waitForTimeout(400);
-    // Half way, not the very bottom: a list that loses a row is shorter, and
-    // the browser clamps a scroll position past the new end whatever the app
-    // does about it.
-    await page.evaluate((s) => {
-      const el = document.querySelector(s);
-      el.scrollTop = Math.round((el.scrollHeight - el.clientHeight) / 2);
-    }, scroller);
-    await page.waitForTimeout(200);
-    // Opening a row's menu may bring the row into view; the place to keep is
-    // where the list is once the menu is open.
-    await page.locator('.library-item .lib-act[aria-haspopup="menu"]').first().click();
-    await page.waitForSelector('.popover.menu');
-    const before = await page.evaluate((s) => document.querySelector(s).scrollTop, scroller);
-    assert.ok(before > 40, `scrolled down the list (${before})`);
-    // Removing a translation repaints the list; the reader stays where they were.
-    await page.locator('.popover.menu .menu-item', { hasText: 'Remove' }).click();
-    await page.waitForTimeout(1500);
-    const after = await page.evaluate((s) => document.querySelector(s).scrollTop, scroller);
-    assert.ok(Math.abs(after - before) < 60, `the page did not jump to the top (${before} → ${after})`);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.waitForTimeout(300);
+    await page.setViewportSize({ width: 1100, height: 320 });
+    try {
+      await page.waitForTimeout(400);
+      // Half way, not the very bottom: a list that loses a row is shorter, and
+      // the browser clamps a scroll position past the new end whatever the app
+      // does about it.
+      await page.evaluate((s) => {
+        const el = document.querySelector(s);
+        el.scrollTop = Math.round((el.scrollHeight - el.clientHeight) / 2);
+      }, scroller);
+      await page.waitForTimeout(200);
+      // Opening a row's menu may bring the row into view; the place to keep is
+      // where the list is once the menu is open.
+      // The Burmese one is listed last and no later test reads it. Brought to
+      // the middle first, so pressing its menu does not scroll the list.
+      await page.evaluate(() => document.querySelector('.library-item[data-identify="judson1835"]').scrollIntoView({ block: 'center' }));
+      await page.waitForTimeout(200);
+      await page.locator('.library-item[data-identify="judson1835"] .lib-act[aria-haspopup="menu"]').click();
+      await page.waitForSelector('.popover.menu');
+      const before = await page.evaluate((s) => document.querySelector(s).scrollTop, scroller);
+      assert.ok(before > 40, `scrolled down the list (${before})`);
+      // Removing a translation repaints the list; the reader stays where they were.
+      await page.locator('.popover.menu .menu-item', { hasText: 'Remove' }).click();
+      await page.waitForTimeout(1500);
+      const after = await page.evaluate((s) => document.querySelector(s).scrollTop, scroller);
+      assert.ok(Math.abs(after - before) < 60, `the page did not jump to the top (${before} → ${after})`);
+    } finally {
+      // Whatever happened, the tests after this one get the window they expect.
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.waitForTimeout(300);
+    }
   });
 
   await t.test('every document has exactly one place that scrolls', async () => {

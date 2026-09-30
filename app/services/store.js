@@ -15,6 +15,8 @@
  * transactions: a failed install leaves the previous copy untouched.
  */
 
+import { plainVerses } from '../core/strongs.js';
+
 const DB_NAME = 'lai-siangtho';
 const DB_VERSION = 6;
 const DIAGNOSTIC_LIMIT = 400;
@@ -100,10 +102,22 @@ class TranslationStore {
     return meta;
   }
 
-  /** @returns {Promise<Record<string, object> | null>} verses, or null when the translation lacks the chapter */
-  async getChapter(identify, book, chapter) {
+  /**
+   * A chapter's verses, or null when the translation lacks the chapter.
+   *
+   * The text comes back plain — Strong's numbers taken out — unless `markup`
+   * is asked for. Only the reading surface and the source view show the
+   * markup; a card, a search result, a verse read aloud or copied must not,
+   * and a default that has to be remembered at every one of those is a
+   * default that gets forgotten.
+   *
+   * @param {{ markup?: boolean }} [options]
+   * @returns {Promise<Record<string, object> | null>}
+   */
+  async getChapter(identify, book, chapter, { markup = false } = {}) {
     const rec = await request(this.#tx('chapters').objectStore('chapters').get([identify, book, chapter]));
-    return rec ? rec.verses : null;
+    if (!rec) return null;
+    return markup ? rec.verses : plainVerses(rec.verses);
   }
 
   /**

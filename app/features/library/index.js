@@ -4,7 +4,7 @@
  */
 
 import { describe, FORMATS, sniff, slug } from '../../core/formats/index.js';
-import { classify, readMetadata } from '../../core/formats/pack.js';
+import { classify, otherEdition, readMetadata } from '../../core/formats/pack.js';
 import { aboutText, lossOf, optionsFor, WRITERS } from '../../core/formats/write.js';
 import { twoLetter } from '../../core/langcode.js';
 import { onDevice } from '../../core/sources.js';
@@ -13,6 +13,7 @@ import { pickFile, saveText } from '../../services/transfer.js';
 import { gzipText, makeDeflatedZip, openZip } from '../../services/zip.js';
 import { fill, formatBytes, h, keepPlace } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
+import { strongsLine } from '../../shell/trinfo.js';
 import { openMenu } from '../../shell/menu.js';
 import { L, when } from '../../shell/i18n.js';
 import { requestPersistence, storageStatus } from '../../services/store.js';
@@ -171,6 +172,7 @@ export default {
         });
         const notes = [
           `${L('lbl.books', { n: result.stats.books })}, ${L('lbl.verses', { n: result.stats.verses })}`,
+          strongsLine(result.stats),
           result.diagnostics.length ? L('lbl.differs', { n: result.diagnostics.length }) : '',
           result.report?.notes ? L('imp.notesDropped', { n: result.report.notes }) : '',
           result.report?.skipped ? L('imp.skipped', { n: result.report.skipped }) : '',
@@ -204,6 +206,13 @@ export default {
         return;
       }
 
+      // A download from eBible.org that is not the data: say which one is.
+      const other = classify(files).scripture.length ? null : otherEdition(files, file.name);
+      if (other) {
+        shell.notify(L(`imp.edition.${other.kind}`, { file: file.name, instead: other.instead }), 'error');
+        return;
+      }
+
       const found = packDescribe(files, file.name);
       const answers = await shell.form({
         title: L('imp.packTitle'),
@@ -234,7 +243,7 @@ export default {
         const report = result.report ?? {};
         const notes = [
           `${L('lbl.books', { n: result.stats.books })}, ${L('lbl.verses', { n: result.stats.verses })}`,
-          report.strongs ? L('imp.withStrongs', { n: report.strongs }) : '',
+          strongsLine(result.stats),
           report.named ? L('imp.withNames', { n: report.named }) : '',
           result.diagnostics.length ? L('lbl.differs', { n: result.diagnostics.length }) : '',
         ].filter(Boolean).join(' · ');
@@ -670,22 +679,33 @@ export default {
           placeholder: L('lib.filter'), 'aria-label': L('lib.filter'),
           oninput: (e) => { query = e.currentTarget.value; run(); },
         });
-        const note = h('p', { class: 'muted' });
-        const tabs = h('nav', { class: 'lib-tabs', role: 'tablist' });
-        const tools = h('div', { class: 'lib-tools' });
-        const rail = h('div', { class: 'lib-rail', role: 'tablist', 'aria-label': L('lib.sources') });
+        /*
+         * The Cards page's shape: one band of tools across the top and the work
+         * under it, with no title and no standing paragraph — the tab already
+         * says where this is, and a line of storage and catalog facts read once
+         * is a line read past every time after. What is worth knowing sits in
+         * the band's readout, and its detail in that readout's tooltip.
+         *
+         * The band is sticky inside the leaf rather than a scroller of its own,
+         * so the leaf stays this page's one scrolling box and keeps its place
+         * across repaints and tab changes like every other document.
+         */
+        const tabs = h('div', { class: 'lib-seg', role: 'tablist', 'aria-label': L('doc.library') });
+        const rail = h('div', { class: 'lib-srcs', role: 'tablist', 'aria-label': L('lib.sources') });
+        const find = h('div', { class: 'field lib-find' }, icon('search'), filter);
+        const readout = h('span', { class: 'lib-readout' });
+        const acts = h('div', { class: 'lib-bar-acts' });
+        const bar = h('div', { class: 'lib-bar' },
+          tabs, h('span', { class: 'lib-bar-sep' }), rail, find, h('span', { class: 'spacer' }), readout, acts);
         const body = h('div', { class: 'library-body' });
-        const main = h('div', { class: 'lib-main' }, tools, body);
-        const studio = h('div', { class: 'lib-studio' }, rail, main);
+        const studio = h('div', { class: 'lib-page' }, body);
 
-        /** An icon button: what it does is its title. */
-        const action = (glyph, label, onclick) => h('button', {
-          class: 'lib-act', title: label, 'aria-label': label, onclick,
+        /** A tool of the band: an icon, and what it does as its title. */
+        const action = (glyph, label, onclick, extra = '') => h('button', {
+          class: `cd-tool lib-act${extra ? ` ${extra}` : ''}`, title: label, 'aria-label': label, onclick,
         }, icon(glyph));
 
-        el.replaceChildren(h('section', { class: 'doc library' },
-          h('header', { class: 'doc-head' }, h('h1', { class: 'inline-title' }, L('doc.library')), note, tabs),
-          studio));
+        el.replaceChildren(h('section', { class: 'doc library' }, bar, studio));
 
         const go = (next) => {
           page = next;
@@ -707,30 +727,49 @@ export default {
           const here = rows.filter((row) => row.held);
           page ??= here.length ? 'home' : 'more';
           studio.dataset.page = page;
+          bar.dataset.page = page;
 
           fill(tabs,
             tab('home', 'book', L('lib.tab.home'), here.length),
             tab('more', 'download', L('lib.tab.more'), null));
 
-          const storageLine = [
-            L('lib.storageUsed', { size: formatBytes(storage.usage) }),
-            storage.persisted === false
-              ? [' · ', L('lib.notPersistent'), ' ', h('button', { class: 'link-btn', onclick: () => keep().then(run) }, L('lib.keep'))]
-              : null,
-          ];
-          if (page === 'home') {
-            fill(note, ...storageLine);
-            paintHome(here);
-          } else {
-            const catalog = library.catalog;
-            fill(note, source === 'catalog'
-              ? [library.origin === 'bundled'
-                ? [L('lib.bundled'), ' ', h('button', { class: 'link-btn', onclick: () => check().then(run) }, L('lib.checkNow'))]
-                : L('lib.catalog', { version: catalog.version, updated: when.date(catalog.updated), checked: when.dateTime(library.fetchedAt) }),
-              ' · ', ...storageLine]
-              : storageLine);
-            await paintMore(rows, here);
-          }
+          if (page === 'home') paintHome(here, storage);
+          else await paintMore(rows, here);
+          fitBar();
+        }
+
+        /**
+         * Fit the band to its width by measuring it, as the Cards band fits its
+         * tools: a container query cannot know how long a source's name is in
+         * Burmese, and a band that is merely allowed to shrink lets one thing
+         * slide under another — the filter was covering "From a web address".
+         */
+        function fitBar() {
+          bar.classList.remove('is-tight', 'is-wrapped');
+          const over = () => bar.scrollWidth > bar.clientWidth + 1;
+          if (!over()) return;
+          bar.classList.add('is-tight');
+          if (over()) bar.classList.add('is-wrapped');
+        }
+        const sized = new ResizeObserver(() => fitBar());
+        sized.observe(bar);
+
+        /** The readout: a few words, with the rest in its tooltip. */
+        function say(text, detail = '') {
+          readout.textContent = text;
+          readout.title = detail;
+          readout.hidden = !text;
+        }
+
+        /**
+         * The browser may clear what is stored here unless asked not to. Only
+         * then is there a tool for it, and it is the one tool in the band with
+         * a colour: it is the one that is a warning.
+         */
+        function keepTool(storage) {
+          return storage.persisted === false
+            ? action('alert', `${L('lib.notPersistent')} — ${L('lib.keep')}`, () => keep().then(run), 'is-warn')
+            : null;
         }
 
         function tab(id, glyph, label, count) {
@@ -742,10 +781,11 @@ export default {
 
         // --- On this device ----------------------------------------------------
 
-        function paintHome(here) {
-          fill(tools,
-            h('div', { class: 'field' }, icon('search'), filter),
-            h('span', { class: 'grow' }),
+        function paintHome(here, storage) {
+          find.hidden = !here.length;
+          say(here.length ? `${formatBytes(storage.usage)}` : '', L('lib.storageUsed', { size: formatBytes(storage.usage) }));
+          fill(acts,
+            keepTool(storage),
             action('plus', L('imp.cmd'), () => importFile().catch((err) => shell.notify(err.message, 'error'))),
             action('link', L('lib.fromUrl'), () => { page = 'more'; pick('url'); }),
             action('sync', L('cmd.checkUpdates'), check));
@@ -831,20 +871,32 @@ export default {
           const heldRows = here.map((row) => row.held);
           fill(rail, ...SOURCE_IDS.map((id) => h('button', {
             class: 'lib-src', role: 'tab', dataset: { source: id }, 'aria-selected': String(source === id),
+            title: `${L(`lib.src.${id}`)} — ${sourceCount(id, rows)}`,
             onclick: () => pick(id),
-          }, icon(SOURCE_ICON[id]), h('span', { class: 'lib-src-t' },
-            h('b', {}, L(`lib.src.${id}`)),
-            h('span', {}, sourceCount(id, rows))))));
+          }, icon(SOURCE_ICON[id]), h('span', { class: 'lib-src-t' }, L(`lib.src.${id}`)))));
 
-          if (source === 'url') { paintUrl(); return; }
-          if (source === 'file') { paintFile(); return; }
+          const listing = source !== 'url' && source !== 'file';
+          find.hidden = !listing;
+          if (!listing) {
+            say('');
+            fill(acts);
+            if (source === 'url') paintUrl(); else paintFile();
+            return;
+          }
 
-          fill(tools,
-            h('div', { class: 'field' }, icon('search'), filter),
-            h('span', { class: 'grow' }),
-            source === 'catalog'
-              ? action('sync', L('cmd.checkUpdates'), () => check().then(run))
-              : action('sync', L('lib.refreshList'), () => loadList(source, true)));
+          if (source === 'catalog') {
+            const catalog = library.catalog;
+            const bundled = library.origin === 'bundled';
+            say(bundled ? L('lib.bundledShort') : L('lib.catalogShort', { version: catalog.version }),
+              bundled ? L('lib.bundled') : L('lib.catalog', { version: catalog.version, updated: when.date(catalog.updated), checked: when.dateTime(library.fetchedAt) }));
+            // A list bundled with the build may be out of date; checking it is
+            // then the thing to do, and the tool says so by its colour.
+            fill(acts, action('sync', bundled ? L('lib.checkNow') : L('cmd.checkUpdates'), () => check().then(run), bundled ? 'primary' : ''));
+          } else {
+            const got = lists.get(source);
+            say(got?.rows ? L('lib.count', { n: got.rows.length }) : '', got?.rows ? L('lib.listed', { n: got.rows.length, when: when.date(got.fetchedAt) }) : '');
+            fill(acts, action('sync', L('lib.refreshList'), () => loadList(source, true)));
+          }
 
           if (source === 'catalog') {
             const listed = rows.filter((row) => row.entry && matchesEntry(row));
@@ -870,8 +922,7 @@ export default {
           const matching = got.rows.filter(matchesSourceRow);
           const shown = matching.slice(0, LIST_CAP);
           keepPlace(body, () => fill(body,
-            h('p', { class: 'lib-listed' }, L('lib.listed', { n: got.rows.length, when: when.date(got.fetchedAt) }),
-              source === 'ebible' && !sources.viaApp ? [' ', h('span', { class: 'lib-web-note' }, L('lib.webLimit'))] : null),
+            source === 'ebible' && !sources.viaApp ? h('p', { class: 'lib-banner is-warn' }, icon('alert'), L('lib.webLimit')) : null,
             shown.length ? groups(shown, (row) => sourceItem(row, heldRows)) : h('p', { class: 'empty-hint' }, L('lib.noHits', { query: query.trim() })),
             matching.length > shown.length ? h('p', { class: 'lib-more-hint' }, L('lib.capped', { n: shown.length, of: matching.length })) : null));
         }
@@ -953,20 +1004,16 @@ export default {
             type: 'url', inputmode: 'url', spellcheck: 'false', placeholder: 'https://…', 'aria-label': L('lib.urlLabel'),
             onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); fetchUrl(input.value); } },
           });
-          fill(tools);
           fill(body, h('div', { class: 'lib-panel' },
-            h('h2', {}, L('lib.src.url')),
             h('p', { class: 'muted' }, L('lib.urlHint')),
             h('div', { class: 'lib-url' }, h('div', { class: 'field' }, icon('link'), input),
               h('button', { class: 'btn primary', onclick: () => fetchUrl(input.value) }, icon('download'), L('lib.urlGo'))),
-            sources.viaApp ? null : h('p', { class: 'lib-web-note' }, L('lib.webLimit'))));
+            sources.viaApp ? null : h('p', { class: 'lib-web-note' }, icon('alert'), L('lib.webLimit'))));
           input.focus();
         }
 
         function paintFile() {
-          fill(tools);
           fill(body, h('div', { class: 'lib-panel' },
-            h('h2', {}, L('lib.src.file')),
             h('p', { class: 'muted' }, L('lib.fileHint')),
             h('button', { class: 'btn primary', onclick: () => importFile().catch((err) => shell.notify(err.message, 'error')) }, icon('plus'), L('lib.fileGo'))));
         }
@@ -1000,7 +1047,8 @@ export default {
               : await library.importTranslation({ text: got.text(), format: 'getbible', identify: row.identify, info });
             shell.notify(L('lib.gotFrom', {
               name: row.name, source: L(`lib.src.${row.source}`),
-              notes: `${L('lbl.books', { n: result.stats.books })}, ${L('lbl.verses', { n: result.stats.verses })}`,
+              notes: [`${L('lbl.books', { n: result.stats.books })}, ${L('lbl.verses', { n: result.stats.verses })}`, strongsLine(result.stats)]
+                .filter(Boolean).join(' · '),
             }), 'ok');
           } catch (err) {
             shell.notify(`${row.name}: ${err.message}`, 'error');
@@ -1041,7 +1089,7 @@ export default {
           run();
         });
         run();
-        return () => { disposed = true; repaint = () => {}; openSource = null; showHome = null; offChange(); offProgress(); };
+        return () => { disposed = true; repaint = () => {}; openSource = null; showHome = null; sized.disconnect(); offChange(); offProgress(); };
       },
     });
 

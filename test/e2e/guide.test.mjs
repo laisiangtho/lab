@@ -55,6 +55,22 @@ test('the guide', options, async (t) => {
     assert.match(await page.locator('.gd-card .gd-a').first().innerText(), /verse number/);
   });
 
+  await t.test('"how can you help me?" is answered, and no answer is a title with nothing under it', async () => {
+    const said = await ask('how can you help me?');
+    await said.locator('.gd-card').first().waitFor();
+    assert.equal(await said.locator('.gd-card .gd-t').first().innerText(), 'What the guide can help with');
+    // Documents and commands are answers too; each has to say something.
+    for (const question of ['how can you help me?', 'help', 'library', 'shortcuts', 'cards', 'voices', 'settings', 'palette', 'board']) {
+      const block = await ask(question);
+      const cards = block.locator('.gd-card');
+      for (let i = 0; i < await cards.count(); i += 1) {
+        const text = (await cards.nth(i).locator('.gd-a').innerText().catch(() => '')).trim();
+        const title = await cards.nth(i).locator('.gd-t').innerText();
+        assert.ok(text.length > 10, `"${question}" → "${title}" says something`);
+      }
+    }
+  });
+
   await t.test('its button does the thing, and that is remembered', async () => {
     await page.locator('.gd-card .gd-do').first().click();
     await page.waitForTimeout(400);

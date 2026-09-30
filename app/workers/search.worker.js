@@ -16,6 +16,7 @@
  */
 
 import { createMatcher, snippet } from '../core/search.js';
+import { plainText } from '../core/strongs.js';
 import { openStore } from '../services/store.js';
 
 const BATCH = 40;
@@ -59,7 +60,10 @@ async function search({ id, query, translations, books = null, options = {}, lim
       scanned += 1;
       let inChapter = 0;
       for (const [key, verse] of Object.entries(record.verses)) {
-        const ranges = matcher.test(verse.text);
+        // What is searched and shown is the plain text; a Strong's number is
+        // looked for where it is, in the markup.
+        const raw = String(verse.text ?? '');
+        const ranges = matcher.test(matcher.marked ? raw : plainText(raw));
         if (!ranges) continue;
         verses += 1;
         inChapter += 1;
@@ -70,7 +74,7 @@ async function search({ id, query, translations, books = null, options = {}, lim
           kept += 1;
           rows.push({
             identify, book: record.book, chapter: record.chapter, verse: Number(key),
-            merge: verse.merge ?? null, ...snippet(verse.text, ranges),
+            merge: verse.merge ?? null, ...snippet(plainText(raw), ranges),
           });
           if (rows.length >= BATCH) { post({ type: 'batch', rows, counts: counts() }); rows = []; }
         } else {

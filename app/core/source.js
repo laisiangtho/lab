@@ -8,6 +8,7 @@
  */
 
 import { verseLabel } from './align.js';
+import { plainText } from './strongs.js';
 
 export const NOTES_HEADING = '## Notes';
 
@@ -25,7 +26,9 @@ export function toMarkdown({ meta, verses, book, chapter, bookName, notes = [] }
       const story = meta.story?.[book]?.[chapter]?.[key];
       if (story) lines.push(`## ${story.text}`, '');
       if (verse.title) lines.push(`### ${verse.title}`, '');
-      lines.push(`**${verseLabel(key, verse)}** ${verse.text}`);
+      // Markdown has no place for a Strong's number; the USFM, USX and OSIS
+      // views carry them.
+      lines.push(`**${verseLabel(key, verse)}** ${plainText(verse.text)}`);
       if (verse.ref) lines.push(`> ${verse.ref}`);
       lines.push('');
     }

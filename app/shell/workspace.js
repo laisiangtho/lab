@@ -665,7 +665,7 @@ export function createWorkspace(ctx, chrome) {
     const { book, chapter } = state.get();
     const loaded = await Promise.all(order.map(async (identify, index) => {
       const { meta, resolver } = await openTranslation(identify);
-      return { identify, index, meta, resolver, verses: await store.getChapter(identify, book, chapter) };
+      return { identify, index, meta, resolver, verses: await store.getChapter(identify, book, chapter, { markup: true }) };
     }));
     if (!current()) return;
 
@@ -730,14 +730,14 @@ export function createWorkspace(ctx, chrome) {
       const identify = state.get().translation;
       if (!identify) continue;
       const { meta, resolver } = await openTranslation(identify);
-      const verses = await store.getChapter(identify, tab.book, tab.chapter);
+      const verses = await store.getChapter(identify, tab.book, tab.chapter, { markup: true });
       const pane = { identify, index: 0, meta, resolver, verses };
       float.body.replaceChildren(buildLeaf(pane, [pane], { book: tab.book, chapter: tab.chapter }, { float: float.id }));
     }
   }
 
   function buildLeaf(pane, all, { book, chapter }, { float = null } = {}) {
-    const { mode, layout, strongs } = state.get();
+    const { mode, layout, strongs, headings, xrefs } = state.get();
     const annotations = ctx.annotations.chapterIndex(book, chapter);
     const compare = pane.index > 0;
 
@@ -745,7 +745,7 @@ export function createWorkspace(ctx, chrome) {
       ? sourceView(pane, { book, chapter })
       : chapterNote({
         ctx, meta: pane.meta, resolver: pane.resolver, verses: pane.verses, book, chapter,
-        compare, layout, annotations, strongs,
+        compare, layout, annotations, strongs, headings, xrefs,
         primaryVerses: compare ? all[0].verses : null,
         // A cross-reference names a verse, and used to arrive at the top of
         // the chapter with nothing marked — the one link in the app that did

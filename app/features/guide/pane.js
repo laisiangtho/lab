@@ -52,6 +52,7 @@ const TOPICS = Object.freeze([
   { id: 'memory', does: { doc: 'memory' } },
   { id: 'streak', does: { cmd: 'plan.open' } },
   { id: 'guide', does: { doc: 'settings' } },
+  { id: 'help', does: null },
 ]);
 
 /**
@@ -71,6 +72,18 @@ const COMMAND_TEXT = Object.freeze({
   'help.about': 'doc.t.about',
   'settings.open': 'doc.t.settings',
   'help.formats': 'doc.t.formats',
+});
+
+/**
+ * A sentence for each document, from Help where Help has one. A document
+ * missing here still gets `guide.opensDoc`: an answer card with a title and
+ * nothing under it read as a fault, and was one.
+ */
+const DOC_TEXT = Object.freeze({
+  help: 'guide.doc.help', shortcuts: 'doc.t.shortcuts', formats: 'doc.t.formats', about: 'doc.t.about',
+  settings: 'doc.t.settings', welcome: 'doc.t.welcome', graph: 'doc.t.graph', library: 'guide.doc.library',
+  projects: 'guide.doc.projects', cards: 'guide.doc.cards', board: 'guide.doc.board', memory: 'guide.doc.memory',
+  'notes-manager': 'guide.doc.notes', report: 'guide.doc.report', voices: 'guide.doc.voices',
 });
 
 /** The first questions offered, before anything has been asked. */
@@ -378,7 +391,7 @@ function gather({ registry }) {
     if (typeof command.title !== 'string') continue;
     out.push({
       id: `cmd.${command.id}`, title: command.title,
-      text: COMMAND_TEXT[command.id] && hasString(COMMAND_TEXT[command.id]) ? L(COMMAND_TEXT[command.id]) : '',
+      text: COMMAND_TEXT[command.id] && hasString(COMMAND_TEXT[command.id]) ? L(COMMAND_TEXT[command.id]) : L('guide.runsCmd'),
       does: { cmd: command.id }, keys: command.keys ?? '', prior: 0.9,
     });
   }
@@ -386,13 +399,14 @@ function gather({ registry }) {
   for (const verb of registry.verbs()) {
     if (verb.word === 'ask') continue;
     out.push({
-      id: `verb.${verb.word}`, title: verb.title, text: verb.hint ?? '', phrases: [verb.word],
+      id: `verb.${verb.word}`, title: verb.title, text: verb.hint || L('guide.runsCmd'), phrases: [verb.word],
       does: { palette: `${verb.word} ` }, prior: 0.9,
     });
   }
 
   for (const doc of registry.docs()) {
-    out.push({ id: `doc.${doc.id}`, title: doc.title, does: { doc: doc.id }, prior: 0.8 });
+    const key = DOC_TEXT[doc.id];
+    out.push({ id: `doc.${doc.id}`, title: doc.title, text: key && hasString(key) ? L(key) : L('guide.opensDoc'), does: { doc: doc.id }, prior: 0.8 });
   }
 
   // Every setting has a name and a sentence (`set.theme`, `set.themeHint`).

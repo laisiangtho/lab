@@ -18,6 +18,7 @@ import { wireFades } from './fade.js';
 import { icon } from './icons.js';
 import { L, when } from './i18n.js';
 import { downloadJson } from '../services/transfer.js';
+import { editionCodes } from '../core/strongs.js';
 
 export function createTranslationInfo(ctx) {
   const body = h('div', { class: 'tri-body' });
@@ -81,6 +82,7 @@ export function createTranslationInfo(ctx) {
     row(L('lbl.size'), installed?.bytes ? formatBytes(installed.bytes) : '');
     const stats = installed?.stats;
     if (stats) {
+      row(L('lbl.strongs'), stats.strongs?.words ? L('lbl.strongsWords', { n: stats.strongs.words }) : '');
       row(L('lbl.contents'), L('lbl.contentsOf', {
         books: L('lbl.books', { n: stats.books }),
         chapters: L('lbl.chapters', { n: stats.chapters }),
@@ -100,6 +102,10 @@ export function createTranslationInfo(ctx) {
       ].filter(Boolean).join(' · ') || L('lbl.differs', { n: found.total }));
     }
     if (facts.children.length) out.push(facts);
+    // A sentence, not a cell: in a narrow popover a grid cell this long is a
+    // column one word wide.
+    const own = strongsEdition(stats);
+    if (own) out.push(h('p', { class: 'tri-note' }, own));
     if (licence) out.push(longBlock(L('lbl.copyright'), licence));
     if (found?.total) out.push(diagnostics(meta, found));
 
@@ -228,4 +234,26 @@ function formatBytes(n) {
   let unit = 0;
   while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
   return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+}
+
+/**
+ * What a translation's Strong's numbers amount to, in a line: how many words
+ * carry one, and any numbers the edition uses past the end of the lexicon
+ * (eBible.org's tagged Judson marks particles H9999). Empty for a translation
+ * without them, and for one installed before they were counted.
+ */
+export function strongsLine(stats) {
+  const tally = stats?.strongs;
+  if (!tally) return '';
+  return [tally.words ? `${L('lbl.strongs')}: ${L('lbl.strongsWords', { n: tally.words })}` : '', strongsEdition(stats)]
+    .filter(Boolean).join(' · ');
+}
+
+/** The edition's own numbers, as a sentence; empty when it has none. */
+export function strongsEdition(stats) {
+  const tally = stats?.strongs;
+  const own = editionCodes(tally);
+  if (!own.length) return '';
+  const codes = own.map(([code, n]) => `${code} ×${n}`).join(', ');
+  return L('lbl.strongsEdition', { n: Object.keys(tally.edition).length, codes });
 }

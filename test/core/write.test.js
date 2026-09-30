@@ -289,3 +289,34 @@ test('the copyright goes wherever the format has a place for it', () => {
   assert.match(about, /Copyright\n\nPublic domain\./);
   assert.match(aboutText({ identify: 'x', info: { name: 'X' } }), /states no copyright/);
 });
+
+test("Strong's numbers are written in each format's own markup, and read back", () => {
+  const picked = selection();
+  const marked = {
+    '1/1/1': 'In the beginning{H7225} God{H430} created{H1254}{H853} the heaven & the earth.',
+    // eBible.org's tagged Judson: words run together, and H9999 is the
+    // edition's own number for a word with nothing behind it.
+    '1/1/2': 'မြေကြီး{H776}သည်{H9999} အဆင်း{H8414}ကင်းမဲ့၏။',
+  };
+  picked.chapters = picked.chapters.map((row) => (row.book === 1 && row.chapter === 1
+    ? { ...row, verses: { ...row.verses, 1: { ...row.verses[1], text: marked['1/1/1'] }, 2: { ...row.verses[2], text: marked['1/1/2'] } } }
+    : row));
+  const markup = {
+    usfm: /\\w God\|strong="H430"\\w\*/,
+    usx: /<char style="w" strong="H430">God<\/char>/,
+    osis: /<w lemma="strong:H430">God<\/w>/,
+    zefania: /<gr str="430">God<\/gr>/,
+  };
+  for (const [format, pattern] of Object.entries(markup)) {
+    const text = write(format, picked).map((file) => file.text).join('\n');
+    assert.match(text, pattern, `${format}: the format's own markup`);
+    assert.doesNotMatch(text, /\{[HG]\d/, `${format}: not this app's inline notation`);
+    const back = readBack(format, write(format, picked));
+    for (const [place, expected] of Object.entries(marked)) {
+      assert.equal(back.get(place).text.trim(), expected, `${format}: ${place} comes back with every number, the edition's own included`);
+    }
+  }
+  const md = write('markdown', picked).map((file) => file.text).join('\n');
+  assert.match(md, /God<sup>H430<\/sup>/);
+  assert.match(md, /created<sup>H1254 H853<\/sup>/, 'a word with two numbers keeps both');
+});

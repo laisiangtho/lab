@@ -27,7 +27,7 @@
  */
 
 import { bookCodes } from './books.js';
-import { extractStrongs } from '../strongs.js';
+import { extractStrongs, strongsRuns } from '../strongs.js';
 
 /**
  * @typedef {{ meta: object, chapters: { book: number, chapter: number, verses: object }[],
@@ -304,7 +304,7 @@ function usfmText(book, chapters, { meta, name }) {
     for (const [n, verse] of versesOf(row)) {
       if (verse.title) lines.push(`\\s1 ${verse.title}`);
       lines.push('\\p');
-      lines.push(`\\v ${n}${verse.merge ? `-${verse.merge}` : ''} ${verse.text}`);
+      lines.push(`\\v ${n}${verse.merge ? `-${verse.merge}` : ''} ${tagged(verse.text, USFM_WORD)}`);
       if (verse.ref) lines.push(`\\r ${verse.ref}`);
     }
   }
@@ -333,7 +333,7 @@ function usxText(book, chapters, { meta, name, join }) {
       if (verse.title) out.push(`  <para style="s1">${esc(verse.title)}</para>`);
       const sid = `${code} ${row.chapter}:${n}`;
       out.push('  <para style="p">');
-      out.push(`    <verse number="${n}${verse.merge ? `-${verse.merge}` : ''}" style="v" sid="${esc(sid)}" />${esc(verse.text)}`);
+      out.push(`    <verse number="${n}${verse.merge ? `-${verse.merge}` : ''}" style="v" sid="${esc(sid)}" />${tagged(verse.text, USX_WORD)}`);
       out.push(`    <verse eid="${esc(sid)}" />`);
       out.push('  </para>');
       if (verse.ref) out.push(`  <para style="r">${esc(verse.ref)}</para>`);
@@ -367,7 +367,7 @@ function osisText({ meta, grouped, name, join }) {
       out.push(`      <chapter osisID="${id}.${row.chapter}">`);
       for (const [n, verse] of versesOf(row)) {
         if (verse.title) out.push(`        <title type="section">${esc(verse.title)}</title>`);
-        out.push(`        <verse osisID="${id}.${row.chapter}.${n}">${esc(verse.text)}</verse>`);
+        out.push(`        <verse osisID="${id}.${row.chapter}.${n}">${tagged(verse.text, OSIS_WORD)}</verse>`);
         if (verse.ref) out.push(`        <note type="crossReference">${esc(verse.ref)}</note>`);
       }
       out.push('      </chapter>');
@@ -397,7 +397,7 @@ function zefaniaText({ meta, grouped, name, join }) {
       out.push(`    <CHAPTER cnumber="${row.chapter}">`);
       for (const [n, verse] of versesOf(row)) {
         if (verse.title) out.push(`      <CAPTION vref="${n}">${esc(verse.title)}</CAPTION>`);
-        out.push(`      <VERS vnumber="${n}">${esc(verse.text)}</VERS>`);
+        out.push(`      <VERS vnumber="${n}">${tagged(verse.text, ZEFANIA_WORD)}</VERS>`);
       }
       out.push('    </CHAPTER>');
     }
@@ -455,13 +455,37 @@ function markdownText(book, chapters, { meta, name, notes, opts }) {
     for (const note of notes?.get(`${book}.${row.chapter}`) ?? []) out.push(...noteBlock(note));
     for (const [n, verse] of versesOf(row)) {
       if (verse.title) out.push(`### ${verse.title}`, '');
-      out.push(`**${n}${verse.merge ? `–${verse.merge}` : ''}** ${verse.text}`, '');
+      out.push(`**${n}${verse.merge ? `–${verse.merge}` : ''}** ${tagged(verse.text, MARKDOWN_WORD)}`, '');
       if (verse.ref) out.push(`> ${verse.ref}`, '');
       for (const note of notes?.get(`${book}.${row.chapter}.${n}`) ?? []) out.push(...noteBlock(note));
     }
   }
   return `${out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`;
 }
+
+/**
+ * Verse text with its Strong's numbers in a format's own markup, so the file
+ * is one that format's other readers understand. The inline notation this app
+ * stores (`word{H430}`) is kept only where a format has no markup of its own:
+ * this app's JSON, and a spreadsheet. With Strong's numbers left out of the
+ * export, `shapeChapters` has already taken them away and this is the text.
+ *
+ * @param {{ plain: (text: string) => string, word: (text: string, codes: string[]) => string }} style
+ */
+function tagged(text, style) {
+  return strongsRuns(String(text ?? ''), { all: true })
+    .map((run) => (run.codes.length ? style.word(run.text, run.codes) : style.plain(run.text)))
+    .join('');
+}
+
+// USFM 3: `\w word|strong="H430,H1234"\w*`.
+const USFM_WORD = { plain: (t) => t, word: (t, codes) => `\\w ${t}|strong="${codes.join(',')}"\\w*` };
+const USX_WORD = { plain: (t) => esc(t), word: (t, codes) => `<char style="w" strong="${codes.join(',')}">${esc(t)}</char>` };
+const OSIS_WORD = { plain: (t) => esc(t), word: (t, codes) => `<w lemma="${codes.map((c) => `strong:${c}`).join(' ')}">${esc(t)}</w>` };
+// Zefania numbers a word without its testament letter; the book says which.
+const ZEFANIA_WORD = { plain: (t) => esc(t), word: (t, codes) => `<gr str="${codes.map((c) => c.replace(/^[HG]/, '')).join(' ')}">${esc(t)}</gr>` };
+// Markdown has no markup for it; a superscript is what a reader would write.
+const MARKDOWN_WORD = { plain: (t) => t, word: (t, codes) => `${t}<sup>${codes.join(' ')}</sup>` };
 
 /** A copyright notice on one line, for the formats that hold one line. */
 const oneLine = (text) => String(text).replace(/\s+/g, ' ').trim();

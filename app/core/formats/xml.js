@@ -147,7 +147,7 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
       else if (tag === 'para') {
         if (capturing !== null) { title = capturing; capturing = null; }
         else if (muted) muted -= 1;
-      } else if (tag === 'w' || tag === 'char') {
+      } else if (tag === 'w' || tag === 'char' || tag === 'gr') {
         // The word has just been written; its number follows it.
         const code = tagged.pop();
         if (code) put(code);
@@ -166,8 +166,9 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
     }
     // A word carrying a Strong's number, in either dialect's spelling of it.
     // The number is kept inline, in the notation `core/strongs.js` reads.
-    if (tag === 'w' || (tag === 'char' && String(event.attrs.style ?? '').toLowerCase() === 'w')) {
-      const code = strongsOf(event.attrs);
+    // Zefania's `<gr str="430">` leaves the testament to the book it is in.
+    if (tag === 'w' || tag === 'gr' || (tag === 'char' && String(event.attrs.style ?? '').toLowerCase() === 'w')) {
+      const code = tag === 'gr' ? zefaniaStrongs(event.attrs.str, book) : strongsOf(event.attrs);
       if (event.empty) { if (code) put(code); return; }
       tagged.push(code);
       return;
@@ -271,6 +272,16 @@ function strongsOf(attrs) {
     .map((part) => /(?:strong:)?([HG]?\d+[a-z]?)$/i.exec(part.trim())?.[1] ?? '')
     .filter(Boolean);
   return codes.map((code) => `{${code.toUpperCase()}}`).join('');
+}
+
+/** Zefania's `str="430 1234"`, lettered by testament: books 1–39 are Hebrew. */
+function zefaniaStrongs(raw, book) {
+  const letter = book !== null && book <= 39 ? 'H' : 'G';
+  return String(raw ?? '').split(/[,\s]+/)
+    .map((part) => /^\d+[a-z]?$/i.exec(part.trim())?.[0] ?? '')
+    .filter(Boolean)
+    .map((n) => `{${letter}${n.toUpperCase()}}`)
+    .join('');
 }
 
 /** The nth number in a dotted OSIS id: "Gen.1.1" → 1 is the chapter. */

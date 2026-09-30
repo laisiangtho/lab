@@ -15,6 +15,7 @@ import {
 } from './errors.js';
 import { chapterAgainstCanon } from './examine.js';
 import { toTag } from './langcode.js';
+import { hasStrongs, tallyStrongs } from './strongs.js';
 
 const VERSE_KEYS = new Set(['text', 'title', 'ref', 'merge']);
 
@@ -55,7 +56,9 @@ export function parseTranslation(raw, { identify, category }) {
   const books = {};
   const chapters = [];
   const diagnostics = [];
-  const stats = { books: 0, chapters: 0, verses: 0, merges: 0, titles: 0, refs: 0 };
+  // `strongs`: how many words carry a Strong's number, and the edition's own
+  // numbers past the end of the lexicon, by number (core/strongs.js).
+  const stats = { books: 0, chapters: 0, verses: 0, merges: 0, titles: 0, refs: 0, strongs: { words: 0, edition: {} } };
 
   for (const [bookKey, bookRaw] of Object.entries(booksRaw)) {
     const bp = `$.book.${bookKey}`;
@@ -177,6 +180,7 @@ function parseVerses(raw, S, path, stats) {
       verse.merge = Number(merge);
       stats.merges += 1;
     }
+    if (hasStrongs(verse.text)) tallyStrongs(verse.text, stats.strongs);
     out[n] = Object.freeze(verse);
     stats.verses += 1;
   }

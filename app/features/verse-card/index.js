@@ -940,7 +940,12 @@ export default {
           // All the room there is under the button, rather than a share of the
           // workspace: a panel that stops two thirds of the way down a tall
           // window hides its last row for no reason anyone can see.
-          panel.style.maxHeight = `${Math.max(180, host.height - top - 12)}px`;
+          // On a phone the floating bar sits over the foot of the studio; the
+          // panel stops above it rather than running under it.
+          const pill = document.querySelector('.mobile-bar');
+          const pillTop = pill && pill.offsetParent ? pill.getBoundingClientRect().top - host.top : Infinity;
+          const floor = Math.min(host.height, pillTop - 4);
+          panel.style.maxHeight = `${Math.max(180, floor - top - 12)}px`;
           for (const tool of el.querySelectorAll('.cd-tool[data-panel]')) {
             tool.setAttribute('aria-expanded', String(tool.dataset.panel === which));
           }

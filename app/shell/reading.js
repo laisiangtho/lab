@@ -92,8 +92,8 @@ export function chapterNote(p) {
     const mark = p.annotations?.marks.get(key);
     const noteCount = p.annotations?.notes.get(key) ?? 0;
     chapterEl.append(h('div', { class: 'vblock', dataset: { verse: key, span: verse.merge ?? key } },
-      story ? h('h2', { class: 'md-h md-h2 story-head' }, story.text) : null,
-      verse.title ? h('h3', { class: 'md-h md-h3 verse-title' }, verse.title) : null,
+      story && p.headings !== false ? h('h2', { class: 'md-h md-h2 story-head' }, story.text) : null,
+      verse.title && p.headings !== false ? h('h3', { class: 'md-h md-h3 verse-title' }, verse.title) : null,
       h('p', {
         class: `verse${mark ? ' is-marked' : ''}`, id: `v${key}`,
         dataset: mark?.colour ? { colour: mark.colour } : undefined,
@@ -109,7 +109,7 @@ export function chapterNote(p) {
           class: 'verse-note-dot', title: L('lbl.notes', { n: noteCount }), 'aria-label': L('lbl.notes', { n: noteCount }),
           onclick: (e) => p.onVerse?.(key, e.currentTarget, { extend: e.shiftKey }),
         }, icon('note')) : null),
-      verse.ref && !compare ? refsLine(verse.ref, meta, p.resolver, p.onRef, p.onPeek) : null));
+      verse.ref && !compare && p.xrefs !== false ? refsLine(verse.ref, meta, p.resolver, p.onRef, p.onPeek) : null));
   }
   note.append(chapterEl);
 

@@ -92,7 +92,7 @@ export async function launch(options = {}) {
   const browser = await chromium.launch({ executablePath: chromiumPath(), headless: options.headed ? false : undefined, args: ['--no-sandbox'] });
   const context = await browser.newContext({
     viewport: options.viewport ?? { width: 1440, height: 900 },
-    colorScheme: 'dark',
+    colorScheme: options.colorScheme ?? 'dark',
     // A phone: touch, no hover, and the pixel density that makes a 1 px
     // hairline and a 40 px margin look the way they do on one.
     ...(options.phone ? { isMobile: true, hasTouch: true, deviceScaleFactor: 3 } : {}),
@@ -186,10 +186,11 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
     }),
     // No 639-1, which is the ordinary state of a real translation file: the
     // field exists in the schema and nobody filled it in.
-    // One verse carries a Strong's number, the way an import from a tagged
-    // edition leaves them: the reading surface has to turn `{H7225}` into a
-    // word somebody can press, and nothing else in the fixtures exercises that.
-    ddb1931: build('ddb1931', 'Det Danske Bibel', 'Danske', 'Danish', { name: 'dan', iso: { '639-1': '', '639-3': 'dan' } }, pick(), (b, c, v) => pad(`Dansk ${c}:${v} tekst${v === 1 ? '{H7225}' : ''}.`, 'og ordet gik ud over hele landet og blev hørt af alle'), {
+    // Three verses carry numbers, the way an import from a tagged edition
+    // leaves them: a Strong's number to press (1), the edition's own number
+    // past the end of the lexicon, which eBible.org's tagged Judson uses for
+    // words with nothing behind them (2), and a sense letter (3).
+    ddb1931: build('ddb1931', 'Det Danske Bibel', 'Danske', 'Danish', { name: 'dan', iso: { '639-1': '', '639-3': 'dan' } }, pick(), (b, c, v) => pad(`Dansk ${c}:${v} tekst${{ 1: '{H7225}', 2: '{H9999}', 3: '{H1254a}' }[v] ?? ''}.`, 'og ordet gik ud over hele landet og blev hørt af alle'), {
       bookNames: { 1: 'Første Mosebog', 2: 'Anden Mosebog', 19: 'Salmernes Bog', 40: 'Matthæus' },
       described: { 19: 'Salmerne, samlet gennem mange århundreder.' },
       rich: true,
@@ -371,7 +372,8 @@ export async function installFromLibrary(page, identify, { timeout = 60000 } = {
     await page.locator('.lib-src[data-source="catalog"]').click();
     await row.first().waitFor();
   }
-  const button = page.locator(`[data-identify="${identify}"] button`, { hasText: 'Make available offline' });
+  // By what it does rather than what it says, so a run in Burmese finds it too.
+  const button = page.locator(`[data-identify="${identify}"] button[data-place="install:${identify}"]`);
   if (await button.count()) await button.click();
   await page.locator(`[data-identify="${identify}"] .badge-ok`).first().waitFor({ timeout });
 }

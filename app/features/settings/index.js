@@ -393,6 +393,8 @@ export default {
                     }),
                     flag('syncScroll', L('cmd.sync'), L('set.syncHint')),
                     flag('alignRows', L('set.align'), L('set.alignHint')),
+                    flag('headings', L('cmd.headings'), L('set.headingsHint')),
+                    flag('xrefs', L('cmd.xrefs'), L('set.xrefsHint')),
                     flag('strongs', L('cmd.strongs'), L('set.strongsHint')),
                     flag('restoreTabs', L('set.restore'), L('set.restoreHint'))),
                   directionRows(installed)),

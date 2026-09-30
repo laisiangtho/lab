@@ -1,7 +1,8 @@
 /**
  * Reading panel: the size of the scripture, the size of the interface around
  * it, line height, line length and verse layout — applied as CSS variables and
- * kept in settings.
+ * kept in settings — and what is shown besides the verses: headings,
+ * cross-references, Strong's numbers.
  *
  * The panel is built once and only its values change, so choosing a layout
  * cannot move it under the pointer. It points at the control that opened it.
@@ -47,10 +48,14 @@ export function createReadingPanel(ctx) {
     ui: row('lbl.uiSize', 'uiSize', READING.ui, 'px', 0),
   };
   const segment = h('div', { class: 'rp-seg' });
+  // What is drawn besides the verses: each a switch of its own, since any mix
+  // of them is a reasonable way to read.
+  const shown = h('div', { class: 'rp-seg rp-shown' });
   const reset = h('button', { class: 'rp-reset', onclick: () => { resetAll(); paint(); } }, L('cmd.reset'));
   const panel = h('div', { class: 'popover rpanel has-arrow', hidden: true },
     rows.size.element, rows.leading.element, rows.measure.element,
     h('div', { class: 'rp-row is-wide' }, h('span', { class: 'rp-l' }, L('cmd.layout')), segment),
+    h('div', { class: 'rp-row is-wide' }, h('span', { class: 'rp-l' }, L('lbl.show')), shown),
     h('div', { class: 'rp-sep' }),
     rows.ui.element,
     h('div', { class: 'rp-foot' }, h('span', {}, L('lbl.readingHint')), reset));
@@ -93,6 +98,10 @@ export function createReadingPanel(ctx) {
       'aria-pressed': String(id === s.layout),
       onclick: () => { ctx.state.set({ layout: id }); paint(); },
     }, L(`val.${id}`))));
+    shown.replaceChildren(...[['headings', 'cmd.headings'], ['xrefs', 'cmd.xrefs'], ['strongs', 'cmd.strongs']].map(([key, name]) => h('button', {
+      'aria-pressed': String(Boolean(s[key])), dataset: { show: key },
+      onclick: () => { ctx.state.set({ [key]: !ctx.state.get()[key] }); paint(); },
+    }, L(name))));
     if (!panel.hidden && anchor && panel.offsetHeight !== placedAt) place(anchor);
   }
 

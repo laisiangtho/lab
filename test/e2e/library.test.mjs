@@ -78,5 +78,35 @@ test('the Library', options, async (t) => {
     await page.keyboard.press('Escape');
   });
 
+  await t.test('the band never lets one tool slide under another, at any width', async () => {
+    const collisions = () => page.evaluate(() => {
+      const bar = document.querySelector('.lib-bar');
+      const parts = [...bar.querySelectorAll('.lib-tab, .lib-src, .lib-find, .lib-readout, .lib-act')]
+        .filter((el) => el.offsetParent && getComputedStyle(el).display !== 'none')
+        .map((el) => ({ el, r: el.getBoundingClientRect() }));
+      const out = [];
+      for (let i = 0; i < parts.length; i += 1) {
+        for (let j = i + 1; j < parts.length; j += 1) {
+          const a = parts[i].r; const b = parts[j].r;
+          if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) {
+            out.push(`${parts[i].el.className} × ${parts[j].el.className}`);
+          }
+        }
+        const r = parts[i].r; const box = bar.getBoundingClientRect();
+        if (r.right > box.right + 1 || r.left < box.left - 1) out.push(`${parts[i].el.className} outside the band`);
+      }
+      return out;
+    });
+    for (const width of [1440, 1180, 980, 820, 640, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const id of ['home', 'more']) {
+        await tab(id).click();
+        await page.waitForTimeout(250);
+        assert.deepEqual(await collisions(), [], `${id} at ${width}px`);
+      }
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+  });
+
   await t.test('nothing went wrong on the way', () => assert.deepEqual(app.problems, []));
 });

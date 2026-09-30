@@ -29,7 +29,8 @@ test('the interface follows the device, and the reader can choose', options, asy
   assert.equal(await page.locator('.library-item .btn.soft').first().innerText(), 'Gjør tilgjengelig uten nett');
 
   await t.test('dates are written in the interface language', async () => {
-    const line = await page.locator('.doc-head .muted').first().innerText();
+    // The catalog's dates are the detail behind the Library's readout.
+    const line = await page.locator('.lib-readout').getAttribute('title');
     // Norwegian writes 1.9.2026; the fixture catalog was updated 2026-09-01.
     assert.match(line, /1\.9\.2026/, `the catalog date is Norwegian: ${line}`);
   });

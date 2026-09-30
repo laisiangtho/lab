@@ -16,11 +16,21 @@
  *
  * A regular expression is matched against the text as written: folding it would
  * change what the pattern means.
+ *
+ * All three read the plain text — Strong's numbers taken out — so a phrase is
+ * found across a tagged word. A query that is one Strong's number instead
+ * finds the words tagged with it (`strongsQuery`).
  */
 
+import { codeRanges, normalizeCode } from './strongs.js';
+
 const LATIN_MARKS = /[̀-ͯ]/g;
-/** What counts as being inside a word, for whole-word matching. */
-const WORD = /[\p{L}\p{N}_]/u;
+/**
+ * What counts as being inside a word, for whole-word matching. Marks are: a
+ * Burmese vowel sign is part of the word it is written on, and without \p{M}
+ * a search for the whole word က found it inside ကောင်း.
+ */
+const WORD = /[\p{L}\p{M}\p{N}_]/u;
 
 export const MATCH_MODES = Object.freeze(['terms', 'word', 'regex']);
 
@@ -86,6 +96,9 @@ export function normalize(text, matchCase = false) {
 export function createMatcher(query, { mode = 'terms', matchCase = false } = {}) {
   if (!MATCH_MODES.includes(mode)) throw new Error(`search: unknown match mode "${mode}"`);
   if (mode === 'regex') return regexMatcher(query, matchCase);
+
+  const code = strongsQuery(query);
+  if (code) return strongsMatcher(code);
 
   const terms = parseQuery(query, matchCase);
   if (!terms.length) return null;
@@ -169,6 +182,42 @@ export function parseQuery(query, matchCase = false) {
     if (term) terms.push(term);
   }
   return terms;
+}
+
+/**
+ * A query that is one Strong's number — `H430`, `g26`, `H1254a` — asks for the
+ * words tagged with it, not for the letters: those are not in the plain text
+ * at all. A bare number is a verse number or a count far more often than a
+ * lexicon entry, so it is searched as text.
+ *
+ * @returns {string|null} the number, normalised
+ */
+export function strongsQuery(query) {
+  const found = /^\s*([HG])0*(\d{1,5})([a-z]?)\s*$/i.exec(String(query ?? ''));
+  return found ? normalizeCode(`${found[1]}${found[2]}${found[3]}`) : null;
+}
+
+/**
+ * Matches the words carrying one number. It is given the verse as stored —
+ * with its markup, the only place the number is — and answers with ranges in
+ * the plain text, which is what the result shows. `marked` tells the caller
+ * which text to hand it. A number with a sense letter finds only that sense;
+ * one without finds every sense of it.
+ */
+function strongsMatcher(code) {
+  const base = code.replace(/[A-Z]$/, '');
+  const exact = base !== code;
+  return {
+    terms: [code],
+    mode: 'strongs',
+    marked: true,
+    test(text) {
+      const ranges = codeRanges(text)
+        .filter((range) => (exact ? range.code === code : range.code.replace(/[A-Z]$/, '') === base))
+        .map(({ from, to }) => ({ start: from, end: to }));
+      return ranges.length ? ranges : null;
+    },
+  };
 }
 
 /**

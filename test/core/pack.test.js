@@ -138,3 +138,17 @@ test('book names are matched by their standard code, and an unknown one is passe
   assert.equal(found[46].name, '1 Corinthians');
   assert.equal(Object.keys(found).length, 1);
 });
+
+test('eBible.org downloads that are not the data are named, with the one to take instead', async () => {
+  const { otherEdition, readPack } = await import('../../app/core/formats/pack.js');
+  const readaloud = [
+    { name: 'myajvb_002_GEN_01_read.txt', text: 'အစအဦး၌ ဘုရားသခင်သည် ကောင်းကင်နှင့် မြေကြီးကို ဖန်ဆင်းတော်မူ၏။' },
+    { name: 'myajvb_002_GEN_02_read.txt', text: '…' },
+  ];
+  assert.deepEqual(otherEdition(readaloud, 'download.zip'), { kind: 'readaloud', id: 'myajvb', instead: 'myajvb_usfx.zip' }, 'known by its files alone');
+  assert.equal(otherEdition([], 'myajvb_browserBible.zip').kind, 'browserbible');
+  assert.equal(otherEdition([{ name: 'info.json', text: '{}' }, ...['GN1', 'GN2', 'GN3', 'EX1', 'EX2'].map((n) => ({ name: `${n}.html`, text: '<p/>' }))], 'x.zip').kind, 'browserbible');
+  assert.equal(otherEdition([], 'myajvb_html.zip').instead, 'myajvb_usfx.zip');
+  assert.equal(otherEdition([{ name: 'myajvb_usfx.xml', text: '<usfx/>' }], 'myajvb_usfx.zip'), null, 'the data is not another edition');
+  assert.throws(() => readPack(readaloud, { category, source: 'myajvb_readaloud.zip' }), /read-?aloud.*take myajvb_usfx\.zip instead/i);
+});

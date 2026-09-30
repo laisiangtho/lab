@@ -235,6 +235,8 @@ export function createShell(root, ctx) {
     command('reading.panel', L('cmd.reading'), () => readingPanel.toggle(document.querySelector('.statusbar .sb-reading') ?? document.body), { icon: 'type' });
     command('reading.mode', L('cmd.mode'), toggleMode, { keys: 'Mod+e', icon: 'edit', needsChapter: true, state: () => ctx.state.get().mode === 'source' });
     command('reading.strongs', L('cmd.strongs'), toggleStrongs, { icon: 'tag', needsChapter: true, state: () => ctx.state.get().strongs });
+    command('reading.headings', L('cmd.headings'), () => toggleShown('headings', 'cmd.headings'), { icon: 'heading', needsChapter: true, state: () => ctx.state.get().headings });
+    command('reading.xrefs', L('cmd.xrefs'), () => toggleShown('xrefs', 'cmd.xrefs'), { icon: 'link', needsChapter: true, state: () => ctx.state.get().xrefs });
     command('tab.detach', L('cmd.detach'), () => { const tab = workspace.activeTab; if (tab) workspace.detach(tab.id); }, { icon: 'restore' });
     command('tab.next', L('cmd.nextTab'), () => stepTab(1), { keys: 'Mod+Shift+ArrowRight', icon: 'tab-next' });
     command('tab.prev', L('cmd.prevTab'), () => stepTab(-1), { keys: 'Mod+Shift+ArrowLeft', icon: 'tab-prev' });
@@ -399,6 +401,13 @@ export function createShell(root, ctx) {
    * the published translations do today, so say that rather than toggling a
    * setting with no visible effect.
    */
+  /** Headings and cross-references: on or off, and said. */
+  function toggleShown(key, nameKey) {
+    const next = !ctx.state.get()[key];
+    ctx.state.set({ [key]: next });
+    shell.notify(L('msg.state', { what: L(nameKey), value: L(next ? 'val.on' : 'val.off') }));
+  }
+
   function toggleStrongs() {
     const next = !ctx.state.get().strongs;
     ctx.state.set({ strongs: next });

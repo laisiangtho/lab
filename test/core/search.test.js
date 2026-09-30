@@ -81,3 +81,23 @@ test('a pattern that can match nothing still terminates', () => {
 test('an unknown match mode is refused', () => {
   assert.throws(() => createMatcher('a', { mode: 'fuzzy' }), /unknown match mode/);
 });
+
+test("a query that is one Strong's number finds the words tagged with it", () => {
+  const text = 'In the beginning{H7225} God{H430} created{H1254a} the heaven';
+  const plain = 'In the beginning God created the heaven';
+  const words = (query) => createMatcher(query).test(text)?.map(({ start, end }) => plain.slice(start, end)) ?? null;
+  assert.deepEqual(words('H430'), ['God']);
+  assert.deepEqual(words(' h0430 '), ['God'], 'however it is typed');
+  assert.deepEqual(words('H1254'), ['created'], 'a number without its sense letter finds every sense');
+  assert.deepEqual(words('H1254A'), ['created']);
+  assert.equal(words('H1254B'), null);
+  assert.equal(createMatcher('430').marked, undefined, 'a bare number is text');
+  assert.equal(createMatcher('H430', { mode: 'regex' }).marked, undefined, 'a pattern is a pattern');
+});
+
+test('a whole word in Burmese includes the vowel signs written on it', () => {
+  const word = (query, text) => createMatcher(query, { mode: 'word' }).test(text);
+  assert.equal(word('က', 'ကောင်းကင်'), null, 'က is a letter of ကောင်း, not a word');
+  assert.ok(word('ကောင်းကင်', 'ကောင်းကင် နှင့်'));
+  assert.equal(word('ကောင်း', 'ကောင်းကင်'), null);
+});

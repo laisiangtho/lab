@@ -466,12 +466,13 @@ body.is-dragging-tab .sidebar[data-empty="true"] .side-body::after {
   border-radius: var(--radius-m);
 }
 
-/* ---- library tools -------------------------------------------------------*/
-.lib-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
-.lib-tools .field { margin: 0; flex: 1 1 140px; min-width: 0; max-width: 320px; }
-.lib-tools .grow { flex: 1; }
-.lib-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.library-group h2 { font-size: var(--fs-ui-l); font-weight: 650; color: var(--text-muted); margin: 20px 0 8px; }
+/* ---- library groups ------------------------------------------------------*/
+/* A language over its translations: a quiet label, the way the sidebars
+   label a section, not a heading competing with the names under it. */
+.library-group h2 {
+  display: flex; align-items: center; margin: 22px 2px 8px; color: var(--text-faint);
+  font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase;
+}
 
 /* ---- the crumb bar carries the translation --------------------------------*/
 .crumb-tr { font-weight: 500; }
@@ -499,6 +500,7 @@ body.is-dragging-tab .sidebar[data-empty="true"] .side-body::after {
 .tri-name { font-size: var(--fs-ui-l); font-weight: 650; color: var(--text-normal); }
 .tri-sub { font-size: var(--fs-ui-s); color: var(--text-faint); margin-top: 2px; }
 .tri-desc { margin: 10px 0 0; color: var(--text-muted); font-size: var(--fs-ui-m); line-height: 1.55; }
+.tri-note { margin: 8px 0 0; color: var(--text-faint); font-size: var(--fs-ui-s); line-height: 1.5; }
 .tri-facts {
   display: grid; grid-template-columns: auto 1fr; gap: 4px 12px;
   margin: 12px 0 0; font-size: var(--fs-ui-m);
@@ -604,12 +606,10 @@ body[data-shell="on"] {
    and a segmented control too wide even then scrolls on its own. */
 .nm-tools { flex-wrap: wrap; }
 .nm-tools .field { flex: 1 1 180px; }
-.nm-tools .rp-seg,
-.lib-tools .rp-seg {
+.nm-tools .rp-seg {
   max-width: 100%; overflow-x: auto; scrollbar-width: none;
 }
-.nm-tools .rp-seg::-webkit-scrollbar,
-.lib-tools .rp-seg::-webkit-scrollbar { height: 0; }
+.nm-tools .rp-seg::-webkit-scrollbar { height: 0; }
 
 /* The reader's correction to a translation's text direction */
 .tri-dir { margin-top: 12px; }
@@ -1269,6 +1269,13 @@ label.set-row:hover { background: var(--bg-hover); }
 .cd-panel-body .set-row { padding: 8px 10px; border-radius: var(--radius-m); border-top: 0; background: var(--bg-secondary); }
 .cd-panel-body .set-row:has(.set-slider),
 .cd-panel-body .set-row:has(.rp-seg) { flex-direction: column; align-items: stretch; gap: 8px; }
+/* Side by side, a label needs less room here than on the Settings page: a
+   colour row keeps its swatch and its reset on the same line as its name. */
+.cd-panel-body .set-text { flex-basis: 110px; }
+/* In a column, flex-basis is a height: .set-text's 200px basis (a width in a
+   row) became 200px of empty space between a label and its control. */
+.cd-panel-body .set-row:has(.set-slider) .set-text,
+.cd-panel-body .set-row:has(.rp-seg) .set-text { flex: 0 0 auto; }
 .cd-panel-body .set-row:has(.set-slider) .set-slider,
 .cd-panel-body .set-row:has(.rp-seg) .rp-seg { flex: 0 0 auto; max-width: none; width: 100%; }
 .cd-panel-body .rp-seg { flex-wrap: wrap; }
@@ -1671,34 +1678,55 @@ label.set-row:hover { background: var(--bg-hover); }
 /* Two pages under one title: what is here, and where to get more. Get more is
    a rail of sources beside the chosen source's list; in a narrow pane the rail
    becomes a row of chips over the list. */
-.doc.library { max-width: 1040px; }
-.lib-tabs { display: flex; gap: 2px; margin-top: 10px; border-bottom: 1px solid var(--border); }
+.doc.library { max-width: none; padding: 0; }
+/* The band: the Cards page's, across the whole leaf and held at the top while
+   the list scrolls under it. */
+.lib-bar {
+  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 4px;
+  padding: 7px 10px; border-bottom: var(--divider); background: var(--bg-primary);
+}
+/* Fitted by measuring (fitBar): nothing in the band is allowed to shrink
+   under another. Short of room, the sources give up their names first, the
+   chosen one last; shorter still, the filter takes a line of its own. */
+.lib-bar.is-tight .lib-src:not([aria-selected="true"]) .lib-src-t { display: none; }
+.lib-bar.is-tight .lib-src:not([aria-selected="true"]) { padding: 0; width: 28px; justify-content: center; }
+.lib-bar.is-tight .lib-readout { display: none; }
+.lib-bar.is-wrapped { flex-wrap: wrap; row-gap: 6px; }
+.lib-bar.is-wrapped .lib-find { order: 9; flex: 1 1 100%; max-width: none; margin: 0; }
+.lib-bar.is-wrapped .lib-tab[aria-selected="false"] > span:not(.lib-tab-n) { display: none; }
+.lib-bar .spacer { flex: 1; min-width: 0; }
+.lib-bar-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; flex: 0 0 auto; }
+.lib-bar[data-page="home"] .lib-bar-sep { display: none; }
+.lib-bar-acts { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.lib-act.is-warn { color: var(--c-orange); }
+.lib-readout { flex: 0 1 auto; min-width: 0; padding: 0 6px; color: var(--text-faint); font-size: var(--fs-ui-s); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; }
+.lib-readout[hidden] { display: none; }
+/* The two pages, as a segmented pair. */
+.lib-seg { display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-m); background: var(--base-10); flex: 0 0 auto; }
 .lib-tab {
-  display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px 9px; margin-bottom: -1px;
-  border-bottom: 2px solid transparent; color: var(--text-muted); font-size: var(--fs-ui-m); font-weight: 550;
-  transition: color var(--speed), border-color var(--speed);
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: var(--radius-s);
+  color: var(--text-muted); font-size: var(--fs-ui-s); font-weight: 550; white-space: nowrap;
+  transition: background var(--speed), color var(--speed);
 }
 .lib-tab:hover { color: var(--text-normal); }
-.lib-tab[aria-selected="true"] { color: var(--text-normal); border-bottom-color: var(--accent); }
-.lib-tab svg { width: 15px; height: 15px; }
-.lib-tab-n { min-width: 18px; padding: 0 6px; border-radius: 99px; background: var(--bg-hover); color: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
-.lib-studio { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; margin-top: 16px; }
-.lib-studio[data-page="more"] { grid-template-columns: 210px minmax(0, 1fr); }
-.lib-studio[data-page="home"] .lib-rail { display: none; }
-.lib-rail { display: flex; flex-direction: column; gap: 3px; position: sticky; top: 8px; align-self: start; }
+.lib-tab[aria-selected="true"] { background: var(--bg-elevated); color: var(--text-normal); box-shadow: 0 0 0 1px var(--border-strong); }
+.lib-tab svg { width: 14px; height: 14px; }
+.lib-tab-n { min-width: 18px; padding: 0 5px; border-radius: 99px; background: var(--bg-hover); color: var(--text-faint); font-size: 11px; line-height: 16px; font-variant-numeric: tabular-nums; text-align: center; }
+/* Where more comes from: tools of the band, the chosen one lit. */
+.lib-srcs { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+.lib-srcs:empty { display: none; }
 .lib-src {
-  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; text-align: start;
-  color: var(--text-muted); transition: background var(--speed), color var(--speed);
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; border-radius: var(--radius-m);
+  color: var(--text-muted); font-size: var(--fs-ui-s); white-space: nowrap; flex: 0 0 auto;
+  transition: background var(--speed), color var(--speed);
 }
 .lib-src:hover { background: var(--bg-hover); color: var(--text-normal); }
-.lib-src[aria-selected="true"] { background: var(--accent-fade); color: var(--text-normal); }
-.lib-src > svg { width: 30px; height: 30px; padding: 7px; flex: 0 0 auto; border-radius: 8px; background: var(--bg-secondary); color: var(--accent-2); box-shadow: inset 0 0 0 1px var(--border); }
-.lib-src-t { display: flex; flex-direction: column; min-width: 0; }
-.lib-src-t b { font-size: var(--fs-ui-m); font-weight: 600; }
-.lib-src-t span { font-size: var(--fs-ui-s); color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lib-main { min-width: 0; }
-.lib-main > .lib-tools { margin-top: 0; }
-.lib-main > .lib-tools:empty { display: none; }
+.lib-src[aria-selected="true"] { background: var(--accent-fade); color: var(--accent-2); }
+.lib-src svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.lib-find { flex: 1 1 160px; min-width: 140px; max-width: 280px; margin: 0 0 0 6px; }
+.lib-find[hidden] { display: none; }
+/* The work under the band keeps a reading width. */
+.lib-page { max-width: 1040px; margin: 0 auto; padding: 14px var(--doc-pad-x, 28px) 40px; }
 
 /* A row: the translation's short name as a small square, then who it is,
    then what can be done. */
@@ -1714,7 +1742,7 @@ label.set-row:hover { background: var(--bg-hover); }
 .badge { display: inline-flex; align-items: center; gap: 3px; }
 .badge svg { width: 10px; height: 10px; }
 .badge-src { background: var(--bg-hover); color: var(--text-muted); }
-.lib-group-n { margin-inline-start: 8px; color: var(--text-faint); font-size: var(--fs-ui-s); font-weight: 500; }
+.lib-group-n { margin-inline-start: 8px; font-weight: 500; letter-spacing: 0; }
 .library-group:first-child h2 { margin-top: 4px; }
 
 .lib-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 48px 12px; text-align: center; }
@@ -1726,19 +1754,17 @@ label.set-row:hover { background: var(--bg-hover); }
 .lib-banner svg { width: 14px; height: 14px; }
 .lib-listed, .lib-more-hint, .lib-loading { margin: 2px 0 10px; font-size: var(--fs-ui-s); color: var(--text-faint); }
 .lib-more-hint { text-align: center; margin-top: 12px; }
-.lib-web-note { display: block; margin-top: 6px; font-size: var(--fs-ui-s); color: var(--c-orange); }
+.lib-web-note { display: flex; gap: 6px; align-items: flex-start; margin-top: 10px; font-size: var(--fs-ui-s); color: var(--c-orange); line-height: 1.5; }
+.lib-web-note svg, .lib-banner svg { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
+.lib-banner.is-warn { background: color-mix(in srgb, var(--c-orange) 12%, transparent); color: var(--c-orange); }
 .lib-panel { padding: 18px 20px; border-radius: 12px; background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--border); }
-.lib-panel h2 { margin: 0 0 6px; font-size: var(--fs-ui-l); }
 .lib-panel p { max-width: 560px; line-height: 1.55; }
 .lib-panel .btn svg { width: 14px; height: 14px; }
 .lib-url { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .lib-url .field { flex: 1 1 280px; margin: 0; }
 .lib-url input { width: 100%; }
 
+/* A phone: the page under the band keeps clear of the floating bar. */
 @container leaf (max-width: 760px) {
-  .lib-studio[data-page="more"] { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .lib-rail { position: static; flex-direction: row; flex-wrap: wrap; gap: 6px; }
-  .lib-src { flex: 0 0 auto; padding: 6px 12px 6px 6px; border-radius: 99px; box-shadow: inset 0 0 0 1px var(--border); }
-  .lib-src > svg { width: 26px; height: 26px; padding: 6px; border-radius: 99px; }
-  .lib-src-t span { display: none; }
+  .lib-page { padding: 10px 12px 96px; }
 }

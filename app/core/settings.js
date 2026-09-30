@@ -112,6 +112,10 @@ export const defaultSettings = Object.freeze({
   ribbonItems: null,
   /** Show Strong's numbers where a translation carries them. */
   strongs: false,
+  /** Show section headings (the translation's `story` and verse titles). */
+  headings: true,
+  /** Show the cross-reference lines under the verses that carry them. */
+  xrefs: true,
   /**
    * Sidebar arrangement: each side is a list of rows, each row a list of pane
    * ids with the one on show and the row's share of the height. Empty means
@@ -247,7 +251,7 @@ export function parseSettings(raw, { source, category }) {
     readingLeading: clamp(raw.readingLeading, READING.leading, defaultSettings.readingLeading),
     readingMeasure: clamp(raw.readingMeasure, READING.measure, defaultSettings.readingMeasure),
     uiSize: clamp(raw.uiSize, READING.ui, defaultSettings.uiSize),
-    mode, strongs: flag('strongs'),
+    mode, strongs: flag('strongs'), headings: flag('headings'), xrefs: flag('xrefs'),
     sourceFormat: SOURCE_FORMATS.includes(raw.sourceFormat) ? raw.sourceFormat : defaultSettings.sourceFormat,
     readingFont: READING_FONTS.includes(raw.readingFont) ? raw.readingFont : defaultSettings.readingFont,
     restoreTabs: flag('restoreTabs'), motion: flag('motion'),

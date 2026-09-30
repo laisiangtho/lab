@@ -64,6 +64,43 @@ export function classify(files) {
 }
 
 /**
+ * eBible.org publishes each translation in several shapes, and only some of
+ * them are a Bible this app can read. The others are recognised so the reader
+ * is told which download to take instead, rather than "no scripture file":
+ *
+ *   <id>_readaloud.zip     a chapter to a text file, verse numbers taken out
+ *                          so a speech engine does not read them — nothing
+ *                          left to say which verse is which
+ *   <id>_browserBible.zip  pages built for one web reader
+ *   <id>_html.zip          the website, a chapter to a page
+ *
+ * `<id>_usfx.zip` is the same translation as data: verses, book names,
+ * metadata, copyright and, for a tagged edition, its Strong's numbers.
+ *
+ * @param {PackFile[]} files
+ * @param {string} archiveName
+ * @returns {{ kind: 'readaloud'|'browserbible'|'html', id: string, instead: string } | null}
+ */
+export function otherEdition(files, archiveName = '') {
+  const base = String(archiveName).split(/[\\/]/).pop();
+  const names = (files ?? []).map((file) => String(file.name ?? '').split('/').pop());
+  const idFrom = (name) => /^([a-z0-9-]+?)_/i.exec(name)?.[1] ?? '';
+  const pick = (kind, from) => {
+    const id = idFrom(base) || idFrom(from ?? '') || '';
+    return { kind, id, instead: id ? `${id}_usfx.zip` : 'the USFX zip' };
+  };
+  if (/_readaloud\.zip$/i.test(base)) return pick('readaloud');
+  const read = names.find((name) => /_read\.txt$/i.test(name));
+  if (read) return pick('readaloud', read);
+  if (/_browserbible\.zip$/i.test(base)) return pick('browserbible');
+  const pages = (pattern) => names.filter((name) => pattern.test(name)).length;
+  if (names.includes('info.json') && pages(/^[A-Z0-9]{2}\d{1,3}\.html$/) >= 5) return pick('browserbible');
+  if (/_html\.zip$/i.test(base)) return pick('html');
+  if (pages(/^[A-Z0-9]{3}\d{2,3}\.htm$/) >= 5) return pick('html');
+  return null;
+}
+
+/**
  * Read a published bundle.
  *
  * @param {PackFile[]} files every file in the archive
@@ -74,6 +111,8 @@ export function classify(files) {
 export function readPack(files, { category, info = {}, source = 'archive' }) {
   const { usable, meta, names, rights, scripture } = classify(files);
   if (!scripture.length) {
+    const other = otherEdition(files, source);
+    if (other) throw new Error(`${source}: this is eBible.org's ${other.kind} edition, which has no verses to read; take ${other.instead} instead`);
     throw new Error(`${source}: no scripture file in this archive — looked at ${usable.length} files`);
   }
 
