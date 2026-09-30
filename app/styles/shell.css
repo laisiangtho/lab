@@ -13,7 +13,11 @@
   --base-50:#5c5c5c; --base-60:#6e6e6e; --base-70:#9a9a9a; --base-80:#c4c4c4;
   --base-100:#dadada;
 
-  --accent:#7c3aed; --accent-1:#8b5cf6; --accent-2:#a78bfa;
+  /* --accent-2 is the accent as text. A chosen accent supplies one shade per
+     theme (see applyAccent) and each theme takes its own, falling back to the
+     stylesheet's; one inline value could not be light-on-dark and
+     dark-on-light at once. */
+  --accent:#7c3aed; --accent-1:#8b5cf6; --accent-2:var(--accent-2-on-dark, #a78bfa);
   --accent-fade:rgba(124,58,237,.14); --accent-line:rgba(124,58,237,.42);
 
   --c-red:#fb464c; --c-orange:#e9973f; --c-yellow:#e0de71; --c-green:#44cf6e;
@@ -116,7 +120,7 @@ html[data-theme="light"]{
   --base-50:#949494; --base-60:#767676; --base-70:#585858; --base-80:#3b3b3b;
   --base-100:#1f1f1f;
 
-  --accent:#6d28d9; --accent-1:#7c3aed; --accent-2:#5b21b6;
+  --accent:#6d28d9; --accent-1:#7c3aed; --accent-2:var(--accent-2-on-light, #5b21b6);
   --accent-fade:rgba(109,40,217,.09); --accent-line:rgba(109,40,217,.32);
 
   --c-red:#c0392b; --c-orange:#b45309; --c-yellow:#a16207; --c-green:#15803d;
@@ -266,6 +270,7 @@ body[data-platform="darwin"]::before{
   -webkit-app-region:no-drag;app-region:no-drag;
 }
 body[data-shell="on"] .win-buttons{display:flex}
+body[data-shell="on"],body[data-platform="darwin"]{--drag-reserve:72px}
 body[data-shell="on"][data-platform="darwin"] .win-buttons{display:none}
 body[data-shell="on"] .win-ctl button:nth-child(3){display:none}
 body[data-shell="on"][data-right="open"] .sidebar.right .pane-tabs{padding-inline-end:var(--wc-w)}
@@ -677,6 +682,12 @@ body.is-dragging-tab,body.is-dragging-tab *{cursor:grabbing!important}
   /* The active tab's flares are drawn outside its own box; without this the
      first and last tab lose the curve that fuses them to the sheet. */
   padding-inline:var(--radius-flare);
+  /* Where the app draws its own title bar, the end of the strip is kept empty
+     as the window's handle. Tabs and toolbar buttons can otherwise fill the
+     band — three tabs with both sidebars open left 3 px — and the window could
+     not be moved. It is padding, so fitStrip counts it as taken and sends the
+     last tabs to the overflow menu before they reach it. */
+  padding-inline-end:var(--drag-reserve, var(--radius-flare));
   /* Past a certain number of tabs the strip does not scroll: what does not fit
      is hidden whole and listed behind the button at the end. A tab drawn cut in
      half reads as a fault, and a scrollbar in a 30 px band is unusable. */
@@ -1127,6 +1138,21 @@ body.study-in-margin .outline-study{display:none}
 .btn:hover{background:var(--base-30)}
 .btn.primary{background:var(--accent);box-shadow:none;color:#fff;font-weight:500}
 .btn.primary:hover{background:var(--accent-1)}
+/* The accent without the weight, for an action repeated down a list: the
+   colour says "this does something", and the solid fill is kept for the press. */
+.btn.soft{background:var(--accent-fade);box-shadow:inset 0 0 0 1px var(--accent-line);color:var(--accent-2);font-weight:500}
+.btn.soft:hover{background:var(--accent);box-shadow:none;color:#fff}
+/* A finger needs more than a mouse pointer does: on a touch screen the
+   controls that were sized for a pointer — 22 px fields, crumbs and swatches,
+   a 3 px slider — get room to be pressed. Links and verse numbers inside the
+   running text keep the text's own size. */
+@media (hover:none){
+  .btn{min-height:36px;padding:0 14px}
+  input:not([type]),input[type=text],input[type=search],input[type=number],input[type=url],input[type=email],select{min-height:36px}
+  input[type=range]{min-height:28px}
+  .crumb,.link-btn,.wl-link,.pj-quiet{min-height:32px}
+  .tree-follow{min-width:32px;min-height:32px}
+}
 .btn svg{width:14px;height:14px}
 /* A button for something that removes data. It is styled as a warning rather
    than as the obvious next step: the reader should have to mean it. */
@@ -1755,6 +1781,10 @@ body.drawer-dragging .sidebar{transition:none}
   .panes.is-split .leaf:first-child{border-top:0}
   .statusbar .hide-sm{display:none}
   .win-ctl button:nth-child(3){display:none}
+}
+@media (max-width:760px){
+  /* A notice sits above the floating bar on a phone, not on top of it. */
+  .toasts{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 }
 @media (max-width:760px){
   /* In a narrow window the band keeps only the palette: everything else is a

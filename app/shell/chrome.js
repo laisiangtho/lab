@@ -656,6 +656,25 @@ export function createChrome(root, ctx) {
     ctx.state.set({ [key]: !ctx.state.get()[key] });
   }
 
+  /**
+   * Make a sidebar visible without toggling it: open its drawer in the narrow
+   * layout, or open it in the window. Selecting a pane used to pick it inside
+   * a sidebar that could be shut — always, on a phone, where sidebars are
+   * drawers — so Bookmarks, Plan and the rest did nothing that could be seen.
+   */
+  function revealSide(side) {
+    if (isDrawerLayout()) {
+      const cls = side === 'left' ? 'drawer-l' : 'drawer-r';
+      if (document.body.classList.contains(cls)) return;
+      closeDrawers();
+      document.body.classList.add(cls, 'has-drawer');
+      paintMobileBar();
+      return;
+    }
+    const key = side === 'left' ? 'leftSidebar' : 'rightSidebar';
+    if (!ctx.state.get()[key]) ctx.state.set({ [key]: true });
+  }
+
   function mobileButton(name, labelKey, onclick, extra = '') {
     return h('button', { class: extra, 'data-l': labelKey, 'data-mb': labelKey, onclick }, icon(name));
   }
@@ -998,6 +1017,7 @@ export function createChrome(root, ctx) {
       // A pane the reader moved to the other sidebar is selected where it is.
       const where = sides[side].has(id) ? side : side === 'left' ? 'right' : 'left';
       sides[where].select(id);
+      revealSide(where);
     },
     panesShown: () => registry.panes().map((p) => ({ ...p, shown: Boolean(sideOf(p.id)) })),
     setPaneShown,

@@ -562,6 +562,30 @@ export function createWorkspace(ctx, chrome) {
       }, localNumber(chapter)));
   }
 
+  /**
+   * Make the state name only installed translations, and name one whenever
+   * any is installed. True when it had to change something: the change runs
+   * the render again, and this run stops.
+   *
+   * A translation named by the state but no longer installed is repaired
+   * here, not rendered around. Filtering at paint time made the screen right
+   * and left the state wrong, and everything that is not the render reads the
+   * state: `closePane`, `setPaneTranslation` and `movePane` index into the
+   * unfiltered list, so closing the second column closed the first; and every
+   * feature that asks for `state.translation` — the outline, the card studio,
+   * reading aloud, the exports, the word count in the status bar — asked the
+   * store for a translation that had been deleted and got an exception per
+   * repaint.
+   */
+  function settleTranslations(installed) {
+    if (!installed.length) return false;
+    const open = panesOf(state.get());
+    const order = open.filter((id) => installed.some((t) => t.identify === id));
+    if (!order.length) { state.set({ translation: installed[0].identify, parallel: [] }); return true; }
+    if (order.length !== open.length) { state.set({ translation: order[0], parallel: order.slice(1) }); return true; }
+    return false;
+  }
+
   async function renderPanes() {
     const run = ++renderRun;
     /** True while this is still the run whose answer is wanted. */
@@ -572,6 +596,15 @@ export function createWorkspace(ctx, chrome) {
     // rebuilds the leaves, so a note saved while reading threw the place away
     // too. Remembering first and restoring after covers both.
     rememberPlace();
+
+    // Before anything is drawn, and whatever the tab is: the state must name
+    // translations that are installed. Done only for a chapter tab, the first
+    // install left `translation` null for as long as the reader stayed on the
+    // Library — and the card studio, the outline, search and the exports all
+    // said no translation was available while one plainly was.
+    const installed = await store.list();
+    if (!current()) return;
+    if (settleTranslations(installed)) return;
 
     /**
      * A document already on screen is left alone.
@@ -622,32 +655,12 @@ export function createWorkspace(ctx, chrome) {
       return;
     }
 
-    const installed = await store.list();
-    if (!current()) return;
     if (!installed.length) {
       chrome.panes.replaceChildren(emptyLeaf(L('msg.noTranslations'), L('msg.openLibrary'), () => openDoc('library')));
       return;
     }
 
-    const open = panesOf(state.get());
-    const order = open.filter((id) => installed.some((t) => t.identify === id));
-    if (!order.length) { state.set({ translation: installed[0].identify, parallel: [] }); return; }
-    /**
-     * A translation named by the state but no longer installed is repaired
-     * here, not rendered around.
-     *
-     * Filtering at paint time made the screen right and left the state wrong,
-     * and everything that is not this function reads the state: `closePane`,
-     * `setPaneTranslation` and `movePane` index into the unfiltered list, so
-     * closing the second column closed the first; and every feature that asks
-     * for `state.translation` — the outline, the card studio, reading aloud,
-     * the exports, the word count in the status bar — asked the store for a
-     * translation that had been deleted and got an exception per repaint.
-     */
-    if (order.length !== open.length) {
-      state.set({ translation: order[0], parallel: order.slice(1) });
-      return;
-    }
+    const order = panesOf(state.get());
 
     const { book, chapter } = state.get();
     const loaded = await Promise.all(order.map(async (identify, index) => {

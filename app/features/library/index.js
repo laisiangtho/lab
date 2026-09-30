@@ -620,8 +620,10 @@ export default {
               : [
                 // The one press most readers want, and everything else behind
                 // the menu: a row with five buttons on it is a row nobody reads.
+                // A soft button, not a solid one: the list is a column of these,
+                // and sixty solid accent buttons outshout the names beside them.
                 ...actions.slice(0, 1).map(([label, action]) => h('button', {
-                  class: action === 'remove' ? 'btn' : 'btn primary',
+                  class: action === 'remove' ? 'btn' : 'btn soft',
                   dataset: { place: `${action}:${row.identify}` },
                   onclick: () => act(row.identify, action),
                 }, label)),
