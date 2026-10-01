@@ -1963,3 +1963,7 @@ body.drawer-dragging .sidebar{transition:none}
 /* A pane dragged over the tab band: dropped here it opens as a tab. */
 .tabbar.is-pane-drop{box-shadow:inset 0 -2px 0 var(--accent);background:var(--accent-fade)}
 .leaf-pane > .pane-view{background:transparent}
+/* A message can be read at leisure and copied: its words select like text,
+   and it stays while the pointer is on it (chrome.js, keepWhileHeld). */
+.toast > span{user-select:text;-webkit-user-select:text;cursor:text;overflow-wrap:anywhere}
+.toast.is-held{border-color:var(--accent-line)}

@@ -1858,3 +1858,4 @@ label.set-row:hover { background: var(--bg-hover); }
 .hp-topic:hover { background: var(--bg-hover); color: var(--text-normal); border-color: var(--accent-line); }
 .hp-data .gd-data { max-width: none; align-items: flex-start; margin-top: 22px; }
 @media (hover: none) { .hp-topic { min-height: 38px; } }
+.ws-gloss { font-size: var(--fs-ui-m); font-weight: 600; color: var(--text-normal); }

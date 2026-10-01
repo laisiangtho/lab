@@ -22,6 +22,7 @@
  *         "translit": "rêʼshîyth",
  *         "pronounce": "ray-sheeth'",
  *         "part": "noun feminine",
+ *         "gloss": "beginning",
  *         "define": "the first, in place, time, order or rank",
  *         "kjv": "beginning, chief(-est), first(-fruits, part, time), principal thing"
  *       }
@@ -45,7 +46,9 @@ export const TESTAMENTS = Object.freeze(['H', 'G']);
 
 /**
  * @typedef {{ lemma: string, translit: string, pronounce: string, part: string,
- *             define: string, kjv: string }} LexEntry
+ *             gloss: string, define: string, kjv: string }} LexEntry
+ * `gloss` is a word or two for an interlinear line; without one, the start
+ * of the definition stands in (`glossOf`).
  */
 
 /**
@@ -115,13 +118,14 @@ function readEntry(value) {
     translit: text('translit', 'xlit', 'transliteration'),
     pronounce: text('pronounce', 'pron', 'pronunciation'),
     part: text('part', 'pos', 'partOfSpeech', 'derivation'),
+    gloss: text('gloss', 'short'),
     define: text('define', 'definition', 'meaning', 'strongs_def', 'desc'),
     kjv: text('kjv', 'kjv_def', 'usage', 'translated'),
   };
   return entry.define || entry.kjv || entry.lemma ? entry : null;
 }
 
-const EMPTY = Object.freeze({ lemma: '', translit: '', pronounce: '', part: '', define: '', kjv: '' });
+const EMPTY = Object.freeze({ lemma: '', translit: '', pronounce: '', part: '', gloss: '', define: '', kjv: '' });
 
 /**
  * The entry for one code, given whichever lexicons are loaded.
@@ -140,7 +144,8 @@ const EMPTY = Object.freeze({ lemma: '', translit: '', pronounce: '', part: '', 
  * first rendering.
  */
 export function glossOf(entry, { max = 28 } = {}) {
-  const first = String(entry?.define ?? '').split('\n')[0].split(/[;(]/)[0].replace(/[\s,.:]+$/, '').trim();
+  const first = (String(entry?.gloss ?? '').trim()
+    || String(entry?.define ?? '').split('\n')[0].split(/[;(]/)[0]).replace(/[\s,.:]+$/, '').trim();
   if (!first) return '';
   return first.length > max ? `${first.slice(0, max - 1).trimEnd()}…` : first;
 }
@@ -208,6 +213,7 @@ export function readStepLexicon(text, { source }) {
       lemma: cells[3].trim(),
       translit: cells[4].trim(),
       part: cells[5].trim(),
+      gloss: cells[6].trim(),
       define: [cells[6].trim(), htmlText(cells[7])].filter(Boolean).join('\n'),
     };
     plain[key] = isPlain;

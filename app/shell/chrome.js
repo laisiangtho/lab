@@ -1096,7 +1096,47 @@ export function createChrome(root, ctx) {
         h('button', { class: 'toast-x', title: L('cmd.close'), 'aria-label': L('cmd.close'), onclick: () => toast.remove() }, icon('x')));
     }
     toasts.append(toast);
-    setTimeout(() => toast.remove(), action ? 30000 : kind === 'error' ? 9000 : 3500);
+    keepWhileHeld(toast, action ? 30000 : kind === 'error' ? 9000 : 3500);
+  }
+
+  /**
+   * A message goes after its time — but not while it is being read. The
+   * clock stops while the pointer is on it, while something in it has focus,
+   * and while some of its text is selected (to be copied); when all three
+   * end, it runs again from what was left, never less than a moment.
+   */
+  function keepWhileHeld(toast, ms) {
+    let left = ms;
+    let started = 0;
+    let timer = null;
+    let hovered = false;
+    const selected = () => {
+      const selection = document.getSelection();
+      return Boolean(selection && !selection.isCollapsed && toast.contains(selection.anchorNode));
+    };
+    const held = () => hovered || toast.contains(document.activeElement) || selected();
+    const stop = () => {
+      if (!timer) return;
+      clearTimeout(timer);
+      timer = null;
+      left = Math.max(0, left - (Date.now() - started));
+    };
+    const go = () => {
+      if (timer || !toast.isConnected || held()) return;
+      left = Math.max(left, 1500);
+      started = Date.now();
+      timer = setTimeout(() => { if (held()) { timer = null; return; } toast.remove(); }, left);
+    };
+    toast.addEventListener('pointerenter', () => { hovered = true; stop(); toast.classList.add('is-held'); });
+    toast.addEventListener('pointerleave', () => { hovered = false; toast.classList.remove('is-held'); go(); });
+    toast.addEventListener('focusin', stop);
+    toast.addEventListener('focusout', () => setTimeout(go, 0));
+    const onSelect = () => {
+      if (!toast.isConnected) { document.removeEventListener('selectionchange', onSelect); return; }
+      if (selected()) stop(); else go();
+    };
+    document.addEventListener('selectionchange', onSelect);
+    go();
   }
 
   /** Status bar: left is context, right is state the reader can click. */

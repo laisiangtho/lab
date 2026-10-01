@@ -154,6 +154,21 @@ newest first.
 
 ## Releases
 
+### Unreleased
+
+- Messages stay on screen while the pointer is on them, and while part of
+  their text is selected; their words select and copy like any text. Left
+  alone they go as before, resuming from the time they had left.
+- `scripts/lexicon.mjs` builds the two lexicons the app fetches
+  (`lexicon/strongs-h.json`, `lexicon/strongs-g.json` in the catalog
+  repository), from Strong's own dictionaries by default — public domain,
+  free to host — with a short gloss for each entry. The Greek entries whose
+  definition Open Scriptures' edition filed with the derivation (θεός among
+  them) are put back.
+- Lexicon entries may carry a `gloss`; the interlinear line and the word
+  study use it. A STEPBible lexicon imported by hand gives its own glosses.
+
+
 ### 26.10.01.3 — 1 October 2026
 
 - A new icon: an open book with a red ribbon, one colour, no background, so

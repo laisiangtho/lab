@@ -709,6 +709,29 @@ browserBible — is what the word study and the interlinear line read.
   cached for the last chapters shown; each word carries its gloss
   (`glossOf`: the first words of the entry). Verses match by number.
 
+## 3d-x-c-i. The hosted lexicons
+
+`config.lexiconUrl` names `lexicon/strongs-{h,g}.json` in the catalog
+repository, and `scripts/lexicon.mjs` builds them. The default source is
+Strong's own dictionaries (Hebrew 1894, Greek 1890; public domain) in Open
+Scriptures' JSON edition (CC BY-SA), and not STEPBible's TBESH/TBESG, though
+those are the better lexicons, for two reasons found in their own headers:
+STEPBible asks that its data not be redistributed but fetched from its
+repository, and TBESH's meanings are Online Bible's Abridged BDB, whose
+owner's permission STEPBible says should be sought before use in a project.
+STEPBible's files remain a reader's to import, and the script builds from them
+with `--source step` for local use.
+
+Strong's covers the plain numbers, H1–H8674 and G1–G5624 (less the 101 Greek
+numbers Strong left unused); a sense-lettered code finds its plain number.
+Each entry gets a `gloss` for the interlinear line, the definition's first
+clause without Strong's bracketed qualifiers. Open Scriptures' XML edition cut
+each Greek entry at its first semicolon into derivation and definition; in 27
+entries that put the start of the definition with the derivation (θεός read
+"figuratively, a magistrate"). The script moves such text back unless it is
+itself etymology. Every file records its source, licence and the changes made,
+as both licences ask.
+
 ## 3d-x-d. One knowledge, three views
 
 Help and the Guide answer from one knowledge (`features/guide/knowledge.js`):

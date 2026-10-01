@@ -12,3 +12,10 @@ published, not as a test would imagine them.
   H0853, H1254a/b, H7225, H9001) of STEPBible's Translators Brief lexicon of
   Extended Strongs for Hebrew, CC BY 4.0, STEPBible.org
   (https://github.com/STEPBible/STEPBible-Data).
+- `strongs-hebrew-dictionary-extract.js`, `strongs-greek-dictionary-extract.js`
+  — a few entries (H1, H430, H853, H1254, H7225, H8674; G26, G1510, G2316,
+  G3588, G5624) of Open Scriptures' JSON edition of Strong's dictionaries,
+  with its header. Strong's text: public domain; the JSON edition: CC BY-SA,
+  Open Scriptures (https://github.com/openscriptures/strongs). G2316 is in it
+  because its definition is one of those the edition files with the
+  derivation, which `scripts/lexicon.mjs` puts back.

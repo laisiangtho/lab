@@ -89,6 +89,7 @@ export function mountStudy(el, ctx) {
       entry && (entry.translit || entry.pronounce)
         ? h('div', { class: 'ws-say' }, [entry.translit, entry.pronounce].filter(Boolean).join(' · '))
         : null,
+      entry?.gloss ? h('div', { class: 'ws-gloss' }, entry.gloss) : null,
       entry?.part ? h('div', { class: 'ws-part' }, entry.part) : null);
     if (entry) {
       fill(into,
