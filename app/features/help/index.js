@@ -252,56 +252,87 @@ export default {
     // --- About --------------------------------------------------------------
 
     /**
-     * About: what this build is and what it is holding.
+     * About: what this build is, what it is holding, and whose work it
+     * carries.
      *
-     * Centred, and no wider than it needs to be. The facts are figures, so they
-     * are set as tiles with the number first and its name under it — a reader
-     * scanning for how much is stored finds the number, not the word "Storage".
+     * A column, centred: the name and version, one sentence, then two quiet
+     * lists — what is on this device, each figure on its own line with its
+     * name, and where the texts and the study tools come from, as the
+     * licences of the data ask. Storage is the one figure with a bar: it is
+     * the one that can run out. What can be done — keep the storage, check
+     * for a new version, help, the tour — sits under the figures as plain
+     * buttons; the browser's request to keep storage only while it is needed.
      */
     registry.doc({
       id: 'about',
       title: L('doc.about'),
       icon: 'info',
       mount(el) {
-        const facts = h('div', { class: 'about-facts' });
+        const device = h('dl', { class: 'about-list' });
         const actions = h('div', { class: 'about-acts' });
+        const credit = (what, from, licence, href = null) => h('div', { class: 'about-row' },
+          h('dt', {}, what),
+          h('dd', {}, href ? h('a', { href, target: '_blank', rel: 'noopener' }, from) : from,
+            licence ? h('span', { class: 'about-sub' }, licence) : null));
         const card = h('div', { class: 'about' },
-          h('div', { class: 'about-mark' }, h('img', { src: './icons/icon.svg', alt: '', width: 64, height: 64 })),
-          h('h1', {}, L('app.name')),
-          h('div', { class: 'about-ver' }, `v${VERSION} · ${L('lbl.built', { date: when.date(BUILT_AT) })}`),
-          h('p', { class: 'about-lede' }, L('doc.about.lede')),
-          facts,
-          actions,
-          h('p', { class: 'about-note' }, L('doc.about.sources')));
+          h('header', { class: 'about-head' },
+            h('img', { class: 'about-mark', src: './icons/icon.svg', alt: '', width: 52, height: 52 }),
+            h('h1', {}, L('app.name')),
+            h('p', { class: 'about-ver' }, `${VERSION} · ${L('lbl.built', { date: when.date(BUILT_AT) })}`),
+            h('p', { class: 'about-lede' }, L('doc.about.lede'))),
+          h('section', { class: 'about-sec' },
+            h('h2', {}, L('about.device')),
+            device,
+            actions),
+          h('section', { class: 'about-sec' },
+            h('h2', {}, L('about.credits')),
+            h('dl', { class: 'about-list' },
+              credit(L('about.c.texts'), 'laisiangtho/bible', L('about.c.textsLicence'), 'https://github.com/laisiangtho/bible'),
+              credit(L('about.c.lexicon'), L('about.c.lexiconFrom'), L('about.c.lexiconLicence'), 'https://github.com/openscriptures/strongs'),
+              credit(L('about.c.versification'), 'STEPBible TVTMS', 'CC BY 4.0', 'https://github.com/STEPBible/STEPBible-Data'),
+              credit(L('about.c.morphology'), 'STEPBible TEHMC, TEGMC', 'CC BY 4.0', 'https://github.com/STEPBible/STEPBible-Data'),
+              credit(L('about.c.study'), L('about.c.studyFrom'), L('about.c.studyLicence')))),
+          h('p', { class: 'about-foot' },
+            h('a', { href: 'https://github.com/laisiangtho/lab', target: '_blank', rel: 'noopener' }, L('about.source')),
+            ' · ', L('about.licence')));
         // The document body is already the scrolling area of its leaf; wrapping
         // another one inside it leaves the card measured against its own
         // content, and nothing to centre it in.
         el.classList.add('about-wrap');
         el.append(card);
 
-        const tile = (value, label, hint = '') => h('div', { class: 'about-tile', title: hint },
-          h('strong', {}, value), h('span', {}, label));
+        const row = (label, value, sub = '', extra = null) => h('div', { class: 'about-row' },
+          h('dt', {}, label),
+          h('dd', {}, value, sub ? h('span', { class: 'about-sub' }, sub) : null, extra));
 
         async function paint() {
-          const [installed, { usage, quota, persisted }, native] = await Promise.all([
+          const [installed, { usage, quota, persisted }, native, sets] = await Promise.all([
             store.list(),
             storageStatus(),
             platform.capabilities.appInfo ? platform.capabilities.appInfo() : Promise.resolve(null),
+            ctx.study ? ctx.study.list() : [],
           ]);
           const size = installed.reduce((n, t) => n + (t.bytes ?? 0), 0);
-          facts.replaceChildren(
-            tile(String(installed.length), L('lbl.translationsHeld'), installed.map((t) => t.info.name).join(', ')),
-            tile(bytes(size), L('lbl.textStored')),
-            tile(String(annotations.allNotes().length), L('pane.notes')),
-            tile(String(annotations.allMarks().length), L('pane.marks')),
-            tile(usage === null ? L('val.unknown') : bytes(usage), L('lbl.storage'),
-              quota ? L('lbl.ofQuota', { size: bytes(quota), pct: Math.max(1, Math.round(usage / quota * 100)) }) : ''),
-            tile(native ? native.runtime.split(' ')[0] : L('val.web'), L('lbl.runtime'),
-              native ? `${native.runtime} · ${native.platform}` : platform.id));
+          const share = quota && usage !== null ? Math.min(1, usage / quota) : null;
+          fill(device,
+            row(L('lbl.translationsHeld'), String(installed.length),
+              installed.map((t) => t.info.shortname || t.info.name).join(', ')),
+            row(L('lbl.textStored'), bytes(size)),
+            ctx.study ? row(L('lib.tab.study'), String(sets.length), sets.map((set) => set.name).join(', ')) : null,
+            row(L('pane.notes'), String(annotations.allNotes().length)),
+            row(L('pane.marks'), String(annotations.allMarks().length)),
+            row(L('lbl.storage'), usage === null ? L('val.unknown') : bytes(usage),
+              [quota ? L('lbl.ofQuota', { size: bytes(quota), pct: Math.max(1, Math.round(share * 100)) }) : '',
+                persisted === false ? L('lbl.notPersisted') : persisted ? L('about.kept') : ''].filter(Boolean).join(' · '),
+              share === null ? null : h('span', { class: 'about-bar', 'aria-hidden': 'true' },
+                h('span', { style: { width: `${Math.max(2, Math.round(share * 100))}%` } }))),
+            row(L('lbl.runtime'), native ? native.runtime.split(' ')[0] : L('val.web'),
+              native ? `${native.runtime} · ${native.platform}` : ''));
 
           // Storage that may be reclaimed is worth an offer, not a label: the
           // button asks the browser to keep it, and says what it answered.
           const update = registry.commands().find((c) => c.id === 'app.checkUpdate');
+          const tour = registry.commands().find((c) => c.id === 'welcome.tour');
           fill(actions,
             persisted === false
               ? h('button', {
@@ -315,12 +346,14 @@ export default {
               }, icon('db'), L('lib.keep'))
               : null,
             update ? h('button', { class: 'btn', onclick: () => update.run() }, icon('download'), update.title) : null,
-            h('button', { class: 'btn', onclick: () => shell.openDoc('help') }, icon('help'), L('doc.help')));
+            h('button', { class: 'btn', onclick: () => shell.openDoc('help') }, icon('help'), L('doc.help')),
+            tour ? h('button', { class: 'btn', onclick: () => tour.run() }, icon(tour.icon ?? 'guide'), tour.title) : null);
         }
 
         paint().catch((err) => shell.notify(err.message, 'error'));
         const off = annotations.on('change', () => paint().catch(() => {}));
-        return off;
+        const offStudy = ctx.study?.on('change', () => paint().catch(() => {}));
+        return () => { off(); offStudy?.(); };
       },
     });
   },

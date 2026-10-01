@@ -129,6 +129,42 @@ test('study data', options, async (t) => {
     assert.equal(await page.locator('.rf .rf-entry-t').innerText(), 'Prayer');
   });
 
+  await t.test('the guide answers from the study data and the translation', async () => {
+    const ask = async (question) => {
+      await page.keyboard.press('Escape');
+      await page.keyboard.press('Control+p');
+      await page.locator('.modal-input').fill(`? ${question}`);
+      await page.waitForTimeout(300);
+      await page.keyboard.press('Enter');
+      await page.waitForFunction((q) => document.querySelector('.gd-x:last-child .gd-q')?.textContent === q, question);
+      const block = page.locator('.gd-x').last();
+      await block.locator('.gd-card').first().waitFor();
+      return block;
+    };
+    const aaron = await ask('who was Aaron?');
+    const card = aaron.locator('.gd-card').first();
+    assert.equal(await card.locator('.gd-t').innerText(), 'Aaron');
+    assert.match(await card.locator('.gd-topic').innerText(), /Bible dictionary/i);
+    assert.match(await card.locator('.gd-a').innerText(), /eldest son of Amram/);
+    await card.locator('.gd-do').click();
+    await page.waitForSelector('.rf .rf-entry-t');
+    assert.equal(await page.locator('.rf .rf-entry-t').innerText(), 'Aaron', 'Read the article opens it');
+
+    const light = await ask('verses about light');
+    assert.equal(await light.locator('.gd-card .gd-t').first().innerText(), 'Light');
+    assert.match(await light.locator('.gd-card .gd-a').first().innerText(), /5 verses listed/);
+
+    const verse = await ask('gen 1:1');
+    await verse.locator('.gd-verse').first().waitFor();
+    assert.match(await verse.locator('.gd-verse').first().innerText(), /Genesis 1:1 in English/, 'the words, in the translation being read');
+    await verse.locator('.gd-link').first().waitFor();
+    assert.match(await verse.locator('.gd-links').innerText(), /Cross-references/);
+    assert.ok(await verse.locator('.gd-link').count() >= 5, 'and the imported cross-references from it');
+
+    const none = await ask('what is source mode');
+    assert.notEqual(await none.locator('.gd-card .gd-t').first().innerText(), 'source mode', 'not a subject the sets have: the guide\'s own answer');
+  });
+
   await t.test('a set removed is gone from the reading too', async () => {
     await palette('Library: Study data');
     await page.waitForSelector('.sd-group .sd-item', { timeout: 5000 }).catch(async () => {

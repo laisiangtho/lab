@@ -811,6 +811,24 @@ answer says a translation that numbers differently may differ. "What can you
 do" stays with the written topic for it. Nothing is sent anywhere: a
 question the guide cannot answer is said to be one.
 
+## 3d-x-c-vi. What a translation carries
+
+`core/content.js` counts it: books of each testament, verses, words with
+Strong's numbers, verses with cross-references, section headings, verse
+titles. The catalog may carry the counts as each entry's optional `content`
+(read and checked by `parseCatalog`; an entry without it says nothing), written
+by `scripts/catalog-content.mjs` from the translation files themselves, read
+the way the app reads them. The script lists a file the app would refuse and
+leaves its entry without figures, and moves `updated` on so the app takes the
+catalog as newer. A translation on the device is described from the counts
+taken at install. The Library names only what is there.
+
+The Guide draws on the same device: the reader's dictionaries and topical
+indexes are held in memory by term for "who was", "what is", "verses about"
+(`core/converse.js` recognises them last, and the guide answers them only
+where a set has the subject); a passage is answered with its words from the
+translation being read and the imported cross-references from it.
+
 ## 3d-x-d. One knowledge, three views
 
 Help and the Guide answer from one knowledge (`features/guide/knowledge.js`):

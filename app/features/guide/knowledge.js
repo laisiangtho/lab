@@ -20,6 +20,7 @@
 
 import { ask, createIndex, learn, readMemory } from '../../core/guide.js';
 import { intentOf, scopeOf } from '../../core/converse.js';
+import { termKey } from '../../core/studydata.js';
 import { BUILT_AT, VERSION } from '../../version.js';
 import { currentLocale, hasString, L, stringKeys, when } from '../../shell/i18n.js';
 import { GUIDE_KEY } from './index.js';
@@ -165,6 +166,13 @@ export function createKnowledge(ctx, { guideData }) {
     // Worked out before anything is looked up: "how many verses in John 3"
     // names a passage, and is a question about it, not a way to go there.
     const said = worked(question);
+    if (said?.subject) {
+      // A subject the reader's own dictionaries or indexes have: that first,
+      // and the guide's own answers under it — "what is a note" may be
+      // about the app as well as about a word.
+      const more = distinct(ask(index, question, { memory, limit: limit + 3 })).slice(0, limit - 1);
+      return { passage: null, hits: [{ entry: said, score: 10, learned: false }, ...more] };
+    }
     if (said) return { passage: null, hits: [{ entry: said, score: 10, learned: false }] };
     const passage = shell.readPassage(question);
     if (passage?.book) return { passage, hits: [] };
@@ -201,10 +209,53 @@ export function createKnowledge(ctx, { guideData }) {
     if (does.palette) {
       return { glyph: 'cmd', label: L('guide.tryIt'), run: () => shell.openPaletteWith(does.palette) };
     }
+    if (does.verb) {
+      const verb = registry.verbs().find((v) => v.word === does.verb);
+      if (!verb) return null;
+      return { glyph: verb.icon ?? 'arrow-right', label: does.label ?? verb.title, run: () => verb.run(does.arg ?? '') };
+    }
     return null;
   }
 
   // --- answers worked out ---------------------------------------------------
+
+  /**
+   * The reader's dictionaries and topical indexes by term, kept in memory so
+   * a question is answered as it is typed; read again when a set changes.
+   */
+  let subjects = new Map();
+  async function readSubjects() {
+    if (!ctx.study) return;
+    const [dictionary, topics] = await Promise.all([ctx.study.dictionary(), ctx.study.topics()]);
+    const next = new Map();
+    const add = (entry, type) => {
+      const key = termKey(entry.term);
+      if (!key) return;
+      if (!next.has(key)) next.set(key, []);
+      next.get(key).push({ entry, type });
+    };
+    for (const entry of dictionary) add(entry, 'dictionary');
+    for (const entry of topics) add(entry, 'topics');
+    subjects = next;
+  }
+  readSubjects().catch(() => {});
+  ctx.study?.on('change', () => { readSubjects().catch(() => {}); });
+
+  /** A subject in the reader's own sets: the word, then without a plural "s". */
+  function subject(text, prefer) {
+    const key = termKey(text);
+    const found = subjects.get(key) ?? subjects.get(key.replace(/(?<=\p{L}{3})s$/u, '')) ?? [];
+    if (!found.length) return null;
+    return [...found].sort((a, b) => (a.type === prefer ? -1 : 0) - (b.type === prefer ? -1 : 0))[0];
+  }
+
+  /** A dictionary article's first lines, as plain text. */
+  const opening = (body) => {
+    const paragraphs = Array.isArray(body) ? body : [String(body ?? '')];
+    const text = (Array.isArray(paragraphs[0]) ? paragraphs[0] : [paragraphs[0]])
+      .map((seg) => (typeof seg === 'string' ? seg : seg.t)).join('').replace(/\s+/g, ' ').trim();
+    return text.length > 320 ? `${text.slice(0, 300).replace(/\s+\S*$/, '')}…` : text;
+  };
 
   /** The translations on this device, kept current for answers asked synchronously. */
   let installed = [];
@@ -300,6 +351,23 @@ export function createKnowledge(ctx, { guideData }) {
       // Answered by the written topic for it, which says the same at more length.
       case 'help':
         return null;
+      case 'define':
+      case 'about': {
+        const hit = subject(found.rest, found.intent === 'about' ? 'topics' : 'dictionary');
+        if (!hit) return null;
+        const { entry, type } = hit;
+        const set = entry.set ? entry.set.split(':').slice(1).join(':') : '';
+        return {
+          ...(type === 'dictionary'
+            ? live(`study.${type}.${termKey(entry.term)}`, entry.term, opening(entry.body), { verb: 'define', arg: entry.term, label: L('cv.readArticle') })
+            : live(`study.${type}.${termKey(entry.term)}`, entry.term,
+              [entry.note, L('cv.topicVerses', { n: number(entry.refs?.length ?? 0) })].filter(Boolean).join(' '),
+              { verb: 'topic', arg: entry.term, label: L('cv.seeVerses') })),
+          topic: L(`sd.type.${type}`),
+          subject: true,
+          set,
+        };
+      }
       case 'start':
         return installed.length
           ? live('start', L('cv.start'), L('cv.startNote'), { cmd: 'welcome.tour' })

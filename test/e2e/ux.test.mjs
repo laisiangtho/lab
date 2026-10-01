@@ -164,6 +164,26 @@ test('around the reading', options, async (t) => {
     await said.locator('.toast-x').click();
   });
 
+  await t.test('the Library says what each translation carries before it is downloaded', async () => {
+    await palette('Library');
+    await page.locator('.lib-tab[data-page="more"]').click();
+    await page.waitForSelector('[data-identify="judson1835"] .lib-has');
+    const has = (id) => page.locator(`[data-identify="${id}"] .lib-has [data-has]`).evaluateAll((els) => els.map((el) => el.dataset.has));
+    assert.deepEqual(await has('judson1835'), ['bible', 'refs']);
+    assert.deepEqual(await has('ddb1931'), ['bible', 'strongs', 'refs', 'headings']);
+    assert.match(await page.locator('[data-identify="ddb1931"] [data-has="strongs"]').getAttribute('title'), /^535 words/);
+  });
+
+  await t.test('About: what is on the device, and whose work it carries', async () => {
+    await palette('About');
+    await page.waitForSelector('.about-row');
+    const text = await page.locator('.about').innerText();
+    assert.match(text, /On this device/i);
+    assert.match(text, /Offline translations\s+2/);
+    assert.match(text, /STEPBible TVTMS/);
+    assert.match(text, /Strong's dictionaries/);
+  });
+
   await t.test('nothing went wrong on the way', () => {
     assert.deepEqual(app.problems.filter((p) => !/CORS|Access-Control-Allow-Origin|net::ERR_FAILED/.test(p)), []);
   });

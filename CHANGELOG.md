@@ -215,6 +215,19 @@ newest first.
   the reading is, what it is, where to begin, the app's version, greetings,
   and "play the walkthrough again". English, Norwegian and Burmese ways of
   asking are all read. What it cannot answer it says so, with what it can.
+- The Guide answers from what is on the device: a passage asked for shows
+  its words in the translation being read and the imported cross-references
+  from it; "who was Aaron", "what is grace" open the imported dictionary's
+  article, "verses about prayer" the topical index's entry, with the Guide's
+  own answers under it.
+- The Library says what a translation carries — both testaments or one,
+  Strong's numbers, cross-references, headings — with the counts in their
+  tooltips, before it is downloaded where the catalog has the figures, and
+  for every translation on the device. `scripts/catalog-content.mjs` writes
+  the figures into the catalog's book.json (dry run by default).
+- About is a quiet column: the version, what is on the device (with a bar
+  for storage), and the sources of the texts, the lexicon, the verse map, the
+  grammar and the study data with their licences.
 
 
 ### 26.10.01.3 — 1 October 2026

@@ -101,6 +101,20 @@ const PATTERNS = Object.freeze([
     /^(?:မင်္ဂလာ|ဟယ်လို|ဟိုင်း)/,
   ]],
   ['how', [/^how are you(?: doing| today)?$/, /^hvordan (?:går det|har du det)$/, /နေကောင်းလား/]],
+  // Last: questions about a subject, for the reader's own dictionaries and
+  // topical indexes. The guide answers them only where one of those has the
+  // subject; otherwise the question goes on to the written answers ("what is
+  // source mode" is about the app).
+  ['about', [
+    /^(?:what does the bible say about|what do(?:es)? (?:the )?scriptures? say about|(?:bible )?verses (?:about|on|for)|scriptures? (?:about|on)|find verses about) (.+)$/,
+    /^(?:hva sier bibelen om|vers om|bibelvers om) (.+)$/,
+    /^(.+?)\s*(?:အကြောင်း\s*(?:ကျမ်းချက်|အခန်းငယ်)|ဆိုင်ရာ\s*ကျမ်းချက်)/,
+  ]],
+  ['define', [
+    /^(?:what|who) (?:is|was|were|are) (?:a |an |the )?(.+)$/, /^(?:tell me about|define|meaning of|what does (.+) mean)\s*(.*)$/,
+    /^(?:hva (?:er|var)|hvem (?:er|var)|hva betyr) (?:en |et )?(.+)$/,
+    /^(.+?)\s*(?:ဆိုတာ|ဟူသည်)\s*(?:ဘာ|ဘယ်သူ)/,
+  ]],
 ]);
 
 export const INTENTS = Object.freeze(PATTERNS.map(([intent]) => intent));
@@ -116,7 +130,7 @@ export function intentOf(question) {
   for (const [intent, patterns] of PATTERNS) {
     for (const pattern of patterns) {
       const found = pattern.exec(text);
-      if (found) return { intent, rest: (found[1] ?? '').trim().replace(/^(?:the|book of)\s+/, '') };
+      if (found) return { intent, rest: (found.slice(1).find(Boolean) ?? '').trim().replace(/^(?:the|book of)\s+/, '') };
     }
   }
   return null;

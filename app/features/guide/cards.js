@@ -10,6 +10,7 @@ import { icon } from '../../shell/icons.js';
 import { keyLabel } from '../../shell/keys.js';
 import { currentLocale, L } from '../../shell/i18n.js';
 import { passageName } from './knowledge.js';
+import { refText } from '../../core/studydata.js';
 
 /**
  * @param {ReturnType<import('./knowledge.js').createKnowledge>} knowledge
@@ -51,17 +52,64 @@ export function answerCard(knowledge, question, { entry, learned = false }) {
     acts);
 }
 
-/** A question that named a passage is answered with the passage. */
-export function passageCard(shell, passage) {
+/**
+ * A question that named a passage is answered with the passage: its words in
+ * the translation being read, the imported cross-references from it where
+ * there are any, and the way there. The words arrive a moment after the card.
+ */
+export function passageCard(ctx, passage) {
+  const { shell } = ctx;
   const name = passageName(shell, passage);
-  return h('article', { class: 'gd-card' },
+  const words = h('div', { class: 'gd-verses' });
+  const links = h('div', { class: 'gd-links' });
+  const card = h('article', { class: 'gd-card gd-passage' },
     h('h3', { class: 'gd-t' }, name),
+    words,
+    links,
     h('div', { class: 'gd-acts' }, h('button', {
       type: 'button', class: 'btn soft gd-do',
       onclick: () => (passage.verse
         ? shell.openVerse(passage.book, passage.chapter, passage.verse)
         : shell.openChapter(passage.book, passage.chapter)),
     }, icon('book-open'), L('guide.goTo', { where: name }))));
+  fillPassage(ctx, passage, words, links).catch(() => {});
+  return card;
+}
+
+/** Verses shown at most; a longer passage, or a chapter, is a press away. */
+const VERSES_SHOWN = 4;
+
+async function fillPassage(ctx, passage, words, links) {
+  const { shell, state } = ctx;
+  const identify = state.get().translation;
+  const verses = identify ? await ctx.store.getChapter(identify, passage.book, passage.chapter) : null;
+  if (verses) {
+    const first = passage.verse ?? 1;
+    const last = passage.verse ? (passage.to ?? passage.verse) : Number.POSITIVE_INFINITY;
+    const keys = Object.keys(verses).map(Number).filter((n) => n >= first && n <= last).sort((a, b) => a - b);
+    const shown = keys.slice(0, VERSES_SHOWN);
+    const dir = shell.textDirection?.(identify) ?? 'auto';
+    words.replaceChildren(
+      ...shown.map((n) => h('p', { class: 'gd-verse', dir },
+        h('sup', { class: 'gd-vn' }, shell.workspace.number(n)), ' ', String(verses[n]?.text ?? ''))),
+      keys.length > shown.length ? h('p', { class: 'gd-more-v' }, L('guide.moreVerses', { n: keys.length - shown.length })) : null,
+      shown.length ? h('p', { class: 'gd-src' }, shell.workspace.primaryName()) : null);
+  }
+  // Where the reader has imported cross-references, those from this verse.
+  if (!passage.verse || !ctx.study) return;
+  const found = (await ctx.study.crossrefs(passage.book, passage.chapter))[passage.verse] ?? [];
+  if (!found.length) return;
+  links.replaceChildren(
+    h('span', { class: 'gd-links-l' }, L('sd.type.crossrefs')),
+    ...found.slice(0, 6).map(({ ref }) => {
+      const [b, c, v, c2, v2] = ref;
+      const label = refText(ref, shell.workspace.bookName(b), shell.workspace.number);
+      return h('button', {
+        type: 'button', class: 'gd-link',
+        onclick: () => (v ? shell.openVerse(b, c, v) : shell.openChapter(b, c)),
+        title: c2 !== c || v2 !== v ? label : null,
+      }, label);
+    }));
 }
 
 /**
@@ -97,7 +145,7 @@ export function answerBlock(ctx, knowledge, question, { chosen = null, help = tr
     ? { passage: null, hits: [{ entry: knowledge.entry(chosen), score: 1, learned: false }].filter((hit) => hit.entry) }
     : knowledge.answer(question);
   if (found.passage) {
-    block.append(passageCard(ctx.shell, found.passage));
+    block.append(passageCard(ctx, found.passage));
     return block;
   }
   if (!found.hits.length) {

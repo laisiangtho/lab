@@ -17,6 +17,9 @@ import { createServer } from 'node:http';
 import { createReadStream, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseCategory } from '../../app/core/category.js';
+import { contentOf } from '../../app/core/content.js';
+import { parseTranslation } from '../../app/core/translation.js';
 
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const DIST = join(ROOT, 'dist', 'web');
@@ -199,6 +202,7 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
     }),
   };
 
+  const canon = parseCategory(category);
   const catalog = {
     name: 'test catalog',
     updated: '2026-09-01',
@@ -211,6 +215,8 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
       language: { text: t.info.language.text, textdirection: 'ltr', name: t.info.language.iso['639-1'] || t.info.language.iso['639-3'] },
       version: String(t.version),
       publisher: t.info.publisher,
+      // What it carries, counted the way scripts/catalog-content.mjs counts it.
+      content: contentOf(parseTranslation(t, { identify: t.identify, category: canon }), canon),
     })),
   };
 

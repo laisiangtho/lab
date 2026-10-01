@@ -6,6 +6,7 @@
 import { describe, FORMATS, sniff, slug } from '../../core/formats/index.js';
 import { isBrowserBible } from '../../core/formats/browserbible.js';
 import { isStepLexicon } from '../../core/lexicon.js';
+import { contentOfStats, featuresOf } from '../../core/content.js';
 import { sniffStudy } from '../../core/studydata.js';
 import { classify, otherEdition, readMetadata } from '../../core/formats/pack.js';
 import { aboutText, lossOf, optionsFor, WRITERS } from '../../core/formats/write.js';
@@ -18,7 +19,7 @@ import { fill, formatBytes, h, keepPlace } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { strongsLine } from '../../shell/trinfo.js';
 import { openMenu } from '../../shell/menu.js';
-import { L, when } from '../../shell/i18n.js';
+import { currentLocale, L, when } from '../../shell/i18n.js';
 import { requestPersistence, storageStatus } from '../../services/store.js';
 
 /** Where Get more can take a translation from, in the order they are offered. */
@@ -949,6 +950,7 @@ export default {
             h('div', { class: 'library-meta' },
               h('strong', {}, row.entry ? `${row.entry.shortname} · ${row.entry.name}` : ownTitle(row)),
               h('span', { class: 'muted' }, [info.language?.text, row.held ? held(row.held) : null].filter(Boolean).join(' · ')),
+              hasLine(row.held?.stats ? contentOfStats(row.held.stats, row.entry?.content) : row.entry?.content),
               row.state === 'local' ? h('span', { class: 'badge' }, L('lib.yours')) : null,
               origin && row.held?.source !== 'native' ? h('span', { class: 'badge badge-src' }, origin) : null,
               row.state === 'unlisted' ? h('span', { class: 'badge' }, L('lib.unlisted')) : null,
@@ -969,6 +971,22 @@ export default {
                   onclick: (e) => rowMenu(e.currentTarget, row),
                 }, icon('more')),
               ]));
+        }
+
+        /**
+         * What a translation carries, as a row of quiet labels — both
+         * testaments, Strong's numbers, cross-references, headings — each
+         * with its count in its tooltip. Only what is there is named; a
+         * translation the catalog has no figures for shows none.
+         */
+        function hasLine(content) {
+          const found = featuresOf(content);
+          if (!found.length) return null;
+          const n = (value) => new Intl.NumberFormat(currentLocale()).format(value);
+          return h('span', { class: 'lib-has', 'aria-label': L('lib.has.label') },
+            found.map(({ id, n: count }) => h('span', {
+              class: `lib-has-i is-${id}`, dataset: { has: id }, title: L(`lib.has.${id}Hint`, { n: n(count) }),
+            }, L(`lib.has.${id}`))));
         }
 
         /** A translation's short name, as a small square: the eye finds a row by it. */
@@ -1200,6 +1218,7 @@ export default {
             h('div', { class: 'library-meta' },
               h('strong', {}, `${e.shortname} · ${e.name}`),
               h('span', { class: 'muted' }, [e.year, e.publisher].filter(Boolean).join(' · ')),
+              hasLine(e.content),
               here && row.state !== 'update' ? h('span', { class: 'badge badge-ok' }, icon('check'), L('lib.onDevice')) : null,
               row.state === 'update' ? h('span', { class: 'badge badge-hint' }, `v${row.installedVersion} → v${e.version}`) : null,
               !here && suggested(row) ? h('span', { class: 'badge badge-hint' }, L('lib.suggested')) : null),

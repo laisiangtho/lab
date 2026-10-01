@@ -646,29 +646,31 @@ body :is([lang="my"], [lang^="my-"], [lang="mya"]):not(.chapter, .chapter *, .pd
    and there is nothing to read down the left edge. */
 /* The scroller is a flex child of the leaf; it has to claim the height before
    it can centre anything in it. */
-.about-wrap { display: grid; place-items: center; align-content: center; padding: 32px 16px; }
-.about { width: min(520px, 100%); text-align: center; }
-.about-mark { width: 76px; height: 76px; margin: 0 auto 16px; display: grid; place-items: center; }
-.about-mark img { width: 64px; height: 64px; }
-.about h1 { font-size: 1.6rem; font-weight: 650; margin: 0; letter-spacing: -.01em; }
-.about-ver { margin-top: 4px; color: var(--text-faint); font-size: var(--fs-ui-s); font-variant-numeric: tabular-nums; }
-.about-lede { margin: 14px 0 22px; color: var(--text-muted); font-size: var(--fs-ui-l); line-height: 1.6; }
-.about-facts {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
-}
-.about-tile {
-  padding: 12px 8px; border-radius: var(--radius-l);
-  background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--border);
-  display: flex; flex-direction: column; gap: 3px; min-width: 0;
-}
-.about-tile strong {
-  font-size: var(--fs-ui-l); font-weight: 650; color: var(--text-normal);
-  font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.about-tile span { font-size: 11px; color: var(--text-faint); }
-.about-acts { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
-.about-note { margin-top: 20px; color: var(--text-faint); font-size: var(--fs-ui-s); line-height: 1.6; }
-@media (max-width: 560px) { .about-facts { grid-template-columns: repeat(2, 1fr); } }
+.about-wrap { display: grid; justify-items: center; padding: 48px 16px 40px; }
+.about { width: min(480px, 100%); display: flex; flex-direction: column; gap: 28px; }
+.about-head { text-align: center; }
+.about-mark { display: block; width: 52px; height: 52px; margin: 0 auto 14px; }
+.about h1 { margin: 0; font-size: 1.5rem; font-weight: 650; letter-spacing: -.01em; }
+.about-ver { margin: 4px 0 0; color: var(--text-faint); font-size: var(--fs-ui-s); font-variant-numeric: tabular-nums; }
+.about-lede { margin: 12px auto 0; max-width: 34ch; color: var(--text-muted); font-size: var(--fs-ui-l); line-height: 1.55; }
+.about-sec { display: flex; flex-direction: column; gap: 10px; }
+.about-sec h2 { margin: 0 0 2px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+/* A list, not tiles: the name on the left, the figure on the right, a
+   hairline between — the shape of a receipt, read down. */
+.about-list { margin: 0; border-top: 1px solid var(--border); }
+.about-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 4px 16px; padding: 9px 2px; border-bottom: 1px solid var(--border); }
+.about-row dt { color: var(--text-muted); font-size: var(--fs-ui-m); }
+.about-row dd { margin: 0; text-align: end; color: var(--text-normal); font-size: var(--fs-ui-m); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.about-row dd a { color: var(--accent-2); text-decoration: none; }
+.about-row dd a:hover { text-decoration: underline; }
+.about-sub { display: block; margin-top: 2px; color: var(--text-faint); font-size: var(--fs-ui-s); line-height: 1.45; }
+.about-bar { display: block; height: 3px; margin: 6px 0 0 auto; width: 100%; max-width: 180px; border-radius: 2px; background: var(--bg-hover); overflow: hidden; }
+.about-bar > span { display: block; height: 100%; background: var(--accent-line); border-radius: 2px; }
+.about-acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.about-acts .btn svg { width: 14px; height: 14px; }
+.about-foot { margin: 0; text-align: center; color: var(--text-faint); font-size: var(--fs-ui-s); }
+.about-foot a { color: var(--text-muted); }
+@media (max-width: 420px) { .about-row { grid-template-columns: 1fr; } .about-row dd { text-align: start; } .about-bar { margin-inline-start: 0; } }
 
 /* ---- settings rows -------------------------------------------------------*/
 /* One setting a line: what it is on the left, the control on the right. */
@@ -1933,3 +1935,23 @@ label.set-row:hover { background: var(--bg-hover); }
 .tour-acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
 .tour-acts .btn svg { width: 14px; height: 14px; }
 @media (prefers-reduced-motion: reduce) { .tour-ring, .tour-card { transition: none; } }
+
+/* What a translation carries: quiet labels under its name, the study
+   features in the accent so a study Bible stands out from a plain one. */
+.lib-has { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.lib-has-i {
+  padding: 1px 7px; border-radius: 99px; font-size: 11px; line-height: 1.6;
+  color: var(--text-muted); background: var(--bg-hover); cursor: default;
+}
+.lib-has-i.is-strongs, .lib-has-i.is-refs { color: var(--accent-2); background: var(--accent-fade); }
+
+/* The Guide answering with a passage: its words, in the reading face. */
+.gd-verses { display: flex; flex-direction: column; gap: 4px; }
+.gd-verse { margin: 0; font-family: var(--font-text); font-size: 15px; line-height: 1.6; color: var(--text-normal); overflow-wrap: anywhere; user-select: text; }
+.gd-vn { color: var(--accent-2); font-family: var(--font-ui); font-size: .7em; }
+.gd-more-v, .gd-src { margin: 0; font-size: var(--fs-ui-s); color: var(--text-faint); }
+.gd-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.gd-links:empty { display: none; }
+.gd-links-l { font-size: 11px; color: var(--text-faint); margin-inline-end: 2px; }
+.gd-link { padding: 1px 8px; border-radius: 99px; border: 1px solid var(--border); color: var(--accent-2); font-size: 12px; background: var(--bg-primary); }
+.gd-link:hover { border-color: var(--accent-line); }

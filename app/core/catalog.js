@@ -7,6 +7,7 @@
  * Only `book[]` is app content; `updated` and `version` drive change detection.
  */
 
+import { readContent } from './content.js';
 import {
   expectArray, expectObject, expectString, fail, isPlainObject, normalizeVersion, optionalString,
 } from './errors.js';
@@ -25,6 +26,7 @@ const DIRECTIONS = new Set(['ltr', 'rtl']);
  * @property {string} description
  * @property {string} publisher
  * @property {string} copyright
+ * @property {object|null} content  what it carries (core/content.js), when the catalog says
  */
 
 /**
@@ -82,6 +84,7 @@ export function parseCatalog(raw, { source, requireRemoteShape = false }) {
       description: optionalString(e.description, source, `${p}.description`) ?? '',
       publisher: optionalString(e.publisher, source, `${p}.publisher`) ?? '',
       copyright: optionalString(e.copyright, source, `${p}.copyright`) ?? '',
+      content: readContent(e.content, source, `${p}.content`),
     });
   });
 

@@ -24,7 +24,7 @@ test('the questions worked out rather than looked up', () => {
 });
 
 test('a request is not small talk', () => {
-  for (const question of ['help me make a note', 'how do I bookmark a verse', 'what is grace', 'search for love', 'why is it dark']) {
+  for (const question of ['help me make a note', 'how do I bookmark a verse', 'search for love', 'why is it dark']) {
     assert.equal(intentOf(question), null, question);
   }
 });
@@ -43,4 +43,16 @@ test('what a count is of', () => {
   assert.deepEqual(scopeOf(intentOf('how many books in the old testament').rest, read), { scope: 'testament', testament: 1 });
   assert.deepEqual(scopeOf(intentOf('how many chapters').rest, read), { scope: 'bible' });
   assert.deepEqual(scopeOf('narnia', read), { scope: 'unknown', text: 'narnia' });
+});
+
+test('a subject, for the reader\'s own dictionaries and topical indexes', () => {
+  assert.deepEqual(intentOf('What is grace?'), { intent: 'define', rest: 'grace' });
+  assert.deepEqual(intentOf('who was Aaron'), { intent: 'define', rest: 'aaron' });
+  assert.deepEqual(intentOf('tell me about Moses'), { intent: 'define', rest: 'moses' });
+  assert.deepEqual(intentOf('what does redemption mean?'), { intent: 'define', rest: 'redemption' });
+  assert.deepEqual(intentOf('hva er nåde'), { intent: 'define', rest: 'nåde' });
+  assert.deepEqual(intentOf('what does the Bible say about prayer?'), { intent: 'about', rest: 'prayer' });
+  assert.deepEqual(intentOf('verses about light'), { intent: 'about', rest: 'light' });
+  assert.equal(intentOf('what is the time')?.intent, 'time', 'the clock first');
+  assert.equal(intentOf('who are you')?.intent, 'who');
 });
