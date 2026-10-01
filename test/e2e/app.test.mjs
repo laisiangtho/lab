@@ -425,7 +425,7 @@ test('the app in a browser', options, async (t) => {
     await page.setViewportSize({ width: 720, height: 900 });
     await page.waitForTimeout(500);
     assert.ok(await page.locator('.mobile-bar').isVisible(), 'the navigation pill');
-    assert.ok(await page.locator('#barApp').isVisible(), 'the app pill');
+    assert.equal(await page.locator('.app-pill, .rib-app, .sb-app').count(), 0, 'no app mark in the chrome');
     // The strip fits what it can and hides the rest behind its own button,
     // which is how the other tabs are reached in a window this narrow.
     const shown = await page.locator('.tabstrip .tab:visible').count();

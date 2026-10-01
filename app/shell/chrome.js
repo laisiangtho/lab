@@ -83,11 +83,6 @@ export function createChrome(root, ctx) {
     right: barButton('panel-r', 'side.right'),
   };
 
-  // Shown only in the narrow layout, where the ribbon is not: the app's mark,
-  // and the way back to the command palette.
-  const barApp = h('button', { class: 'app-pill', id: 'barApp', 'data-l': 'cmd.palette', onclick: () => run('shell.palette') },
-    h('span', { class: 'app-mark' }, h('img', { src: './icons/icon.svg', alt: '', width: 18, height: 18 })),
-    h('span', {}, L('app.name')));
 
   const scrim = h('div', { class: 'scrim-mobile', onclick: () => closeDrawers() });
   // Escape closes a drawer too — the way out for a keyboard, and for the back
@@ -104,25 +99,25 @@ export function createChrome(root, ctx) {
     closeDrawers();
   });
   const mobileBar = h('nav', { class: 'mobile-bar', role: 'toolbar' },
-    mobileButton('library', 'side.left', () => toggleSide('left')),
+    mobileButton('library', 'side.left', (e) => toggleSide('left', e.currentTarget)),
     mobileButton('chev', 'cmd.prev', () => run('passage.prev-chapter'), 'flip'),
     mobileButton('chev', 'cmd.next', () => run('passage.next-chapter')),
-    mobileButton('inspector', 'side.right', () => toggleSide('right')),
+    mobileButton('inspector', 'side.right', (e) => toggleSide('right', e.currentTarget)),
     mobileButton('more', 'cmd.palette', () => run('shell.palette')));
 
   const app = h('div', { id: 'app' },
     h('div', { class: 'body-row' },
       h('nav', { class: 'ribbon' },
-        h('div', { class: 'rib-head band-drag' },
-          h('button', { class: 'rib-app', 'data-l': 'app.name', onclick: () => run('shell.palette') },
-            h('span', { class: 'app-mark' }, h('img', { src: './icons/icon.svg', alt: '', width: 20, height: 20 })))),
+        // Empty on purpose: the corner the window is dragged by, and where
+        // macOS draws its window buttons. The app's name is the window's and
+        // the browser tab's; a mark here only repeated the palette button.
+        h('div', { class: 'rib-head band-drag' }),
         ribRail,
         ribFoot),
       sides.left.element,
       h('main', { class: 'workspace' },
         h('div', { class: 'tabbar band-drag' },
           h('div', { class: 'nav-group' }, navPrev, navNext),
-          barApp,
           tabStrip,
           barActions,
           h('span', { class: 'bar-sep' }),
@@ -141,7 +136,7 @@ export function createChrome(root, ctx) {
   navPrev.addEventListener('click', () => run('passage.prev-chapter'));
   navNext.addEventListener('click', () => run('passage.next-chapter'));
   for (const side of ['left', 'right']) {
-    toggles[side].addEventListener('click', () => toggleSide(side));
+    toggles[side].addEventListener('click', (e) => toggleSide(side, e.currentTarget));
   }
 
   function run(id) {
@@ -169,19 +164,45 @@ export function createChrome(root, ctx) {
     let rows = [];
     const views = new Map(); // pane id → { pane, element }
 
+    /**
+     * A pane's view, not yet mounted. No title row: the pane's own tab already
+     * names it, and repeating the name inside the pane costs a line of every
+     * column. The name is on the tab as its accessible name, and on the view
+     * itself for anything that reads the document rather than looks at it.
+     */
+    function makeEntry(pane) {
+      const view = h('section', {
+        class: 'pane-view', 'data-view': pane.id,
+        role: 'tabpanel', 'aria-label': pane.title,
+      }, h('div', { class: 'pane-body scroll' }));
+      return { pane, element: view, off: null };
+    }
+
     function build(list) {
       for (const pane of list) {
-        // No title row: the pane's own tab already names it, and repeating the
-        // name inside the pane costs a line of every column. The name is on the
-        // tab as its accessible name, and on the view itself for anything that
-        // reads the document rather than looks at it.
-        const view = h('section', {
-          class: 'pane-view', 'data-view': pane.id,
-          role: 'tabpanel', 'aria-label': pane.title,
-        }, h('div', { class: 'pane-body scroll' }));
-        holder.append(view);
-        views.set(pane.id, { pane, element: view, off: null });
+        const entry = makeEntry(pane);
+        holder.append(entry.element);
+        views.set(pane.id, entry);
       }
+    }
+
+    /** Take a pane's id out of the rows, tidying rows left empty. */
+    function unplace(id) {
+      for (const row of rows) row.views = row.views.filter((view) => view !== id);
+      for (let i = rows.length - 1; i >= 0; i -= 1) {
+        if (!rows[i].views.length) rows.splice(i, 1);
+        else if (!rows[i].views.includes(rows[i].active)) rows[i].active = rows[i].views[0];
+      }
+    }
+
+    /** Put a pane's id in the first row, where its registration's order says. */
+    function place(id) {
+      if (!rows.length) rows.push({ views: [], active: null, size: 1 });
+      const row = rows[0];
+      const rank = (other) => registry.panes().findIndex((p) => p.id === other);
+      const at = row.views.findIndex((other) => rank(other) > rank(id));
+      row.views.splice(at === -1 ? row.views.length : at, 0, id);
+      row.active = id;
     }
 
     /**
@@ -331,6 +352,16 @@ export function createChrome(root, ctx) {
 
     function wireTab(tab, index, id) {
       tab.addEventListener('click', () => select(id));
+      // What can be done with the pane itself, not with what is in it: show
+      // it in the workspace, or switch it off.
+      tab.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const name = views.get(id)?.pane.title ?? id;
+        openMenu(tab, [
+          paneTabs && { id: 'tab', icon: 'files', title: L('cmd.openAsTab'), run: () => paneTabs.open(id) },
+          { id: 'hide', icon: 'x', title: L('cmd.paneHide', { name }), run: () => { setPaneShown(id, false); notify(L('msg.paneHidden', { name })); } },
+        ].filter(Boolean));
+      });
       dragPaneTab(tab, { side, group: index, view: id });
     }
 
@@ -376,11 +407,7 @@ export function createChrome(root, ctx) {
       drop(id) {
         const entry = views.get(id);
         if (!entry) return false;
-        for (const row of rows) row.views = row.views.filter((view) => view !== id);
-        for (let i = rows.length - 1; i >= 0; i -= 1) {
-          if (!rows[i].views.length) rows.splice(i, 1);
-          else if (!rows[i].views.includes(rows[i].active)) rows[i].active = rows[i].views[0];
-        }
+        unplace(id);
         dispose(entry);
         entry.element.remove();
         views.delete(id);
@@ -397,12 +424,32 @@ export function createChrome(root, ctx) {
         if (views.has(pane.id)) return;
         build([pane]);
         mountOne(views.get(pane.id));
-        if (!rows.length) rows.push({ views: [], active: null, size: 1 });
-        const row = rows[0];
-        const rank = (id) => registry.panes().findIndex((p) => p.id === id);
-        const at = row.views.findIndex((id) => rank(id) > rank(pane.id));
-        row.views.splice(at === -1 ? row.views.length : at, 0, pane.id);
-        row.active = pane.id;
+        place(pane.id);
+      },
+      /**
+       * Lift a pane out whole — mounted, listening, with whatever it is
+       * showing — to be shown somewhere else (a workspace tab). Unlike `drop`
+       * nothing is disposed: the search keeps its results.
+       */
+      lift(id) {
+        const entry = views.get(id);
+        if (!entry) return null;
+        unplace(id);
+        views.delete(id);
+        return entry;
+      },
+      /** A pane that is in no sidebar, built and mounted, to be shown elsewhere. */
+      make(pane) {
+        const entry = makeEntry(pane);
+        mountOne(entry);
+        return entry;
+      },
+      /** Take back a lifted pane, mounted as it is, at its registered place. */
+      put(entry) {
+        if (views.has(entry.pane.id)) return;
+        views.set(entry.pane.id, entry);
+        holder.append(entry.element);
+        place(entry.pane.id);
       },
       get empty() { return views.size === 0; },
       ids: () => rows.flatMap((r) => r.views),
@@ -473,9 +520,73 @@ export function createChrome(root, ctx) {
     ctx.state.set(next);
   }
 
-  /** Which side a pane is on, or null when it is switched off. */
+  /** Which side a pane is on, or null when it is switched off or in a tab. */
   function sideOf(id) {
     return ['left', 'right'].find((side) => sides[side].has(id)) ?? null;
+  }
+
+  // --- panes shown as workspace tabs ----------------------------------------
+  //
+  // A pane can be lifted out of its sidebar into a tab of the workspace — on a
+  // phone a drawer is the wrong shape for a search or a word study — and it is
+  // the same pane, moved: one mounting, so whatever it shows comes with it,
+  // and closing the tab puts it back in its sidebar. The workspace owns the
+  // tab (`pane:<id>`); the chrome owns the pane. While no tab shows it the
+  // view waits, still mounted, in `parking`.
+
+  /** Panes in tabs: id → their mounted entry. */
+  const tabbed = new Map();
+  const parking = h('div', { class: 'pane-parking', hidden: true });
+  /** Set by the workspace: how to open, close and ask about a pane's tab. */
+  let paneTabs = null;
+
+  function liftPane(id) {
+    if (tabbed.has(id)) return tabbed.get(id);
+    const pane = registry.panes().find((p) => p.id === id);
+    if (!pane) throw new Error(`chrome: no pane "${id}" is registered`);
+    const at = sideOf(id);
+    const entry = at ? sides[at].lift(id) : sides[pane.side].make(pane);
+    tabbed.set(id, entry);
+    parking.append(entry.element);
+    if (at) {
+      sides[at].render();
+      sides[at].persist();
+      applyChrome(ctx.state.get());
+    }
+    return entry;
+  }
+
+  /** Show a lifted pane in a tab's body; the disposer parks it again. */
+  function hostPane(id, body) {
+    const entry = liftPane(id);
+    entry.element.classList.add('is-active');
+    body.append(entry.element);
+    return () => { if (tabbed.get(id) === entry) parking.append(entry.element); };
+  }
+
+  /** A pane's tab was closed: the pane goes back to its sidebar. */
+  function returnPane(id) {
+    const entry = tabbed.get(id);
+    if (!entry) return;
+    tabbed.delete(id);
+    const side = entry.pane.side;
+    sides[side].put(entry);
+    sides[side].render();
+    sides[side].persist();
+    applyChrome(ctx.state.get());
+  }
+
+  /** Whether panes open as tabs now: asked for, and the sidebars are drawers. */
+  const panesAsTabs = () => Boolean(ctx.state.get().paneTabs) && isDrawerLayout() && Boolean(paneTabs);
+
+  /** A sidebar's panes, as a menu that opens each in a tab. */
+  function openSideAsTabs(side, anchor) {
+    const items = [...sides[side].ids(), ...[...tabbed.keys()].filter((id) => tabbed.get(id).pane.side === side)]
+      .map((id) => registry.panes().find((p) => p.id === id))
+      .filter(Boolean)
+      .map((pane) => ({ id: pane.id, title: pane.title, icon: pane.icon, active: paneTabs.isOpen(pane.id), run: () => paneTabs.open(pane.id) }));
+    if (!items.length) { notify(L('msg.sideEmpty'), 'info'); return; }
+    openMenu(anchor ?? mobileBar, items);
   }
 
   /**
@@ -489,6 +600,12 @@ export function createChrome(root, ctx) {
   function setPaneShown(id, shown) {
     const pane = registry.panes().find((p) => p.id === id);
     if (!pane) return false;
+    // A pane in a tab is shown; switching it off closes its tab first, which
+    // puts it back in its sidebar to be taken out of.
+    if (tabbed.has(id)) {
+      if (shown) return false;
+      paneTabs?.close(id);
+    }
     const at = sideOf(id);
     if (shown === Boolean(at)) return false;
     if (at) {
@@ -511,6 +628,10 @@ export function createChrome(root, ctx) {
   /** Where a dragged pane tab would land, and what happens when it is dropped. */
   const dragPaneTab = createPaneDrag({
     host: (side) => sides[side].element,
+    // The workspace's tab band takes a pane too: dropped there, it opens in a
+    // tab of its own.
+    workspace: () => (paneTabs ? tabStrip.closest('.tabbar') : null),
+    toTab: (view) => paneTabs?.open(view),
     title: (id) => registry.panes().find((p) => p.id === id)?.title ?? id,
     iconOf: (id) => registry.panes().find((p) => p.id === id)?.icon ?? 'info',
     rows: (side) => sides[side].rows,
@@ -658,7 +779,8 @@ export function createChrome(root, ctx) {
     paintMobileBar();
   }
 
-  function toggleSide(side) {
+  function toggleSide(side, anchor = null) {
+    if (panesAsTabs()) { openSideAsTabs(side, anchor); return; }
     if (isDrawerLayout()) {
       const cls = side === 'left' ? 'drawer-l' : 'drawer-r';
       const open = document.body.classList.contains(cls);
@@ -1004,6 +1126,7 @@ export function createChrome(root, ctx) {
       remove: (id) => removeFromRibbon(id),
       run: (id) => run(id),
     });
+    app.append(parking);
     arrange();
     for (const side of ['left', 'right']) {
       sides[side].render();
@@ -1036,6 +1159,9 @@ export function createChrome(root, ctx) {
       isCustom: () => settings.get().ribbonItems !== null,
     },
     selectPane: (side, id) => {
+      // A pane in a tab is shown in its tab; on a phone that asked for panes
+      // as tabs, every pane is.
+      if (tabbed.has(id) || panesAsTabs()) { paneTabs.open(id); return; }
       // A pane that is switched off is switched on again: a feature asking for
       // its own pane by name is a reader asking for it, and answering with
       // silence is the one thing this must not do. It comes back now, not on
@@ -1047,7 +1173,14 @@ export function createChrome(root, ctx) {
       sides[where].select(id);
       revealSide(where);
     },
-    panesShown: () => registry.panes().map((p) => ({ ...p, shown: Boolean(sideOf(p.id)) })),
+    panesShown: () => registry.panes().map((p) => ({ ...p, shown: Boolean(sideOf(p.id)) || tabbed.has(p.id) })),
     setPaneShown,
+    /** What the workspace needs to show panes in tabs, and to be told of them. */
+    paneTabs: {
+      connect(api) { paneTabs = api; },
+      host: hostPane,
+      release: returnPane,
+      has: (id) => tabbed.has(id),
+    },
   };
 }

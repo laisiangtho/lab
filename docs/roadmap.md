@@ -5,7 +5,7 @@ and what "done" means, so it can be picked up cold. Items marked **decide**
 need an architecture discussion before any code: they change what the app
 stores, fetches or promises.
 
-Last reviewed at 26.10.01.1.
+Last reviewed at 26.10.01.3.
 
 ---
 

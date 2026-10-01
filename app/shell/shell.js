@@ -69,6 +69,8 @@ export function createShell(root, ctx) {
       else console.error(`[${kind}] ${message}`);
     },
     openDoc: (id) => workspace.openDoc(id),
+    /** A sidebar pane, shown in a workspace tab of its own. */
+    openPaneTab: (id) => workspace.openPaneTab(id),
     /** @returns {boolean} true for the one feature that greets a new reader. */
     claimFirstRun() {
       if (firstRunClaimed) return false;
@@ -308,6 +310,18 @@ export function createShell(root, ctx) {
    */
   function registerPaneCommands() {
     const shown = (id) => chrome.panesShown().find((p) => p.id === id)?.shown ?? false;
+    // One command for every pane rather than one each: the palette already
+    // has a row per pane, and a second row per pane would double them.
+    ctx.registry.command({
+      id: 'pane.tab',
+      title: L('cmd.paneToTab'),
+      icon: 'files',
+      run: () => modal.open({
+        placeholder: L('ph.paneToTab'),
+        items: ctx.registry.panes().map((pane) => ({ id: pane.id, title: pane.title, icon: pane.icon })),
+        onPick: (item) => workspace.openPaneTab(item.id),
+      }),
+    });
     for (const pane of ctx.registry.panes()) {
       ctx.registry.command({
         id: `pane.${pane.id}`,
@@ -827,9 +841,6 @@ export function createShell(root, ctx) {
     };
 
     const left = [
-      h('span', { class: 'sb sb-app hide-sm' },
-        h('img', { class: 'sb-mark', src: './icons/icon.svg', alt: '', width: 14, height: 14 }),
-        h('span', {}, L('app.name'))),
       h('button', { class: 'sb', title: L('cmd.translation'), onclick: () => openTranslationPicker(0) },
         icon('book'), h('span', {}, workspace.primaryName())),
       chapterOnly(h('button', {

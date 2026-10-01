@@ -1164,4 +1164,11 @@ export default {
   'guide.t.interlinear.title': 'Interlinear line',
   'guide.t.interlinear.q': 'interlinear\nhebrew under the verse\ngreek under the text\nword by word\noriginal under the translation',
   'guide.t.interlinear.a': 'Turn on the interlinear line to see, under each verse, the Hebrew or Greek imported to this device, a word at a time with its gloss. Press a word in it for its lexicon entry.',
+  'cmd.paneToTab': 'Open a pane as a tab…',
+  'ph.paneToTab': 'Pane to open as a tab…',
+  'cmd.openAsTab': 'Open as a tab',
+  'msg.paneNoDetach': 'A pane stays in the tab strip; close its tab to put it back in its sidebar.',
+  'msg.sideEmpty': 'This sidebar has no panes.',
+  'set.paneTabs': 'Panes as tabs on narrow screens',
+  'set.paneTabsHint': 'Where the sidebars are drawers, a pane opens in a tab of its own, at full width. Closing the tab puts it back.',
 };

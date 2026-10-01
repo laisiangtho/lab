@@ -19,8 +19,10 @@
  * changed SVG with stale PNGs is caught.
  *
  * The maskable icon (Android's adaptive shapes crop it to a circle or a
- * squircle) is the icon at 80 % on the app's own background, so nothing that
- * matters falls outside the safe zone.
+ * squircle) is the icon at 60 % on the app's own background, so nothing that
+ * matters falls outside the safe zone. The mark has no background of its own,
+ * so the desktop icons are set in from the edge (`inset`), as a desktop's own
+ * icons are.
  */
 
 import { createHash } from 'node:crypto';
@@ -36,10 +38,13 @@ const BACKGROUND = '#181818';
 
 /** @type {{ path: string, size: number, maskable?: boolean }[]} */
 export const ICONS = Object.freeze([
-  // electron-builder: macOS and Windows take one large image.
-  { path: 'assets/icon.png', size: 1024 },
+  // electron-builder: macOS and Windows take one large image. The mark has no
+  // background of its own, so it is set in from the edge the way a desktop's
+  // own icons are; drawn edge to edge it would look a size larger than its
+  // neighbours in a dock or a taskbar.
+  { path: 'assets/icon.png', size: 1024, inset: 0.84 },
   // Linux: one per hicolor size (electron-builder.yml `linux.icon`).
-  ...[16, 24, 32, 48, 64, 128, 256, 512].map((n) => ({ path: `assets/icons/${n}x${n}.png`, size: n })),
+  ...[16, 24, 32, 48, 64, 128, 256, 512].map((n) => ({ path: `assets/icons/${n}x${n}.png`, size: n, inset: n >= 48 ? 0.9 : 1 })),
   // The web build and its manifest.
   { path: 'public/icons/favicon-32.png', size: 32 },
   { path: 'public/icons/icon-192.png', size: 192 },
@@ -63,9 +68,12 @@ function chromium() {
   return null;
 }
 
-async function draw(svg, { size, maskable }) {
+async function draw(svg, { size, maskable, inset = 1 }) {
   const src = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-  const inner = maskable ? Math.round(size * 0.8) : size;
+  // A maskable icon is cut to a circle, a squircle or a rounded square by
+  // the launcher; only the middle 80 % circle is sure to survive, and a
+  // book wider than it is tall needs to sit well inside that.
+  const inner = Math.round(size * (maskable ? 0.6 : inset));
   const html = `<!doctype html><html><body style="margin:0;background:${maskable ? BACKGROUND : 'transparent'}">
     <div style="width:${size}px;height:${size}px;display:grid;place-items:center">
       <img src="${src}" width="${inner}" height="${inner}" style="display:block"></div></body></html>`;

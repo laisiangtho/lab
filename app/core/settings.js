@@ -118,6 +118,12 @@ export const defaultSettings = Object.freeze({
    * gloss from the lexicon where one is held.
    */
   interlinear: false,
+  /**
+   * Where sidebars are drawers (a phone, a narrow window), open a pane in a
+   * workspace tab instead: a drawer is the wrong shape for a search or a word
+   * study. Off by default; a pane can be opened as a tab on any screen.
+   */
+  paneTabs: false,
   /** Show section headings (the translation's `story` and verse titles). */
   headings: true,
   /** Show the cross-reference lines under the verses that carry them. */
@@ -257,7 +263,7 @@ export function parseSettings(raw, { source, category }) {
     readingLeading: clamp(raw.readingLeading, READING.leading, defaultSettings.readingLeading),
     readingMeasure: clamp(raw.readingMeasure, READING.measure, defaultSettings.readingMeasure),
     uiSize: clamp(raw.uiSize, READING.ui, defaultSettings.uiSize),
-    mode, strongs: flag('strongs'), interlinear: flag('interlinear'), headings: flag('headings'), xrefs: flag('xrefs'),
+    mode, strongs: flag('strongs'), interlinear: flag('interlinear'), paneTabs: flag('paneTabs'), headings: flag('headings'), xrefs: flag('xrefs'),
     sourceFormat: SOURCE_FORMATS.includes(raw.sourceFormat) ? raw.sourceFormat : defaultSettings.sourceFormat,
     readingFont: READING_FONTS.includes(raw.readingFont) ? raw.readingFont : defaultSettings.readingFont,
     restoreTabs: flag('restoreTabs'), motion: flag('motion'),

@@ -1,14 +1,14 @@
 # Icons
 
-Every PNG the builds ship is drawn from one source, `public/icons/icon.svg`:
+Every PNG the builds ship is drawn from one source, `public/icons/icon.svg`: an open book with a red ribbon, one colour, no background, drawn on a 64-unit grid so it reads at 14 px on dark and light alike.
 
 | File | Size | Used by |
 |---|---|---|
-| `assets/icon.png` | 1024 | electron-builder, macOS and Windows |
-| `assets/icons/NxN.png` | 16–512 | the Linux hicolor theme (`linux.icon`), `256x256.png` as the window icon |
+| `assets/icon.png` | 1024 | electron-builder, macOS and Windows; the mark at 84 %, set in as desktop icons are |
+| `assets/icons/NxN.png` | 16–512 | the Linux hicolor theme (`linux.icon`), `256x256.png` as the window icon; 48 px and up at 90 % |
 | `public/icons/favicon-32.png` | 32 | the web build's fallback favicon |
 | `public/icons/icon-192.png`, `icon-512.png` | 192, 512 | the web manifest |
-| `public/icons/icon-maskable-512.png` | 512 | the manifest's maskable icon: 80 % of the icon on the app background, inside Android's safe zone |
+| `public/icons/icon-maskable-512.png` | 512 | the manifest's maskable icon: 60 % of the icon on the app background, inside Android's safe zone |
 
 After `icon.svg` changes:
 

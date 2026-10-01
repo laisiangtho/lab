@@ -45,13 +45,13 @@ This is Phase 2 of the project. The Phase 1 single-file `index.html` is preserve
 | `npm run desktop:build` | Compile main, preload and renderer → `out/` |
 | `npm run desktop:package` | Installers for the current system → `release/` (`.dmg`/`.zip`; setup and portable `.exe`; AppImage, `.deb`, `.rpm`, `.tar.gz`) |
 | `npm test` | Unit and boundary tests (`node:test`, no framework) — about a second |
-| `npm run test:e2e` | The built web app driven in a browser, one file at a time: the ordered checks, the app across restarts, phone and title-bar layout (every page on a phone, in Burmese), the interface languages and projects studio, the Library, Help and the Guide, Strong's numbers and the rest of a translation's markup, every card-studio panel on a desktop and on a phone, and a word study from imported Hebrew, KJV and STEPBible files |
+| `npm run test:e2e` | The built web app driven in a browser, one file at a time: the ordered checks, the app across restarts, phone and title-bar layout (every page on a phone, in Burmese), the interface languages and projects studio, the Library, Help and the Guide, Strong's numbers and the rest of a translation's markup, every card-studio panel on a desktop and on a phone, a word study from imported Hebrew, KJV and STEPBible files, and sidebar panes moved into workspace tabs |
 | `npm run test:desktop` | The packaged Electron application, started and inspected |
 | `npm run test:perf` | Timings at full size: three complete Bibles, the longest chapter, a whole-library search |
 | `npm run test:crawl` | Every palette command run on a desktop (dark, light, Norwegian) and a phone (English, Burmese), the screen inspected after each for errors, overflow, leaked strings, clipped labels, overlapping controls and unnamed buttons (a few minutes a run) |
 | `npm run test:all` | `npm test` then the browser suite |
 | `npm run aliases -- <identify> [--file PATH] [--apply]` | Alias overlay maintenance (dry run by default) |
-| `npm run icons -- [--apply \| --out DIR]` | Every PNG icon drawn again from `public/icons/icon.svg` (dry run by default; see `assets/icons/README.md`) |
+| `npm run icons -- [--apply \| --out DIR]` | Every PNG icon drawn again from `public/icons/icon.svg` — an open book with a red ribbon, one colour, no background — set in from the edge for desktops and on a tile for Android's adaptive icon (dry run by default; see `assets/icons/README.md`) |
 | `node scripts/morphology.mjs <TEHMC> <TEGMC> [--apply]` | Rebuild `app/core/morph-data.js` from STEPBible's morphology tables (dry run by default) |
 | `node scripts/guide-check.mjs <folder>` | Check guide data (a `guide/` folder) the way the app reads it; exits 1 on any problem |
 | `npm run version:stamp -- --apply` | Stamp today's date and the next build number |
@@ -235,7 +235,8 @@ Notes are written in a small Markdown: headings, emphasis, code, quotes, lists, 
 | Drag a pane's head onto another | swap the parallel panes; the leftmost is the primary translation |
 | Drag a detached window's bar over the tab strip | dock it back where it was |
 | The `+` at the end of the strip | a new tab on the passage in view, with the switcher open to send it elsewhere |
-| Drag a sidebar pane's tab | reorder it, move it to another row, drop it on the other sidebar, or drop it into a row's body to split that sidebar into rows |
+| Drag a sidebar pane's tab | reorder it, move it to another row, drop it on the other sidebar, drop it into a row's body to split that sidebar into rows, or drop it on the tab band to open it as a workspace tab |
+| Right-click a sidebar pane's tab, or *Open a pane as a tab…* in the palette | the pane in a workspace tab of its own — the same pane, moved, with whatever it was showing; closing the tab puts it back in its sidebar. It reopens with the session. On a narrow screen, *Panes as tabs on narrow screens* (Settings → Reading) opens every pane this way instead of in a drawer |
 | Drag a row divider | share the height between two sidebar rows |
 | Drag a sidebar's inner edge | resize it; the width is remembered |
 | Click a breadcrumb | its siblings — the testament's books, or the book's chapters, marking the ones this translation carries |
@@ -255,7 +256,7 @@ Nothing rebuilds a page the reader is looking at, either. A document tab that is
 
 While a document tab is active — Library, Settings, Help, a board — the controls that act on a chapter are shown but not pressable, rather than failing when pressed. Detached windows remember the size and position they were last left at.
 
-The status bar carries the app's mark, the translation, the passage, and the word and verse counts of the chapter on screen; on the right, typography, mode, Strong's, synchronised scrolling, and how much storage the app is using (its tooltip names the quota and whether the browser has agreed to keep the data).
+The status bar carries the translation, the passage, and the word and verse counts of the chapter on screen; on the right, typography, mode, Strong's, synchronised scrolling, and how much storage the app is using (its tooltip names the quota and whether the browser has agreed to keep the data).
 
 **Help, Shortcuts, About, Data and formats** and **Welcome** are documents, reachable from the `?` at the foot of the ribbon. Help opens on a question field; see *Help and the Guide* above. The shortcut table is generated from the command list, so it cannot describe a key this build does not bind, and it lists the palette verbs the same way; About reports what is installed and what is stored.
 
@@ -289,7 +290,7 @@ Interface strings live in `app/shell/locales/{en,nb,my}.js`, read through `L()` 
 
 ### Narrow windows and touch
 
-Under 900 px a sidebar comes in as a drawer over the text with a scrim behind it; under 760 px the status bar gives way to a floating navigation pill, the band carries the app's mark, and the tab strip shows only the active tab — press it for the list of the others. A window grown back to a column layout puts the drawer away.
+Under 900 px a sidebar comes in as a drawer over the text with a scrim behind it; under 760 px the status bar gives way to a floating navigation pill and the tab strip shows only the tabs that fit — the `⋯` lists the others. With *Panes as tabs on narrow screens* on, the sidebar buttons list their panes and open the one chosen as a tab instead of a drawer. A window grown back to a column layout puts the drawer away.
 
 A page lays itself out by the width of the pane it is in, not the window's: a wide window with both sidebars open leaves the page about 400 px, and there Settings puts its menu above the settings, the graph's bar wraps, the card studio drops its size readout, and the one tab the strip keeps shrinks to an ellipsis rather than pushing the new-tab button out of sight.
 
@@ -366,7 +367,7 @@ The Settings page is where they are seen rather than remembered: a column of sec
 | Section | Holds |
 |---|---|
 | Appearance | theme, accent (a palette, a custom colour, a reset that greys out when there is nothing to reset), ribbon, status bar, movement, and which buttons the ribbon carries |
-| Reading | verse layout, scripture typeface, synchronised scrolling, levelled verses, section headings, cross-references, Strong's numbers, the interlinear line, reopening last session, and a fold with every installed translation's text direction |
+| Reading | verse layout, scripture typeface, synchronised scrolling, levelled verses, section headings, cross-references, Strong's numbers, the interlinear line, panes as tabs on narrow screens, reopening last session, and a fold with every installed translation's text direction |
 | Typography | the four sizes, and a reset |
 | Study | what the Books pane, Search, the composer and the card studio each own — contributed by those features rather than duplicated here |
 | Keyboard | the shortcut document |

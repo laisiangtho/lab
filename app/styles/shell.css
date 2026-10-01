@@ -165,7 +165,6 @@ html[data-theme="light"]{
   color-scheme:light;
 }
 html[data-theme="light"] .scrim{background:rgba(30,26,40,.28)}
-html[data-theme="light"] .app-mark{box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
 }
@@ -242,26 +241,6 @@ body[data-platform="darwin"]::before{
 .band-drag button,.band-drag input,.band-drag .tab,.band-drag .no-drag{
   -webkit-app-region:no-drag;app-region:no-drag;
 }
-.app-pill{
-  display:flex;align-items:center;gap:7px;height:var(--tab-h);padding:0 9px 0 5px;
-  border-radius:var(--radius-m);color:var(--text-muted);font-size:var(--fs-ui-s);
-  font-weight:500;flex:0 0 auto;position:relative;
-}
-.app-pill:hover{color:var(--text-normal)}
-.app-mark{
-  width:18px;height:18px;border-radius:5px;display:grid;place-items:center;flex:0 0 auto;
-  background:linear-gradient(145deg,var(--accent-1),var(--accent));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.28);
-}
-.app-mark svg{width:11px;height:11px;color:#fff}
-.rib-app{
-  width:var(--tab-h);height:var(--tab-h);display:grid;place-items:center;
-  border-radius:var(--radius-m);flex:0 0 auto;
-}
-.rib-app .app-mark{width:20px;height:20px;border-radius:6px}
-.rib-app .app-mark svg{width:12px;height:12px}
-.rib-app:hover .app-mark{box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 0 0 3px var(--accent-fade)}
-
 .win-ctl{display:flex;gap:2px;flex:0 0 auto}
 .win-ctl button{
   width:30px;height:var(--tab-h);border-radius:var(--radius-m);
@@ -298,8 +277,9 @@ body[data-shell="on"][data-right="shut"] .tabbar{padding-inline-end:var(--wc-w)}
   width:var(--ribbon-w);flex:0 0 auto;background:transparent;
   display:flex;flex-direction:column;align-items:stretch;
 }
-/* The menu button keeps the band slot; the rail below starts level with the
-   sheets, so all three columns share one top edge. */
+/* The ribbon's head keeps the band's height and nothing else — the window's
+   drag handle in that corner — so the rail below starts level with the
+   sheets, and all three columns share one top edge. */
 .rib-head{
   height:var(--bar-h);flex:0 0 auto;display:flex;align-items:center;justify-content:center;
 }
@@ -452,12 +432,11 @@ body[data-shell="on"][data-right="shut"] .tabbar{padding-inline-end:var(--wc-w)}
 }
 .pane-tab:not(.is-active):hover::before,.tab:not(.is-active):hover::before{background:var(--bg-hover)}
 .pane-tab:not(.is-active):hover{color:var(--text-muted)}
-.tb-btn::before,.win-ctl button::before,.app-pill::before{
+.tb-btn::before,.win-ctl button::before{
   content:"";position:absolute;inset:3px 2px 4px;z-index:-1;pointer-events:none;
   border-radius:var(--radius-m);background:transparent;transition:background var(--speed);
 }
-.tb-btn:hover::before,.win-ctl button:hover::before,
-.app-pill:hover::before{background:var(--bg-hover)}
+.tb-btn:hover::before,.win-ctl button:hover::before{background:var(--bg-hover)}
 .tb-btn.is-on::before{background:var(--accent-fade)}
 /* The seam already says "active"; the marker only confirms it. Inset by the
    corner radius so it reads as a mark rather than as a border, and mixed back
@@ -675,7 +654,6 @@ body.is-dragging-tab,body.is-dragging-tab *{cursor:grabbing!important}
 /* Tabs must sit on the bar's bottom edge to meet the sheet. Nothing else must,
    and anchoring a bare icon there makes it read as having slipped down, so every
    non-tab cluster centres in the bar instead. */
-.tabbar > .app-pill,
 .tabbar > .nav-group,
 .tabbar > .tb-actions,
 .tabbar > .win-ctl,
@@ -1779,7 +1757,6 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
 @media (max-width:900px){
   #barApp{display:flex}
 }
-.sb-app{font-weight:600;color:var(--text-muted)}
 /* The scrim fades with the drawer so an interrupted drag looks like one motion. */
 .scrim-mobile{
   position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;
@@ -1976,3 +1953,13 @@ body.drawer-dragging .sidebar{transition:none}
 .ilw-o{font-family:var(--font-text);font-size:calc(var(--fs-text) * .95);line-height:1.35;color:var(--text-muted)}
 .ilw-g{font-family:var(--font-ui);font-size:11px;line-height:1.2;color:var(--text-faint);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chapter.flow .ilin, .chapter.list .ilin{margin-top:2px}
+
+/* A sidebar pane shown in a workspace tab: the same pane, centred at a width
+   it was designed for, scrolling inside itself as it does in a sidebar. */
+.leaf-pane{flex:1;min-height:0;display:flex;flex-direction:column;align-items:stretch}
+.leaf-pane > .pane-view{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;max-width:44rem;margin:0 auto}
+.leaf-pane > .pane-view > .pane-body{flex:1;min-height:0;overflow-y:auto}
+.pane-parking{display:none}
+/* A pane dragged over the tab band: dropped here it opens as a tab. */
+.tabbar.is-pane-drop{box-shadow:inset 0 -2px 0 var(--accent);background:var(--accent-fade)}
+.leaf-pane > .pane-view{background:transparent}

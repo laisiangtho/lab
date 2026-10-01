@@ -242,7 +242,6 @@ body.is-dragging-ui { user-select: none; cursor: grabbing; }
 }
 
 /* The app mark in the ribbon and the title pill */
-.app-mark img { width: 20px; height: 20px; border-radius: 5px; display: block; }
 
 /* Popover arrow: the base rule Phase 1's .vbar::before and .rpanel.no-arrow
    overrides expect. It points at whatever opened the popover (--arrow-x). */
@@ -443,7 +442,6 @@ body { line-height: var(--lh-ui); }
 }
 
 /* The app's own mark in the status bar, beside its name */
-.sb-mark { width: 14px; height: 14px; border-radius: 3px; display: block; flex: 0 0 auto; }
 .sb[disabled] { opacity: .4; pointer-events: none; }
 
 /* ---- a sidebar with nothing in it ----------------------------------------*/

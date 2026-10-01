@@ -1176,4 +1176,11 @@ export default {
   'guide.t.interlinear.title': 'Interlineær linje',
   'guide.t.interlinear.q': 'interlineær\nhebraisk under verset\ngresk under teksten\nord for ord\ngrunnteksten under oversettelsen',
   'guide.t.interlinear.a': 'Slå på den interlineære linjen for å se den hebraiske eller greske teksten som er importert, under hvert vers, ett ord om gangen med glose. Trykk på et ord for oppslaget i ordboken.',
+  'cmd.paneToTab': 'Åpne et panel som fane …',
+  'ph.paneToTab': 'Panel som skal åpnes som fane …',
+  'cmd.openAsTab': 'Åpne som fane',
+  'msg.paneNoDetach': 'Et panel blir i fanelinjen; lukk fanen for å sette det tilbake i sidefeltet.',
+  'msg.sideEmpty': 'Dette sidefeltet har ingen paneler.',
+  'set.paneTabs': 'Paneler som faner på smale skjermer',
+  'set.paneTabsHint': 'Der sidefeltene er skuffer, åpnes et panel i en egen fane i full bredde. Når fanen lukkes, går panelet tilbake.',
 };

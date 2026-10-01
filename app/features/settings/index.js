@@ -397,6 +397,7 @@ export default {
                     flag('xrefs', L('cmd.xrefs'), L('set.xrefsHint')),
                     flag('strongs', L('cmd.strongs'), L('set.strongsHint')),
                     flag('interlinear', L('cmd.interlinear'), L('set.interlinearHint')),
+                    flag('paneTabs', L('set.paneTabs'), L('set.paneTabsHint')),
                     flag('restoreTabs', L('set.restore'), L('set.restoreHint'))),
                   directionRows(installed)),
 

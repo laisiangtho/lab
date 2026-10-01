@@ -27,6 +27,15 @@ const TRAVEL = 4;         // px before a press becomes a drag rather than a clic
  *           activate(id: string): void, hint: { show(x: number, y: number): void, hide(): void } }} api
  */
 export function wireTabDrag(strip, api) {
+  // A double-click detaches. It is heard on the strip, not on the tab: the
+  // first press activates the tab, which draws the strip again, so the
+  // second press lands on a new element and a listener on the old one never
+  // hears it. The browser counts the clicks, at the system's own speed.
+  strip.addEventListener('dblclick', (e) => {
+    const node = e.target.closest('.tab');
+    if (!node || e.target.closest('.t-close')) return;
+    api.detach(node.dataset.tab, node.getBoundingClientRect());
+  });
   strip.addEventListener('pointerdown', (e) => {
     const node = e.target.closest('.tab');
     if (!node || e.button !== 0 || e.target.closest('.t-close')) return;
@@ -107,7 +116,10 @@ export function wireTabDrag(strip, api) {
       for (const t of tabs) t.style.transform = '';
 
       if (detaching) { api.detach(id, rects[from]); return; }
-      if (!moved) { api.activate(id); return; }
+      // After the click this press makes, not before: activating draws the
+      // strip again, and a click whose element has gone is a click the
+      // browser does not count — so a double-click never reached two.
+      if (!moved) { setTimeout(() => api.activate(id), 0); return; }
       if (to !== from) api.commit(from, to);
       else api.activate(id);
     };
@@ -133,8 +145,13 @@ export function wireTabDrag(strip, api) {
 export function createPaneDrag(api) {
   const SIDES = ['left', 'right'];
 
-  /** @returns {null | { side: string, type: 'strip'|'above'|'below', group: number, index?: number }} */
+  /** @returns {null | { type: 'tab' } | { side: string, type: 'strip'|'above'|'below', group: number, index?: number }} */
   function targetAt(x, y) {
+    const band = api.workspace?.();
+    if (band && !band.hidden) {
+      const box = band.getBoundingClientRect();
+      if (box.width && x >= box.left && x <= box.right && y >= box.top - 4 && y <= box.bottom + 12) return { type: 'tab' };
+    }
     for (const side of SIDES) {
       const host = api.host(side);
       if (!host || host.hidden) continue;
@@ -255,7 +272,8 @@ export function createPaneDrag(api) {
         ghost.style.top = `${ev.clientY}px`;
         target = targetAt(ev.clientX, ev.clientY);
         for (const s of SIDES) clearPaint(api.host(s));
-        if (target) paint(api.host(target.side), target, view);
+        api.workspace?.()?.classList.toggle('is-pane-drop', target?.type === 'tab');
+        if (target && target.type !== 'tab') paint(api.host(target.side), target, view);
       };
 
       const up = () => {
@@ -265,10 +283,12 @@ export function createPaneDrag(api) {
         ghost?.remove();
         document.body.classList.remove('is-dragging-tab');
         for (const s of SIDES) clearPaint(api.host(s));
+        api.workspace?.()?.classList.remove('is-pane-drop');
         if (!moved || !target) { tab.classList.remove('is-ghost'); return; }
         // The class stays on until the click that follows this release has been
         // swallowed, or the drop would also count as a click on the tab.
         setTimeout(() => tab.classList.remove('is-ghost'), 0);
+        if (target.type === 'tab') { api.toTab?.(view); return; }
         if (target.type !== 'strip' && api.rows(target.side).length >= api.maxRows) { api.onFull(); return; }
         api.drop(view, target);
       };

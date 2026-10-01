@@ -104,8 +104,8 @@ newest first.
 ### Workspace
 
 - Tabs that reorder, detach into floating windows and dock back; parallel panes
-  that swap; sidebars whose panes move between sides and rows; a ribbon the
-  reader arranges. Everything reopens as it was left.
+  that swap; sidebars whose panes move between sides and rows, or into a
+  workspace tab; a ribbon the reader arranges. Everything reopens as it was left.
 - Tabs and panes that do not fit go behind a `⋯` button that counts them.
 - Dark and light themes, following the system or chosen, with an accent colour
   of the reader's own; text on the accent keeps its contrast in both themes.
@@ -153,6 +153,21 @@ newest first.
 ---
 
 ## Releases
+
+### 26.10.01.3 — 1 October 2026
+
+- A new icon: an open book with a red ribbon, one colour, no background, so
+  it reads at the 14–20 px the app and the browser draw it at. Desktop icons
+  are set in from the edge; Android's adaptive icon sits on a tile.
+- The app's mark is gone from the ribbon's corner, the status bar and the
+  phone's top band. The corner stays as the window's drag handle.
+- A sidebar pane can be opened as a workspace tab — right-click its tab, drag
+  it onto the tab band, or *Open a pane as a tab…* in the palette. It is the
+  same pane, moved, with whatever it was showing; closing the tab puts it
+  back. Settings → Reading → *Panes as tabs on narrow screens* opens every
+  pane this way where the sidebars would be drawers.
+- Fixed: double-clicking a tab to detach it, as documented, never worked.
+
 
 ### 26.10.01.2 — 1 October 2026
 

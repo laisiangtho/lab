@@ -303,10 +303,10 @@ The stylesheet carried Phase 1's responsive rules from the start; this wires
 them. At ≤900 px a sidebar arrives as a drawer over the text, with a scrim and
 `body.drawer-l` / `drawer-r` / `has-drawer`; one at a time, and a window grown
 back to a column layout closes whichever was open. At ≤760 px the status bar
-gives way to a floating navigation pill (drawers, previous, next, palette), the
-band carries the app pill, and the tab strip shows only the active tab — which
-is why that tab carries a chevron: pressing it opens the tab switcher, the
-modal listing every open tab plus "new" and "close".
+gives way to a floating navigation pill (drawers, previous, next, palette), and
+the tab strip shows the tabs that fit, the rest behind its `⋯`. The band's app
+pill was removed at 26.10.01.3 (see 3d-xii); with `paneTabs` on, the drawer
+buttons open panes as tabs instead (3d-x-e).
 
 ### 3c-i. Feature records
 
@@ -724,7 +724,57 @@ object on it that is not). The views draw the same cards (`cards.js`):
 - **Palette**: `? question` puts the question to the Guide first, then the
   best answers as rows that act at once (`verb.suggest`).
 
+## 3d-x-e. A pane in a workspace tab
+
+A pane is built for a 240–400 px column, and on a phone its column is a
+drawer over the text — the wrong shape for a search or a word study. So a
+pane can be moved into the workspace, as a tab of kind `pane:<id>`.
+
+- **One mounting, moved.** `chrome.paneTabs` lifts the pane's view out of its
+  sidebar whole (`side.lift`: off the rows, nothing disposed) and lends it to
+  the tab's body; while another tab is in front it waits, still mounted, in a
+  hidden `.pane-parking`. Closing the tab puts the same entry back in its
+  sidebar at its registered place (`side.put`). A second mounting was the
+  alternative and was refused: two copies of the search pane would be two
+  searches, and every pane's listeners would run twice.
+- **The workspace knows a pane by its kind.** `docFor(kind)` answers for a
+  registered document or a registered pane, so the tab strip, the tab menu,
+  the switcher and session restore treat both alike. A pane's leaf body is
+  `.leaf-pane`, not `.leaf-scroll`: the pane scrolls inside itself as it does
+  in a sidebar, centred at 44 rem.
+- **Sidebars and tabs never both hold it.** A lifted pane is out of the rows,
+  and the rows are saved; on the next start `arrange()` sees it as offered and
+  not placed, so it stays out, and the restored tab builds it (`side.make`).
+  `selectPane` on a pane in a tab opens the tab; switching the pane off closes
+  its tab first.
+- **A pane tab is not detached.** A detached window would need a second
+  mounting; pressed twice, the tab says so and stays.
+- **Ways in.** Right-click a pane's own tab; *Open a pane as a tab…* in the
+  palette (one command with a picker, not one per pane); or drag the pane's tab
+  onto the tab band. With `paneTabs` on (Settings → Reading), wherever the
+  sidebars are drawers the sidebar buttons list that side's panes and open the
+  chosen one as a tab, and `selectPane` does the same.
+
+**Double-click.** Detaching a tab by double-clicking it never worked: the
+first press activates the tab, which draws the strip again, so the
+`dblclick` went to a new element and the listener on the old one never heard
+it — worse, the element was gone before the click, and a click on an element
+that has gone is not counted, so the count never reached two. A press now
+activates its tab after its click, and the double-click is heard on the
+strip, with the browser counting clicks at the system's own speed.
+
 ## 3d-xii. Icons
+
+The icon is an open book with a red ribbon in one purple, with no background:
+a silhouette that reads at 14 px on a dark or a light surface, as the marks of
+VS Code or GitHub do. The book-cover icon before it printed "the HOLY BIBLE"
+on the cover, legible at 128 px and grey noise below 32. With no background of
+its own, the desktop icons are set in from the edge as a desktop's own are (84
+% for macOS and Windows, 90 % for the larger Linux sizes), and Android's
+adaptive icon puts it at 60 % on the app's background, inside the safe zone.
+The app does not show its own mark in its chrome: the ribbon's corner is the
+window's drag handle, and the window, the taskbar and the browser tab already
+say which app this is.
 
 Every PNG icon — the desktop packaging set in `assets/`, and the favicon,
 home-screen and maskable icons in `public/icons/` — is drawn from

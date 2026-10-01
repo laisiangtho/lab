@@ -31,6 +31,8 @@ import { fitStrip, watchStrip } from './overflow.js';
 import { chapterNote, LAYOUTS } from './reading.js';
 
 const MAX_PANES = 4;
+/** A tab showing a sidebar pane: `pane:search`. */
+const PANE_TAB = 'pane:';
 /** Where the reader's text-direction corrections are kept, one per translation. */
 const DIR_KEY = 'direction';
 
@@ -170,6 +172,40 @@ export function createWorkspace(ctx, chrome) {
 
   // --- tabs ---------------------------------------------------------------
 
+  /**
+   * What a tab that is not a chapter shows: a registered document, or a
+   * sidebar pane moved into the workspace (`pane:<id>`), which the chrome
+   * lends for as long as the tab is open. Null for a kind this build no
+   * longer has.
+   */
+  function docFor(kind) {
+    if (!kind || kind === 'chapter') return null;
+    if (kind.startsWith(PANE_TAB)) {
+      const id = kind.slice(PANE_TAB.length);
+      const pane = registry.panes().find((p) => p.id === id);
+      if (!pane) return null;
+      return { id: kind, title: pane.title, icon: pane.icon, pane: true, mount: (body) => chrome.paneTabs.host(id, body) };
+    }
+    return registry.getDoc(kind) ?? null;
+  }
+
+  /** Show a sidebar pane in a tab of its own, or bring its tab to the front. */
+  function openPaneTab(id) {
+    if (!registry.panes().some((p) => p.id === id)) throw new Error(`workspace: no pane "${id}" is registered`);
+    const kind = `${PANE_TAB}${id}`;
+    const existing = tabs.find((t) => t.kind === kind);
+    activeId = existing ? existing.id : newTab(kind).id;
+    chrome.closeDrawers();
+    persistTabs();
+    return render();
+  }
+
+  chrome.paneTabs.connect({
+    open: (id) => openPaneTab(id),
+    close: (id) => { const tab = tabs.find((t) => t.kind === `${PANE_TAB}${id}`); if (tab) closeTab(tab.id); },
+    isOpen: (id) => tabs.some((t) => t.kind === `${PANE_TAB}${id}`),
+  });
+
   function newTab(kind, book, chapter) {
     const tab = { id: `t${seq++}`, kind, book, chapter };
     tabs.push(tab);
@@ -216,7 +252,9 @@ export function createWorkspace(ctx, chrome) {
   function closeTab(id) {
     const i = tabs.findIndex((t) => t.id === id);
     if (i === -1) return;
-    tabs.splice(i, 1);
+    const [closed] = tabs.splice(i, 1);
+    // A pane's tab closing is the pane going home to its sidebar.
+    if (closed.kind.startsWith(PANE_TAB)) chrome.paneTabs.release(closed.kind.slice(PANE_TAB.length));
     if (activeId === id) activeId = tabs[Math.min(i, tabs.length - 1)]?.id ?? null;
     persistTabs();
     return activate(activeId ?? '');
@@ -226,6 +264,9 @@ export function createWorkspace(ctx, chrome) {
   function detach(id) {
     const i = tabs.findIndex((t) => t.id === id);
     if (i === -1) return;
+    // A pane is one mounted thing, lent to its tab; a detached window would
+    // need a second. It stays in the strip, and says so.
+    if (tabs[i].kind.startsWith(PANE_TAB)) { chrome.notify(L('msg.paneNoDetach')); return; }
     const [tab] = tabs.splice(i, 1);
     if (activeId === id) activeId = tabs[Math.min(i, tabs.length - 1)]?.id ?? null;
     floats.open(tab);
@@ -275,7 +316,7 @@ export function createWorkspace(ctx, chrome) {
     const { book, chapter } = stored;
     for (const entry of saved) {
       if (entry.kind === 'chapter') newTab('chapter', entry.book, entry.chapter);
-      else if (registry.getDoc(entry.kind)) newTab(entry.kind);
+      else if (docFor(entry.kind)) newTab(entry.kind);
     }
     if (!tabs.length) newTab('chapter', book, chapter);
     activeId = (tabs[index] ?? tabs[0]).id;
@@ -354,7 +395,7 @@ export function createWorkspace(ctx, chrome) {
     }, icon('more'));
 
     chrome.tabStrip.replaceChildren(...tabs.map((tab) => {
-      const doc = tab.kind === 'chapter' ? null : registry.getDoc(tab.kind);
+      const doc = docFor(tab.kind);
       const title = doc ? doc.title : `${bookLabel(tab.book)} ${localNumber(tab.chapter)}`;
       return h('div', {
         // Activation comes from the tab drag: a press that never travels is a
@@ -364,7 +405,6 @@ export function createWorkspace(ctx, chrome) {
         // name is always here for them.
         title: doc ? doc.title : englishRef(tab.book, tab.chapter),
         'aria-label': doc ? doc.title : englishRef(tab.book, tab.chapter),
-        ondblclick: () => detach(tab.id),
       },
         icon(doc ? doc.icon : 'book-open'),
         h('span', { class: 't-name', lang: doc ? '' : primaryLang() }, title),
@@ -400,7 +440,7 @@ export function createWorkspace(ctx, chrome) {
     const shown = new Set([...chrome.tabStrip.querySelectorAll('.tab:not([hidden])')].map((el) => el.dataset.tab));
     openMenu(anchor, [
       ...tabs.map((tab) => {
-        const doc = tab.kind === 'chapter' ? null : registry.getDoc(tab.kind);
+        const doc = docFor(tab.kind);
         return {
           id: tab.id,
           icon: doc ? doc.icon : 'book-open',
@@ -417,7 +457,7 @@ export function createWorkspace(ctx, chrome) {
   /** Every open tab as a list, plus a way to open or close one. */
   function openTabSwitcher() {
     const items = tabs.map((tab) => {
-      const doc = tab.kind === 'chapter' ? null : registry.getDoc(tab.kind);
+      const doc = docFor(tab.kind);
       return {
         id: tab.id,
         icon: doc ? doc.icon : 'book-open',
@@ -636,8 +676,10 @@ export function createWorkspace(ctx, chrome) {
     }
 
     if (tab.kind !== 'chapter') {
-      const doc = registry.getDoc(tab.kind);
-      const body = h('div', { class: 'leaf-scroll scroll' });
+      const doc = docFor(tab.kind);
+      // A pane scrolls inside itself, as it does in a sidebar; a document is
+      // handed the leaf's one scrolling box.
+      const body = h('div', { class: doc.pane ? 'leaf-pane' : 'leaf-scroll scroll' });
       chrome.panes.replaceChildren(h('div', { class: 'leaf', dataset: { doc: doc.id } }, body));
       // A document that throws on mount leaves the tab open and says why, so
       // the reader can close it and carry on reading.
@@ -714,7 +756,7 @@ export function createWorkspace(ctx, chrome) {
   async function renderFloats() {
     for (const float of floats.list()) {
       const { tab } = float;
-      const doc = tab.kind === 'chapter' ? null : registry.getDoc(tab.kind);
+      const doc = docFor(tab.kind);
       floats.setName(float.id, doc ? doc.title : `${bookLabel(tab.book)} ${tab.chapter}`);
 
       if (doc) {
@@ -1059,7 +1101,7 @@ export function createWorkspace(ctx, chrome) {
   }
 
   return {
-    openChapter, openDoc, closeTab, addPane, closePane, setPaneTranslation, movePane, step, render, openVerse, reveal,
+    openChapter, openDoc, openPaneTab, closeTab, addPane, closePane, setPaneTranslation, movePane, step, render, openVerse, reveal,
     newChapterTab, openTabSwitcher,
     detach, adopt, restore, activate,
     floats,
