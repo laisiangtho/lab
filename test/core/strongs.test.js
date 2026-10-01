@@ -9,7 +9,7 @@ test('text without markup is returned untouched', () => {
   const plain = 'In the beginning God created the heavens and the earth.';
   assert.equal(hasStrongs(plain), false);
   assert.deepEqual(extractStrongs(plain), { text: plain, codes: [] });
-  assert.deepEqual(strongsRuns(plain), [{ text: plain, code: null, codes: [] }]);
+  assert.deepEqual(strongsRuns(plain), [{ text: plain, code: null, codes: [], morphs: [] }]);
   assert.equal(plainText(plain), plain);
 });
 
@@ -24,11 +24,11 @@ test('brace, tag and bracket notations all read', () => {
 test('a code attaches to the word before it', () => {
   const runs = strongsRuns('In the beginning{H7225} God{H430} created');
   assert.deepEqual(runs, [
-    { text: 'In the ', code: null, codes: [] },
-    { text: 'beginning', code: 'H7225', codes: ['H7225'] },
-    { text: ' ', code: null, codes: [] },
-    { text: 'God', code: 'H430', codes: ['H430'] },
-    { text: ' created', code: null, codes: [] },
+    { text: 'In the ', code: null, codes: [], morphs: [] },
+    { text: 'beginning', code: 'H7225', codes: ['H7225'], morphs: [null] },
+    { text: ' ', code: null, codes: [], morphs: [] },
+    { text: 'God', code: 'H430', codes: ['H430'], morphs: [null] },
+    { text: ' created', code: null, codes: [], morphs: [] },
   ]);
 });
 
@@ -75,7 +75,7 @@ test('a code after a space belongs to the word before it, and the spaces close u
 
 test('a word may carry several numbers', () => {
   const runs = strongsRuns('created{H1254}{H853} the');
-  assert.deepEqual(runs[0], { text: 'created', code: 'H1254', codes: ['H1254', 'H853'] });
+  assert.deepEqual(runs[0], { text: 'created', code: 'H1254', codes: ['H1254', 'H853'], morphs: [null, null] });
 });
 
 test('what a translation carries is counted, edition numbers by name', () => {
@@ -97,4 +97,19 @@ test('a search for a number finds the word it is on', () => {
   const text = 'In the beginning{H7225} God{H430} created';
   const plain = plainText(text);
   assert.deepEqual(codeRanges(text).map(({ code, from, to }) => [code, plain.slice(from, to)]), [['H7225', 'beginning'], ['H430', 'God']]);
+});
+
+test('a number may carry its morphology, which may hold a colon of its own', () => {
+  const text = 'בְּרֵאשִׁית{H7225:HR/Ncfsa} בָּרָא{H1254:HVqp3ms} created{H853}{H1254:strongMorph:TH8804}';
+  const { text: plain, codes } = extractStrongs(text);
+  assert.equal(plain, 'בְּרֵאשִׁית בָּרָא created');
+  assert.deepEqual(codes.map(({ code, morph }) => [code, morph]), [
+    ['H7225', 'HR/Ncfsa'], ['H1254', 'HVqp3ms'], ['H853', null], ['H1254', 'strongMorph:TH8804'],
+  ]);
+  const runs = strongsRuns(text).filter((run) => run.code);
+  assert.deepEqual(runs.map((run) => [run.text, run.codes, run.morphs]), [
+    ['בְּרֵאשִׁית', ['H7225'], ['HR/Ncfsa']],
+    ['בָּרָא', ['H1254'], ['HVqp3ms']],
+    ['created', ['H853', 'H1254'], [null, 'strongMorph:TH8804']],
+  ]);
 });

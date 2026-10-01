@@ -202,7 +202,15 @@ export function convert({ text, format, source, category, info = {}, ...rest }) 
   if (!adapter) throw new Error(`${source}: no importer called "${format}"`);
   const { raw, report } = adapter.convert(text, { category, source, ...rest });
   if (!raw || typeof raw !== 'object') throw new Error(`${source}: nothing could be read from this file`);
+  return { raw: completeRaw(raw, { source, category, info }), report: { ...report, format } };
+}
 
+/**
+ * What a file in this app's own format is required to carry and an imported
+ * one usually is not, filled in the same way for every reader — the single-
+ * file adapters above and the archive readers that assemble their own.
+ */
+export function completeRaw(raw, { source, category, info = {} }) {
   const merged = {
     ...raw,
     info: {
@@ -221,7 +229,7 @@ export function convert({ text, format, source, category, info = {}, ...rest }) 
   merged.version = merged.version ?? merged.info.version;
   merged.identify = merged.info.identify;
   merged.book = namedBooks(merged.book, category);
-  return { raw: merged, report: { ...report, format } };
+  return merged;
 }
 
 /**

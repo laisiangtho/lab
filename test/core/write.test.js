@@ -320,3 +320,21 @@ test("Strong's numbers are written in each format's own markup, and read back", 
   assert.match(md, /God<sup>H430<\/sup>/);
   assert.match(md, /created<sup>H1254 H853<\/sup>/, 'a word with two numbers keeps both');
 });
+
+test('a word keeps its morphology through every format that has a place for it', () => {
+  const picked = selection();
+  const marked = 'In the beginning{H7225:HR/Ncfsa} God{H430:HNcmpa} created{H853}{H1254:HVqp3ms}.';
+  picked.chapters = picked.chapters.map((row) => (row.book === 1 && row.chapter === 1
+    ? { ...row, verses: { ...row.verses, 1: { ...row.verses[1], text: marked } } }
+    : row));
+  const where = {
+    usfm: /\\w God\|strong="H430" x-morph="HNcmpa"\\w\*/,
+    usx: /<char style="w" strong="H430" x-morph="HNcmpa">God<\/char>/,
+    osis: /<w lemma="strong:H430" morph="HNcmpa">God<\/w>/,
+    zefania: /<gr str="430" rmac="HNcmpa">God<\/gr>/,
+  };
+  for (const [format, pattern] of Object.entries(where)) {
+    assert.match(write(format, picked).map((file) => file.text).join('\n'), pattern, format);
+    assert.equal(readBack(format, write(format, picked)).get('1/1/1').text.trim(), marked, `${format}: read back whole`);
+  }
+});

@@ -37,6 +37,11 @@ newest first.
   the reader is, previews on hover, or opens in a tab of its own.
 - Strong's numbers from tagged editions, with a lexicon fetched on first use
   and kept for reading offline.
+- Word study from a pressed word: the Hebrew or Greek word and its grammar
+  (from an original the reader imported), the lexicon entry, and every word
+  the translation uses for the number, with its verses.
+- An interlinear line: the imported Hebrew or Greek under each verse, a word
+  at a time with its gloss.
 - Read aloud with the device's voices, including a voice in another language
   where the translation's language has none; the ribbon shows progress.
 - Source view: any chapter as Markdown, this app's JSON, USFM, USX, OSIS,
@@ -146,6 +151,40 @@ newest first.
 ---
 
 ## Releases
+
+### 26.10.01.1 — 1 October 2026
+
+Hebrew and Greek, for reading closely:
+
+- browserBible zips (eBible.org's `<id>_browserBible.zip`) are read: chapter
+  pages, headings, poetry lines, Strong's numbers and morphology. The
+  `index/` and `indexlemma/` folders are noted and not read — the app builds
+  its own index from the text it keeps.
+- Morphology codes are kept on import (OSIS, USFM, USX, Zefania,
+  browserBible) and written back on export.
+- STEPBible's lexicons, TBESH (Hebrew) and TBESG (Greek), import as files;
+  a plain number finds its first sense and says which senses there are.
+- Word study (right sidebar, "study H430" in the palette, or "Study this
+  word" from a pressed word): the original word in that verse with its
+  morphology written out, the lexicon entry, and the translation's words for
+  the number with counts and verses. Each section says what is missing and
+  where it comes from.
+- Interlinear line (Reading → Show, or the palette).
+- A word with several Strong's numbers shows them all, and the popover
+  offers each.
+- Help and the Guide are one knowledge in three views: Help in the
+  workspace starts with a question and lays out every topic below; the Guide
+  pane is the same answers as a conversation; "?" in the palette lists the
+  answers as rows under the question.
+
+Found by testing with real downloads:
+
+- Fixed: a browserBible zip imported through the Library failed with
+  "$.info.language.text: expected string"; the language typed in the dialog
+  also lost the right-to-left direction info.json states.
+- Fixed: the Strong's popover could show the word "null" where an entry had
+  no transliteration or part of speech.
+
 
 ### 26.09.30.10 — 30 September 2026
 

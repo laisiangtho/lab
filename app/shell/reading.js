@@ -109,7 +109,8 @@ export function chapterNote(p) {
         // a word carrying a Strong's number is its own element — put each piece
         // in a cell of its own: the tagged word stood alone on a line.
         h('span', { class: 'vtext' },
-          verseText(verse.text, p),
+          verseText(verse.text, p, Number(key)),
+          p.interlinear && !compare ? interlinearLine(p.interlinear, key, p) : null,
           noteCount ? h('button', {
             class: 'verse-note-dot', title: L('lbl.notes', { n: noteCount }), 'aria-label': L('lbl.notes', { n: noteCount }),
             onclick: (e) => p.onVerse?.(key, e.currentTarget, { extend: e.shiftKey }),
@@ -131,14 +132,37 @@ export function chapterNote(p) {
  * Verse text, with Strong's numbers marked where the translation carries them.
  * No published translation does today, so this normally returns the text as is.
  */
-function verseText(text, p) {
+function verseText(text, p, verse) {
   const runs = strongsRuns(text);
   if (runs.length === 1 && runs[0].code === null) return runs[0].text;
   return runs.map((run) => (run.code === null ? run.text : h('span', {
-    class: `strongs${p.strongs ? '' : ' is-hidden-code'}`, dataset: { code: run.code },
-    title: run.code,
-    onclick: (e) => p.onStrongs?.(run.code, e.currentTarget),
-  }, run.text, p.strongs ? h('sup', { class: 'strongs-code' }, run.code) : null)));
+    class: `strongs${p.strongs ? '' : ' is-hidden-code'}`, dataset: { code: run.code, codes: run.codes.join(' ') },
+    title: run.codes.join(' '),
+    onclick: (e) => p.onStrongs?.(run.code, e.currentTarget, { verse, codes: run.codes }),
+  }, run.text, p.strongs ? h('sup', { class: 'strongs-code' }, run.codes.join(' ')) : null)));
+}
+
+/**
+ * The original under a verse: each tagged word of the imported Hebrew or
+ * Greek, with its gloss, pressable like a tagged word of the translation.
+ * Verses are matched by number; where a translation numbers a verse
+ * differently from the original (Malachi 4, the psalm titles), the line is
+ * the original's verse of that number, as a printed interlinear would have it.
+ */
+function interlinearLine(il, key, p) {
+  const words = il.verses?.[key];
+  if (!words?.length) return null;
+  return h('span', { class: 'ilin', dir: il.dir, lang: il.lang || null },
+    ...words.map((word) => {
+      const code = word.codes.find((c) => /^[HG]\d/.test(c)) ?? word.codes[0];
+      const gloss = il.gloss?.(code) || '';
+      return h('button', {
+        class: 'ilw', dataset: { codes: word.codes.join(' ') }, title: word.codes.join(' '),
+        onclick: (e) => p.onStrongs?.(code, e.currentTarget, { verse: Number(key), codes: word.codes }),
+      },
+      h('span', { class: 'ilw-o' }, word.word),
+      h('span', { class: 'ilw-g', dir: 'auto' }, gloss || code));
+    }));
 }
 
 function refsLine(text, meta, resolver, onRef, onPeek) {

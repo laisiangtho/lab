@@ -396,6 +396,7 @@ export default {
                     flag('headings', L('cmd.headings'), L('set.headingsHint')),
                     flag('xrefs', L('cmd.xrefs'), L('set.xrefsHint')),
                     flag('strongs', L('cmd.strongs'), L('set.strongsHint')),
+                    flag('interlinear', L('cmd.interlinear'), L('set.interlinearHint')),
                     flag('restoreTabs', L('set.restore'), L('set.restoreHint'))),
                   directionRows(installed)),
 

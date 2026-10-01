@@ -12,6 +12,8 @@
 
 import { alignChapter } from '../core/align.js';
 import { SOURCE_FORMATS } from '../core/settings.js';
+import { taggedWords } from '../core/lemmas.js';
+import { glossOf, lookup } from '../core/lexicon.js';
 import { createResolver } from '../core/reference.js';
 import { fromMarkdown, toMarkdown } from '../core/source.js';
 import { localizeNumber } from '../core/translation.js';
@@ -663,11 +665,15 @@ export function createWorkspace(ctx, chrome) {
     const order = panesOf(state.get());
 
     const { book, chapter } = state.get();
-    const loaded = await Promise.all(order.map(async (identify, index) => {
-      const { meta, resolver } = await openTranslation(identify);
-      return { identify, index, meta, resolver, verses: await store.getChapter(identify, book, chapter, { markup: true }) };
-    }));
+    const [loaded, interlinear] = await Promise.all([
+      Promise.all(order.map(async (identify, index) => {
+        const { meta, resolver } = await openTranslation(identify);
+        return { identify, index, meta, resolver, verses: await store.getChapter(identify, book, chapter, { markup: true }) };
+      })),
+      interlinearFor(book, chapter).catch(() => null),
+    ]);
     if (!current()) return;
+    loaded[0].interlinear = interlinear;
 
     // The translation carries its own book names, and it loads after the first
     // paint. When the primary one changes, everything that shows a book name —
@@ -736,6 +742,38 @@ export function createWorkspace(ctx, chrome) {
     }
   }
 
+  /** The original's chapters, as tagged words, kept for the chapters read lately. */
+  const originalChapters = new Map();
+
+  /**
+   * What the interlinear line needs for a chapter: the original on this
+   * device for its testament, its words verse by verse, which way it is
+   * written, and a gloss for each number. Null when the line is off or there
+   * is no original to show.
+   */
+  async function interlinearFor(book, chapter) {
+    if (!state.get().interlinear || !ctx.lemmas) return null;
+    const testament = book <= 39 ? 'H' : 'G';
+    const source = await ctx.lemmas.original(testament);
+    if (!source) return null;
+    const key = `${source.identify}:${source.installedAt ?? ''}:${book}:${chapter}`;
+    let verses = originalChapters.get(key);
+    if (!verses) {
+      const raw = await store.getChapter(source.identify, book, chapter, { markup: true });
+      verses = {};
+      for (const [n, verse] of Object.entries(raw ?? {})) verses[n] = taggedWords(verse.text);
+      if (originalChapters.size > 24) originalChapters.delete(originalChapters.keys().next().value);
+      originalChapters.set(key, verses);
+    }
+    return {
+      identify: source.identify,
+      verses,
+      dir: directionOf(source.identify) ?? source.info?.language?.textdirection ?? (testament === 'H' ? 'rtl' : 'ltr'),
+      lang: source.info?.language?.name || (testament === 'H' ? 'hbo' : 'grc'),
+      gloss: (code) => glossOf(lookup(ctx.lexicons?.held ?? {}, code).entry),
+    };
+  }
+
   function buildLeaf(pane, all, { book, chapter }, { float = null } = {}) {
     const { mode, layout, strongs, headings, xrefs } = state.get();
     const annotations = ctx.annotations.chapterIndex(book, chapter);
@@ -746,6 +784,7 @@ export function createWorkspace(ctx, chrome) {
       : chapterNote({
         ctx, meta: pane.meta, resolver: pane.resolver, verses: pane.verses, book, chapter,
         compare, layout, annotations, strongs, headings, xrefs,
+        interlinear: compare ? null : (pane.interlinear ?? null),
         primaryVerses: compare ? all[0].verses : null,
         // A cross-reference names a verse, and used to arrive at the top of
         // the chapter with nothing marked — the one link in the app that did
@@ -755,7 +794,7 @@ export function createWorkspace(ctx, chrome) {
           : openChapter(ref.book, ref.chapter, options)),
         onPeek: (ref, anchor) => ctx.shell.openPeek(anchor, ref),
         onVerse: (verse, anchor, options) => ctx.shell.openVerseBar(anchor, { book, chapter, verse }, options),
-        onStrongs: (code, anchor) => ctx.shell.openStrongs(code, anchor),
+        onStrongs: (code, anchor, at) => ctx.shell.openStrongs(code, anchor, { identify: pane.identify, book, chapter, verse: at?.verse ?? null, codes: at?.codes ?? [code] }),
         onRepair: (identify) => ctx.shell.repairTranslation(identify),
       });
 

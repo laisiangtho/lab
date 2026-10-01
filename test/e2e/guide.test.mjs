@@ -47,8 +47,12 @@ test('the guide', options, async (t) => {
   await t.test('a question in the palette opens it with the answer', async () => {
     await page.keyboard.press('Control+p');
     await page.locator('.modal-input').fill('? how do I bookmark a verse');
-    await page.waitForTimeout(250);
-    assert.equal(await page.locator('.modal-list .mi-t').first().innerText(), 'Ask the guide: how do I bookmark a verse');
+    // The question for the Guide pane first; the answers themselves under it
+    // as rows that do the thing at once.
+    await page.waitForFunction(() => [...document.querySelectorAll('.modal-list .mi-t')].some((el) => el.textContent === 'Bookmark a verse'));
+    const rows = await page.locator('.modal-list .mi-t').allInnerTexts();
+    assert.equal(rows[0], 'Ask the guide: how do I bookmark a verse');
+    assert.equal(rows[1], 'Bookmark a verse', 'the best answer next');
     await page.keyboard.press('Enter');
     await page.waitForSelector('.gd-card', { timeout: 10000 });
     assert.equal(await page.locator('.gd-card .gd-t').first().innerText(), 'Bookmark a verse');
@@ -196,6 +200,57 @@ test('the guide downloads more answers', options, async (t) => {
       return new Promise((r) => { const q = db.transaction('guide').objectStore('guide').count(); q.onsuccess = () => r(q.result); });
     });
     assert.equal(left, 0);
+  });
+
+  await t.test('nothing went wrong on the way', () => assert.deepEqual(app.problems, []));
+});
+
+test('Help is the same knowledge, laid out in the workspace', options, async (t) => {
+  const app = await launch({ viewport: { width: 1280, height: 900 } });
+  const { page } = app;
+  t.after(() => app.close());
+  await app.open();
+  await firstRun(page);
+  await page.keyboard.press('Control+p');
+  await page.locator('.modal-input').fill('Help');
+  await page.waitForTimeout(250);
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.help-doc .hp-ask:not([hidden])');
+
+  await t.test('a question at the top, no page title', async () => {
+    assert.equal(await page.locator('.help-doc h1').count(), 0);
+    const first = await page.locator('.help-doc > *:not([hidden])').first().getAttribute('class');
+    assert.match(first, /hp-ask/);
+  });
+
+  await t.test('asked, it answers with the card the Guide pane draws', async () => {
+    await page.locator('.hp-input').fill('how do I bookmark a verse');
+    await page.keyboard.press('Enter');
+    const card = page.locator('.hp-answers .gd-card').first();
+    await card.waitFor();
+    assert.equal(await card.locator('.gd-t').innerText(), 'Bookmark a verse');
+    assert.equal(await page.locator('.hp-answers .gd-miss .gd-do', { hasText: 'Help' }).count(), 0, 'Help does not offer itself');
+    await card.locator('.gd-do').click();
+    await page.waitForTimeout(400);
+    assert.ok(await page.locator('.pane-view[data-view="marks"].is-active').isVisible(), 'the button did it');
+    const saved = await record(page);
+    assert.equal(saved?.value?.pairs?.[0]?.id ?? saved?.pairs?.[0]?.id, 'topic.bookmark', 'and the guide learned it');
+  });
+
+  await t.test('every written topic is there to browse, and each one answers', async () => {
+    const topics = page.locator('.hp-topic');
+    assert.ok(await topics.count() >= 20, `${await topics.count()} topics`);
+    for (const name of ['Study a word', 'Hebrew and Greek texts', 'Interlinear line']) {
+      await page.locator('.hp-topic', { hasText: name }).click();
+      await page.waitForFunction((title) => document.querySelector('.hp-answers .gd-x .gd-t')?.textContent === title, name);
+      const card = page.locator('.hp-answers .gd-x').first().locator('.gd-card');
+      assert.ok((await card.locator('.gd-a').innerText()).length > 40, `${name} says something`);
+    }
+    assert.ok(await page.locator('.hp-answers .gd-x').count() <= 3, 'a few answers, not a transcript');
+  });
+
+  await t.test('the downloadable answers are offered here too', async () => {
+    assert.match(await page.locator('.hp-data .gd-more-status').innerText(), /can be downloaded/);
   });
 
   await t.test('nothing went wrong on the way', () => assert.deepEqual(app.problems, []));

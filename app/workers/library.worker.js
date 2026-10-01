@@ -105,8 +105,9 @@ async function importPack({ identify, files, info }, post) {
   const { raw, report } = readPack(files, { category, source: info?.source ?? identify, info: { ...info, identify } });
 
   // A bundle states its language as a bare code; the app's own shape wants the
-  // block around it.
-  const language = {
+  // block around it. A browserBible text arrives with the block already built
+  // (its info.json names the language and its direction), and is kept as it is.
+  const language = typeof raw.info.language === 'object' && raw.info.language ? raw.info.language : {
     text: raw.info.languageText || raw.info.language || 'Unknown',
     name: raw.info.language || 'und',
     iso: { '639-1': '', '639-3': /^[a-z]{3}$/i.test(raw.info.language ?? '') ? raw.info.language : '' },

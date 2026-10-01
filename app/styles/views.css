@@ -1776,3 +1776,87 @@ label.set-row:hover { background: var(--bg-hover); }
 @container leaf (max-width: 760px) {
   .lib-page { padding: 10px 12px 96px; }
 }
+
+/* Word study: one Strong's number, in sections that each say what they lack. */
+.ws { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 12px 18px; display: flex; flex-direction: column; gap: 14px; user-select: text; }
+.ws-empty { margin: auto 0; padding: 20px 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; color: var(--text-faint); font-size: var(--fs-ui-s); line-height: 1.55; }
+.ws-empty svg { width: 26px; height: 26px; color: var(--accent-2); }
+.ws-empty p { margin: 0; max-width: 260px; }
+.ws-head { display: flex; flex-direction: column; gap: 2px; }
+.ws-code { font-family: var(--font-mono); font-size: 11px; color: var(--c-orange); }
+.ws-lemma { font-family: var(--font-text); font-size: 26px; line-height: 1.4; color: var(--text-normal); }
+.ws-say { font-size: var(--fs-ui-s); font-style: italic; color: var(--text-faint); }
+.ws-part { font-size: var(--fs-ui-s); color: var(--accent-2); }
+.ws-sec { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: var(--divider); min-width: 0; }
+.ws-h { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-faint); }
+.ws-note { margin: 0; font-size: var(--fs-ui-s); line-height: 1.55; color: var(--text-muted); overflow-wrap: anywhere; }
+.ws-wait { color: var(--text-faint); }
+.ws-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.ws-row .btn { min-height: 28px; font-size: var(--fs-ui-s); }
+.ws-row .btn svg { width: 14px; height: 14px; }
+.ws-define { margin: 0; white-space: pre-line; font-size: var(--fs-ui-m); line-height: 1.55; color: var(--text-normal); overflow-wrap: anywhere; }
+.ws-kjv { margin: 0; font-size: var(--fs-ui-s); line-height: 1.55; color: var(--text-muted); overflow-wrap: anywhere; }
+.ws-label { color: var(--text-faint); }
+.ws-src { margin: 0; font-size: var(--fs-ui-s); color: var(--text-faint); }
+.ws-word { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: var(--radius-m); background: var(--bg-secondary); }
+.ws-orig { font-family: var(--font-text); font-size: 24px; line-height: 1.5; color: var(--text-normal); }
+.ws-morph { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-ui-s); color: var(--text-muted); }
+.ws-mcode { align-self: flex-start; font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); overflow-wrap: anywhere; }
+.ws-parts { margin: 0; padding-inline-start: 16px; line-height: 1.5; }
+.ws-unknown { color: var(--text-faint); }
+.ws-verse { margin: 0; font-family: var(--font-text); font-size: 18px; line-height: 1.8; color: var(--text-muted); overflow-wrap: anywhere; }
+.ws-hit { color: var(--text-normal); background: var(--accent-fade); border-radius: 3px; box-shadow: 0 0 0 2px var(--accent-fade); }
+.ws-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.ws-item { border-radius: var(--radius-m); }
+.ws-item[open] { background: var(--bg-secondary); }
+.ws-sum {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "w n" "b b";
+  gap: 3px 10px; align-items: baseline; padding: 6px 8px; border-radius: var(--radius-m);
+  cursor: pointer; list-style: none;
+}
+.ws-sum::-webkit-details-marker { display: none; }
+.ws-sum:hover { background: var(--bg-hover); }
+.ws-word-t { grid-area: w; font-family: var(--font-text); font-size: var(--fs-ui-l); color: var(--text-normal); overflow-wrap: anywhere; }
+.ws-n { grid-area: n; font-size: var(--fs-ui-s); color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.ws-bar { grid-area: b; display: block; height: 3px; border-radius: 2px; background: var(--bg-hover); overflow: hidden; }
+.ws-bar > span { display: block; height: 100%; background: var(--accent-line); }
+.ws-refs { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 8px 8px; }
+.ws-ref {
+  min-height: 24px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--border);
+  color: var(--text-muted); font-size: 12px; background: var(--bg-primary);
+}
+.ws-ref:hover { color: var(--text-normal); border-color: var(--accent-line); }
+.ws-src .ws-ref { min-height: 0; padding: 0 6px; }
+.ws-more { border-style: dashed; color: var(--text-faint); }
+@media (hover: none) { .ws-ref { min-height: 34px; padding: 4px 12px; } .ws-sum { padding: 9px 8px; } }
+.ws-define.is-folded { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden; }
+.ws-fold { margin-top: 2px; padding: 0; font-size: var(--fs-ui-s); color: var(--accent-2); background: none; }
+.ws-fold:hover { text-decoration: underline; }
+
+/* Help: the knowledge in the workspace. The question at the top, its answers
+   under it, and the rest of what there is to know laid out below. */
+.help-doc .hp-ask {
+  display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; padding: 6px 6px 6px 14px;
+  border-radius: var(--radius-l); background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--border);
+}
+.help-doc .hp-ask[hidden] { display: none; }
+.help-doc .hp-ask:focus-within { box-shadow: inset 0 0 0 1px var(--accent-line); }
+.help-doc .hp-ask > svg { width: 18px; height: 18px; flex: none; color: var(--accent-2); }
+.hp-input {
+  flex: 1; min-width: 0; height: 36px; border: 0; background: transparent; outline: none;
+  font-family: var(--font-ui); font-size: var(--fs-ui-l); color: var(--text-normal);
+}
+.hp-input::placeholder { color: var(--text-faint); }
+.hp-input::-webkit-search-cancel-button { display: none; }
+.hp-go { flex: none; min-height: 34px; }
+.hp-answers { display: flex; flex-direction: column; gap: 14px; }
+.hp-answers:not(:empty) { margin-bottom: 8px; }
+.hp-topics { display: flex; flex-wrap: wrap; gap: 6px; }
+.hp-topic {
+  min-height: 30px; padding: 3px 12px; border-radius: 99px; border: 1px solid var(--border);
+  color: var(--text-muted); font-size: var(--fs-ui-s); background: transparent;
+  transition: background var(--speed), color var(--speed), border-color var(--speed);
+}
+.hp-topic:hover { background: var(--bg-hover); color: var(--text-normal); border-color: var(--accent-line); }
+.hp-data .gd-data { max-width: none; align-items: flex-start; margin-top: 22px; }
+@media (hover: none) { .hp-topic { min-height: 38px; } }

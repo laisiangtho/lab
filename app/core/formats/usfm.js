@@ -21,6 +21,7 @@
  */
 
 import { bookMatcher } from './books.js';
+import { tagNotation } from '../strongs.js';
 
 /** Markers whose content is a note about the text rather than the text. */
 const NOTES = new Set(['f', 'fe', 'x', 'ef', 'efe', 'ex', 'fig', 'rq', 'va', 'vp']);
@@ -207,19 +208,21 @@ function* tokenize(source) {
  * `core/strongs.js` already reads, which is the notation the reading surface
  * already renders.
  *
- * `x-...` attributes, lemmas and morphology are dropped: nothing shows them.
+ * The morphology is kept with the number (`grace{G5485:N-ASF}`); other
+ * `x-...` attributes and lemmas are dropped: nothing shows them.
  */
 function keepStrongs(inner) {
   const bar = inner.indexOf('|');
   if (bar === -1) return inner;
   const word = inner.slice(0, bar);
   const attrs = inner.slice(bar + 1);
-  // `strong="G5485"` or `strong="H430,H1234"`, and the bare form `|G5485`.
+  // `strong="G5485"` or `strong="H430,H1234"`, and the bare form `|G5485`;
+  // the parsing, where there is one, in `x-morph` (USFM 3) or `morph`.
   const found = /strong\s*=\s*"([^"]+)"/i.exec(attrs)?.[1]
     ?? (/^\s*([HG]?\d+[a-z]?)\s*$/i.exec(attrs)?.[1] ?? '');
   if (!found) return word;
-  const codes = found.split(/[,\s]+/).filter(Boolean).map((code) => `{${code.toUpperCase()}}`);
-  return `${word}${codes.join('')}`;
+  const morph = /(?:x-morph|morph)\s*=\s*"([^"]+)"/i.exec(attrs)?.[1] ?? null;
+  return `${word}${tagNotation([found], { morph })}`;
 }
 
 /**

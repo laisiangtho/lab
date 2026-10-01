@@ -19,6 +19,7 @@
 
 import { bookMatcher } from './books.js';
 import { localName, readXml } from './xmlread.js';
+import { tagNotation } from '../strongs.js';
 
 /** Elements whose content is a note about the text rather than the text. */
 const NOTES = new Set(['note', 'f', 'x', 'ef', 'fe', 'rq', 'catchword', 'reftext', 'ref', 'xt', 'fr', 'ft', 'fv', 'fq']);
@@ -77,6 +78,9 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
   let bookTitles = 0;
   /** Strong's numbers waiting for their word to finish. */
   const tagged = [];
+  /** Inside a word whose lemma splits it into morphemes (OpenScriptures'
+      `b/7225` over `בְּ/רֵאשִׁית`): the slashes in its text go. */
+  let morphemes = 0;
 
   const put = (text) => {
     if (muted) return;
@@ -135,7 +139,7 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
   };
 
   readXml(source, (event) => {
-    if (event.kind === 'text') { put(event.text); return; }
+    if (event.kind === 'text') { put(morphemes ? event.text.replace(/\//g, '') : event.text); return; }
     const tag = localName(event.name);
 
     if (event.kind === 'close') {
@@ -149,8 +153,9 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
         else if (muted) muted -= 1;
       } else if (tag === 'w' || tag === 'char' || tag === 'gr') {
         // The word has just been written; its number follows it.
-        const code = tagged.pop();
-        if (code) put(code);
+        const word = tagged.pop();
+        if (word?.slashed) morphemes -= 1;
+        if (word?.code) put(word.code);
       } else if (kind === 'osis' && tag === 'verse') verse = null;
       return;
     }
@@ -168,9 +173,11 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
     // The number is kept inline, in the notation `core/strongs.js` reads.
     // Zefania's `<gr str="430">` leaves the testament to the book it is in.
     if (tag === 'w' || tag === 'gr' || (tag === 'char' && String(event.attrs.style ?? '').toLowerCase() === 'w')) {
-      const code = tag === 'gr' ? zefaniaStrongs(event.attrs.str, book) : strongsOf(event.attrs);
+      const code = tag === 'gr' ? zefaniaStrongs(event.attrs, book) : strongsOf(event.attrs, book);
       if (event.empty) { if (code) put(code); return; }
-      tagged.push(code);
+      const slashed = String(event.attrs.lemma ?? '').includes('/');
+      tagged.push({ code, slashed });
+      if (slashed) morphemes += 1;
       return;
     }
     // USX carries the whole text inside `<para>`, and what a paragraph *is* is
@@ -257,31 +264,32 @@ export function fromXml(source, { category, dialect = null, source: name = 'file
 
   delete report.seen;
   if (!report.books) throw new Error(`${name}: no books could be read from this file`);
+  // Whitespace between elements is layout, not text: a verse does not begin
+  // or end with it, however the file was indented.
+  for (const bookData of Object.values(out)) {
+    for (const chapterData of Object.values(bookData.chapter)) {
+      for (const verseData of Object.values(chapterData.verse)) verseData.text = verseData.text.replace(/\s+/g, ' ').trim();
+    }
+  }
   return { raw: { book: out, info }, report };
 }
 
 /**
- * The Strong's number on a tagged word, however the dialect spells it.
- *
- * USFX puts it in `s`, USX in `strong`, and OSIS in a `lemma` of the form
- * `strong:H7225`. A word with several is written with several.
+ * The Strong's number on a tagged word, however the dialect spells it, with
+ * its morphology. USFX puts the number in `s` and the parsing in `m`, USX in
+ * `strong` and `x-morph`, OSIS in `lemma` (`strong:H7225`, or OpenScriptures'
+ * `b/7225`) and `morph`. A number without its letter is lettered by the book.
  */
-function strongsOf(attrs) {
+function strongsOf(attrs, book) {
   const raw = attrs.s ?? attrs.strong ?? attrs.lemma ?? '';
-  const codes = String(raw).split(/[,\s]+/)
-    .map((part) => /(?:strong:)?([HG]?\d+[a-z]?)$/i.exec(part.trim())?.[1] ?? '')
-    .filter(Boolean);
-  return codes.map((code) => `{${code.toUpperCase()}}`).join('');
+  const morph = attrs.m ?? attrs.morph ?? attrs['x-morph'] ?? null;
+  const letter = book === null ? null : book <= 39 ? 'H' : 'G';
+  return tagNotation([raw], { morph, letter });
 }
 
-/** Zefania's `str="430 1234"`, lettered by testament: books 1–39 are Hebrew. */
-function zefaniaStrongs(raw, book) {
-  const letter = book !== null && book <= 39 ? 'H' : 'G';
-  return String(raw ?? '').split(/[,\s]+/)
-    .map((part) => /^\d+[a-z]?$/i.exec(part.trim())?.[0] ?? '')
-    .filter(Boolean)
-    .map((n) => `{${letter}${n.toUpperCase()}}`)
-    .join('');
+/** Zefania's `str="430 1234"` and `rmac`, lettered by testament: books 1–39 are Hebrew. */
+function zefaniaStrongs(attrs, book) {
+  return tagNotation([attrs.str], { morph: attrs.rmac ?? null, letter: book !== null && book <= 39 ? 'H' : 'G' });
 }
 
 /** The nth number in a dotted OSIS id: "Gen.1.1" → 1 is the chapter. */

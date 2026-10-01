@@ -1958,3 +1958,21 @@ body.drawer-dragging .sidebar{transition:none}
   background:var(--bg-secondary);color:var(--text-muted);
   font-family:var(--font-ui);font-size:var(--fs-ui-s);line-height:1.55;
 }
+
+/* The popover's way into the word study. */
+.pv-foot{margin-top:8px;padding-top:8px;border-top:var(--divider)}
+.pv-study{width:100%;justify-content:center;min-height:30px}
+/* A word with several numbers: each one, to choose between. */
+.pv-codes{display:flex;flex-wrap:wrap;gap:4px}
+.pv-pick{padding:1px 7px;border-radius:99px;border:1px solid var(--border);background:transparent;cursor:pointer}
+.pv-pick[aria-pressed="true"]{background:var(--accent-fade);border-color:var(--accent-line)}
+.pv-pick:hover{border-color:var(--accent-line)}
+
+/* The interlinear line: the original under the verse, a word over its gloss.
+   Quiet, so the translation stays the text being read. */
+.ilin{display:flex;flex-wrap:wrap;gap:2px 4px;margin:4px 0 8px;font-size:var(--fs-ui-s);line-height:1.2}
+.ilw{display:inline-flex;flex-direction:column;align-items:center;gap:2px;padding:3px 5px;border-radius:var(--radius-s);background:transparent;border:0;cursor:pointer;color:inherit;max-width:14rem}
+.ilw:hover{background:var(--bg-hover)}
+.ilw-o{font-family:var(--font-text);font-size:calc(var(--fs-text) * .95);line-height:1.35;color:var(--text-muted)}
+.ilw-g{font-family:var(--font-ui);font-size:11px;line-height:1.2;color:var(--text-faint);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chapter.flow .ilin, .chapter.list .ilin{margin-top:2px}

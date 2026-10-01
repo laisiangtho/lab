@@ -17,7 +17,7 @@ import { createTree } from './tree.js';
 import { createReadingPanel, applyReading } from './readingpanel.js';
 import { createVerseBar } from './versebar.js';
 import { createWorkspace } from './workspace.js';
-import { h } from './dom.js';
+import { fill, h } from './dom.js';
 import { icon } from './icons.js';
 import { L, when } from './i18n.js';
 import { createLookup, parsePassageQuery, passageOf } from '../core/lookup.js';
@@ -56,6 +56,8 @@ export function createShell(root, ctx) {
    */
   let firstRunClaimed = false;
 
+  /** Set by the word-study feature: ({ code, identify, book, chapter, verse }) => void. */
+  let studyWord = null;
   const shell = {
     /** Run once the shell is up — a feature cannot open a document before then. */
     whenReady(fn) {
@@ -84,6 +86,8 @@ export function createShell(root, ctx) {
     openPalette,
     /** The palette with something already typed in it: a verb to finish, say. */
     openPaletteWith: (query) => openPaletteWith(query),
+    /** The palette's suggestions, asked again while it is open. */
+    refreshPalette: () => modal.refresh(),
     openTranslationPicker,
     /** The one modal, for a feature that needs to offer a list of its own. */
     pick: (options) => modal.open(options),
@@ -107,6 +111,11 @@ export function createShell(root, ctx) {
     /** Repaint the ribbon's marks; for a feature whose state moves on its own. */
     refreshCommands: () => chrome.refreshCommands(),
     openStrongs,
+    /**
+     * Where a pressed word's "Word study" goes, offered by the feature that
+     * does the studying; without one the popover has no such button.
+     */
+    offerWordStudy(fn) { studyWord = fn; },
     /** The info button at the end of a crumb bar: what this translation is. */
     openTranslationInfo: (anchor, meta) => trInfo.open(anchor, meta),
     repairTranslation,
@@ -179,6 +188,8 @@ export function createShell(root, ctx) {
     ctx.library.on('change', () => { refresh(); measureStorage(); });
     measureStorage();
     ctx.annotations.on('change', () => workspace.render());
+    // A lexicon arriving gives the interlinear line its glosses.
+    ctx.lexicons?.on('change', () => { if (ctx.state.get().interlinear) workspace.render(); });
 
     applyHash();
     window.addEventListener('hashchange', applyHash);
@@ -235,6 +246,7 @@ export function createShell(root, ctx) {
     command('reading.panel', L('cmd.reading'), () => readingPanel.toggle(document.querySelector('.statusbar .sb-reading') ?? document.body), { icon: 'type' });
     command('reading.mode', L('cmd.mode'), toggleMode, { keys: 'Mod+e', icon: 'edit', needsChapter: true, state: () => ctx.state.get().mode === 'source' });
     command('reading.strongs', L('cmd.strongs'), toggleStrongs, { icon: 'tag', needsChapter: true, state: () => ctx.state.get().strongs });
+    command('reading.interlinear', L('cmd.interlinear'), toggleInterlinear, { icon: 'study', needsChapter: true, state: () => ctx.state.get().interlinear });
     command('reading.headings', L('cmd.headings'), () => toggleShown('headings', 'cmd.headings'), { icon: 'heading', needsChapter: true, state: () => ctx.state.get().headings });
     command('reading.xrefs', L('cmd.xrefs'), () => toggleShown('xrefs', 'cmd.xrefs'), { icon: 'link', needsChapter: true, state: () => ctx.state.get().xrefs });
     command('tab.detach', L('cmd.detach'), () => { const tab = workspace.activeTab; if (tab) workspace.detach(tab.id); }, { icon: 'restore' });
@@ -408,6 +420,18 @@ export function createShell(root, ctx) {
     shell.notify(L('msg.state', { what: L(nameKey), value: L(next ? 'val.on' : 'val.off') }), 'info', { about: key });
   }
 
+  /** The interlinear line: on or off, and said — or why there is nothing to show. */
+  async function toggleInterlinear() {
+    const next = !ctx.state.get().interlinear;
+    ctx.state.set({ interlinear: next });
+    const book = ctx.state.get().book;
+    const testament = book <= 39 ? 'H' : 'G';
+    const original = next ? await ctx.lemmas?.original(testament) : true;
+    shell.notify(original
+      ? L('msg.state', { what: L('cmd.interlinear'), value: L(next ? 'val.on' : 'val.off') })
+      : L(testament === 'H' ? 'msg.noHebrew' : 'msg.noGreek'), 'info', { about: 'interlinear' });
+  }
+
   function toggleStrongs() {
     const next = !ctx.state.get().strongs;
     ctx.state.set({ strongs: next });
@@ -428,9 +452,31 @@ export function createShell(root, ctx) {
    * a lack — a dead end with a button on it is a different thing from a dead
    * end.
    */
-  function openStrongs(code, anchor) {
+  function openStrongs(first, anchor, where = null) {
+    let code = first;
+    // A word can carry several numbers (the KJV tags "created" with H853, the
+    // untranslated object marker, and H1254, the verb). Each is offered; the
+    // popover shows one at a time.
+    const codes = [...new Set((where?.codes ?? []).filter(Boolean))];
+    const header = () => (codes.length > 1
+      ? h('div', { class: 'pv-codes', role: 'group' }, ...codes.map((c) => h('button', {
+        class: 'pv-code pv-pick',
+        'aria-pressed': c === code ? 'true' : 'false',
+        onclick: () => { code = c; show(); },
+      }, c)))
+      : h('div', { class: 'pv-code' }, code));
+    // The way on to the whole study of the word, where a feature offers one.
+    const study = () => (where && studyWord
+      ? h('div', { class: 'pv-foot' }, h('button', {
+        class: 'btn soft pv-study',
+        onclick: () => {
+          strongsPopover.hidden = true;
+          studyWord({ code, identify: where.identify, book: where.book, chapter: where.chapter, verse: where.verse });
+        },
+      }, icon('study'), L('ws.open')))
+      : null);
     const paint = (...children) => {
-      strongsPopover.replaceChildren(h('div', { class: 'pv-code' }, code), ...children);
+      fill(strongsPopover, header(), ...children, study());
       place();
     };
     const place = () => {
@@ -452,7 +498,10 @@ export function createShell(root, ctx) {
             : null,
           entry.part ? h('div', { class: 'pv-part' }, entry.part) : null,
           entry.define ? h('div', { class: 'pv-tr' }, entry.define) : null,
-          entry.kjv ? h('div', { class: 'pv-kjv' }, entry.kjv) : null);
+          entry.kjv ? h('div', { class: 'pv-kjv' }, entry.kjv) : null,
+          found.senses?.length > 1
+            ? h('div', { class: 'pv-say' }, L('lex.senses', { list: found.senses.map((k) => `${found.testament}${k.toUpperCase()}`).join(', ') }))
+            : null);
         return;
       }
       if (found.why === 'missing' || found.why === 'none') {
@@ -546,7 +595,11 @@ export function createShell(root, ctx) {
       if (!verb) return [];
       const rest = question[1].trim();
       if (!rest) return [verbHint(verb)];
-      return [{ id: `verb.${verb.id}`, title: `${verb.title}: ${rest}`, sub: verb.hint ?? undefined, icon: verb.icon, run: () => verb.run(rest) }];
+      // The question put to the Guide pane first — Enter gets the whole
+      // answer, explained — then the answers themselves as rows that do the
+      // thing at once, where the verb can give them.
+      const answers = typeof verb.suggest === 'function' ? verb.suggest(rest) : [];
+      return [{ id: `verb.${verb.id}`, title: `${verb.title}: ${rest}`, sub: verb.hint ?? undefined, icon: verb.icon, run: () => verb.run(rest) }, ...answers];
     }
     const trimmed = text.trim();
     // A word on its own is a name, not an instruction: "parallel" is the

@@ -1,0 +1,32 @@
+﻿TBESH - Translators Brief lexicon of Extended Strongs for Hebrew - STEPBible.org CC BY
+See also
+TFBDB - Translators Formatted full BDB lexicon - STEPBible.org CC BY (not yet available)
+========================================================
+Extended Strongs for Hebrew is backward compatible with original Strong and extended to include all entries in BDB (compatible with OpenScriptures) and all prefixes, suffixes, personal pronoun endings and punctuation (as tagged in Tyndale House texts) 
+The Brief lexicon is based on Abridged BDB by Online Bible, and edited to conform with the extended Strongs. This is provided  for guidence only. Permission should be gained from Online Bible before these definitions are applied in any project. 
+The Full lexicon is edited from the Full BDB by Tyndale House, formatted to make it easy to read, with expansion of abbreviations and revealing bibliographic details on hover. 
+
+	==============================================================												
+	Data created by www.STEPBible.org based on work at Tyndale House Cambridge (CC BY 4.0)												
+	==============================================================												
+	This licence allows you to:												
+	* Include any part of this data in software or publications without requesting permission 												
+	* Download the data and reformat it for your application, without changing the data												
+	* Send any proposed corrections to STEPBibleATGmail.com. to be verified 												
+	  (You MAY make changes yourself, but you should include a note of changes that can be viewed by those who use your new data)												
+	* Refer others to github.com/STEPBible as the source of the data. Please do not redistribute it yourself. 												
+	  (Updates or corrections are easier to implement when the data is distributed from a single source)												
+	* We'd love to hear about your project when you make it available. Email us at STEPBibleATGmail.com..												
+	==============================================================												
+H0001	H0001G =	H0001G	אָב	av	H:N-M	father	1) father of an individual<br>2) of God as father of his people<br>3) head or founder of a household, group, family, or clan<br>4) ancestor<br>4a) grandfather, forefathers - of person<br>4b) of people<br>5) originator or patron of a class, profession, or art<br>6) of producer, generator (fig.)<br>7) of benevolence and protection (fig.)<br>8) term of respect and honour<br>9) ruler or chief (spec.)<BR>Also means: <i>av</i> (אַב "father" H0002)
+H0001	H0001H = a Part of	H2438H, 	אָב	av	H:N-M	(Huram)-abi	A man living at the time of United Monarchy, first mentioned at 1Ki.7.13; also called Huram-abi (KJV: "Huram my father's") at 2Ch.2.13; 4.16; <BR>Combined with <i>chi.ram</i> (חִירָם "Hiram" H2438H)
+H0001	H0001I = a Part of	H0022G	אָב	av	N:N-M-P	father of	The father of Gibeon, also known as Abiel - a man of the tribe of Benjamin living at the time of United Monarchy, first mentioned at 1Sa.9.1; <br> son of: Zeror (H6872C); married to Maacah (H4601N); <br> father of: Kish (H7027G), Ner (H5369G), Abdon (H5658J), Zur (H6698I), Baal (H1168B), Nadab (H5070J), Gedor (H1446I), Ahio (H0283I), Zecher (H2144) and Mikloth (H4732G); also called Jeiel (Ketiv: Jeuel; KJV: Jehiel) at 1Ch.9.35;  Ner at 1Ch.8.33; 9.39;
+H0430	H0430G = a Name of	H3068G	אֱלֹהִים	e.lo.him	H:N-M	God	This name means  "gods" (plural intensive-singular meaning), "God"<BR>Another name of <i>ye.ho.vah</i> (יהוה "LORD" H3068G) 
+H0430	H0430H = a Part of	H3068G	אֱלֹהִים	e.lo.him	H:N-M	(LORD)-Elohe	<BR>Combined with <i>ye.ho.vah</i> (יהוה "LORD" H3068)
+H0430	H0430I = a Part of	H1389G	אֱלֹהִים	e.lo.him	H:N-M	(Gibeath)-elohim	<BR>Combined with <i>giv.ah</i> (גִּבְעָה "Gibeath" H1389)
+H0853	H0853 =	H0853	אֵת	et	H:Part	[Obj.]	sign of the definite direct object, not translated in English but generally preceding and indicating the accusative<BR>Aramaic equivalent: <i>yat</i> (יָת "whom" H3487)
+H1254a	H1254A =	H1254A	בָּרָא	ba.ra	H:V	to create	1) to create, shape, form<br>1a) (Qal) to shape, fashion, create (always with God as subject)<br>1a1) of heaven and earth<br>1a2) of individual man<br>1a3) of new conditions and circumstances<br>1a4) of transformations<br>1b) (Niphal) to be created<br>1b1) of heaven and earth<br>1b2) of birth<br>1b3) of something new<br>1b4) of miracles<br>1c) (Piel)<br>1c1) to cut down<br>1c2) to cut out
+H1254b	H1254B =	H1254B	בָּרָא	ba.ra	H:V	to fatten	1) to be fat<br>1a) (Hiphil) to make yourselves fat
+H7225	H7225G =	H7225G	רֵאשִׁית	re.shit	H:N-F	first: beginning	: beginning<br>1) first, beginning, best, chief<br>1a) beginning<br>1b) first<br>1c) chief<br>1d) choice part<BR>Also means: <i>re.shit</i> (רֵאשִׁית ": best" H7225H)
+H7225	H7225H = a Meaning of	H7225G	רֵאשִׁית	re.shit	H:N-F	first: best	: best<br>1) first, beginning, best, chief<br>1a) beginning<br>1b) first<br>1c) chief<br>1d) choice part
+H9001	H9001 =	H9001	/וַ	v	H:Conj	&	Verbal vav: joined to verb with no intervening prefix (usually conversive)  (future<->past)

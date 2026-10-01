@@ -21,6 +21,7 @@ import { createAnnotations } from './services/annotations.js';
 import { createLibrary, fetchJson } from './services/library.js';
 import { createLangPacks } from './services/langpacks.js';
 import { createLexicons } from './services/lexicon.js';
+import { createLemmas } from './services/lemmas.js';
 import { createRecords } from './services/records.js';
 import { createSearch } from './services/search.js';
 import { createSettings } from './services/settings.js';
@@ -87,6 +88,13 @@ async function boot({ root, platform, features, config: overrides }) {
     records,
     langPacks: createLangPacks({ records, config }),
     lexicons,
+    lemmas: createLemmas({ store }),
+    /**
+     * What one feature lends another, by name — the guide's knowledge, which
+     * the Help page asks too. The context is frozen; this one object is not,
+     * so a feature can offer something without the context changing shape.
+     */
+    provided: {},
     search: createSearch(),
     state,
     registry,

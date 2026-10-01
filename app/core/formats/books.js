@@ -146,4 +146,16 @@ export function bookCodes(id) {
   return { usfm: USFM[id - 1] ?? '', osis: OSIS[id - 1] ?? '' };
 }
 
-export { USFM, OSIS };
+/**
+ * The Digital Bible Society's two-character codes, in canon order — the
+ * names browserBible gives its chapter pages (`GN1.html`, `S1` for 1 Samuel,
+ * `R1` for 1 Chronicles).
+ */
+const DBS = Object.freeze([
+  'GN', 'EX', 'LV', 'NU', 'DT', 'JS', 'JG', 'RT', 'S1', 'S2', 'K1', 'K2', 'R1', 'R2', 'ER', 'NH', 'ET', 'JB', 'PS', 'PR',
+  'EC', 'SS', 'IS', 'JR', 'LM', 'EK', 'DN', 'HS', 'JL', 'AM', 'OB', 'JH', 'MC', 'NM', 'HK', 'ZP', 'HG', 'ZC', 'ML',
+  'MT', 'MK', 'LK', 'JN', 'AC', 'RM', 'C1', 'C2', 'GL', 'EP', 'PP', 'CL', 'H1', 'H2', 'T1', 'T2', 'TT', 'PM', 'HB',
+  'JM', 'P1', 'P2', 'J1', 'J2', 'J3', 'JD', 'RV',
+]);
+
+export { USFM, OSIS, DBS };

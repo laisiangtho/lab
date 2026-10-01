@@ -470,20 +470,26 @@ function markdownText(book, chapters, { meta, name, notes, opts }) {
  * this app's JSON, and a spreadsheet. With Strong's numbers left out of the
  * export, `shapeChapters` has already taken them away and this is the text.
  *
- * @param {{ plain: (text: string) => string, word: (text: string, codes: string[]) => string }} style
+ * A word's morphology — the parsing of the number it stands for, its last —
+ * goes where the format puts one: USFM's and USX's `x-morph`, OSIS's `morph`,
+ * Zefania's `rmac`.
+ *
+ * @param {{ plain: (text: string) => string, word: (text: string, codes: string[], morph: string|null) => string }} style
  */
 function tagged(text, style) {
   return strongsRuns(String(text ?? ''), { all: true })
-    .map((run) => (run.codes.length ? style.word(run.text, run.codes) : style.plain(run.text)))
+    .map((run) => (run.codes.length ? style.word(run.text, run.codes, run.morphs.filter(Boolean).pop() ?? null) : style.plain(run.text)))
     .join('');
 }
 
+const attr = (name, value) => (value ? ` ${name}="${esc(value)}"` : '');
+
 // USFM 3: `\w word|strong="H430,H1234"\w*`.
-const USFM_WORD = { plain: (t) => t, word: (t, codes) => `\\w ${t}|strong="${codes.join(',')}"\\w*` };
-const USX_WORD = { plain: (t) => esc(t), word: (t, codes) => `<char style="w" strong="${codes.join(',')}">${esc(t)}</char>` };
-const OSIS_WORD = { plain: (t) => esc(t), word: (t, codes) => `<w lemma="${codes.map((c) => `strong:${c}`).join(' ')}">${esc(t)}</w>` };
+const USFM_WORD = { plain: (t) => t, word: (t, codes, morph) => `\\w ${t}|strong="${codes.join(',')}"${morph ? ` x-morph="${morph}"` : ''}\\w*` };
+const USX_WORD = { plain: (t) => esc(t), word: (t, codes, morph) => `<char style="w" strong="${codes.join(',')}"${attr('x-morph', morph)}>${esc(t)}</char>` };
+const OSIS_WORD = { plain: (t) => esc(t), word: (t, codes, morph) => `<w lemma="${codes.map((c) => `strong:${c}`).join(' ')}"${attr('morph', morph)}>${esc(t)}</w>` };
 // Zefania numbers a word without its testament letter; the book says which.
-const ZEFANIA_WORD = { plain: (t) => esc(t), word: (t, codes) => `<gr str="${codes.map((c) => c.replace(/^[HG]/, '')).join(' ')}">${esc(t)}</gr>` };
+const ZEFANIA_WORD = { plain: (t) => esc(t), word: (t, codes, morph) => `<gr str="${codes.map((c) => c.replace(/^[HG]/, '')).join(' ')}"${attr('rmac', morph)}>${esc(t)}</gr>` };
 // Markdown has no markup for it; a superscript is what a reader would write.
 const MARKDOWN_WORD = { plain: (t) => t, word: (t, codes) => `${t}<sup>${codes.join(' ')}</sup>` };
 

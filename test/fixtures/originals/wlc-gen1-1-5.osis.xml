@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<osis xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.bibletechnologies.net/2003/OSIS/namespace" xsi:schemaLocation="http://www.bibletechnologies.net/2003/OSIS/namespace http://www.bibletechnologies.net/osisCore.2.1.1.xsd">
+  <osisText xml:lang="he" osisIDWork="WLC">
+    <header>
+      <revisionDesc resp="dt">
+        <date>2013.12.11</date>
+        <p>First release of morphology on selected portions.</p>
+      </revisionDesc>
+      <revisionDesc resp="dt">
+        <date>2013.07.10</date>
+        <p>Updated to WLC version 4.18.</p>
+      </revisionDesc>
+      <revisionDesc resp="dt">
+        <date>2012.07.18</date>
+        <p>Updated to WLC version 4.16.</p>
+      </revisionDesc>
+      <revisionDesc resp="dt">
+        <date>2011.01.21</date>
+        <p>Updated to WLC version 4.14.</p>
+      </revisionDesc>
+      <revisionDesc resp="dt">
+        <date>2008.08.08</date>
+        <p>Convert the Westminster Leningrad Codex files from TEI markup to OSIS book files.</p>
+      </revisionDesc>
+      <work osisWork="WLC" xml:lang="he">
+        <title>Westminster Leningrad Codex</title>
+        <contributor role="edt">Daniel Owens</contributor>
+        <contributor role="edt">David Troidl</contributor>
+        <contributor role="edt">Christopher V. Kimball</contributor>
+        <date>2007.9.16</date>
+        <identifier type="URL">http://www.tanach.us/Tanach.xml</identifier>
+        <rights>Public Domain</rights>
+      </work>
+      <work osisWork="BHS" xml:lang="he">
+        <title>BHS unaccented with Strongs</title>
+        <contributor role="edt">Joseph Planeta</contributor>
+        <contributor role="edt">Rev. Graham Nind</contributor>
+        <description>Unaccented Biblia Hebraica Stuttgartensia Hebrew with Strong's numbers by Rev. Graham.</description>
+        <identifier type="URL">http://www.faithofgod.net/</identifier>
+        <identifier type="URL">http://www.grahamnind.dsl.pipex.com/files</identifier>
+        <rights>Public Domain</rights>
+      </work>
+      <work osisWork="Strong" xml:lang="en">
+        <title>A Concise Dictionary of the Words in the Hebrew Bible</title>
+        <title type="sub">with their Renderings in the King James Version</title>
+        <contributor role="edt">David Troidl</contributor>
+        <contributor role="edt">David Instone-Brewer</contributor>
+        <creator role="edt">James Strong, LL.D., S.T.D.</creator>
+        <date>1894</date>
+        <description resp="dib">The data came from several PD sources which were full of errors. I cleaned them by comparing them to each other and (where necessary) looking at the original.</description>
+        <publisher>Hunt &amp;amp; Eaton</publisher>
+        <identifier type="URL">www.2LetterLookup.com</identifier>
+        <source>The exhaustive concordance of the Bible:</source>
+        <rights>Public Domain</rights>
+      </work>
+      <work osisWork="OSHM" xml:lang="en">
+        <title>Open Scriptures Hebrew Morphology</title>
+        <creator role="edt">Open Scriptures Hebrew Bible Project</creator>
+        <date>2013.12.11</date>
+        <identifier type="URL">https://github.com/openscriptures/morphhb</identifier>
+        <rights type="x-BY-SA">Creative Commons Attribution-ShareAlike</rights>
+      </work>
+      <workPrefix path="//w/@lemma" osisWork="Strong"/>
+      <workPrefix path="//w/@morph" osisWork="OSHM"/>
+    </header>
+    <div type="book" osisID="Gen">
+      <chapter osisID="Gen.1">
+        <verse osisID="Gen.1.1">
+          <w lemma="b/7225" n="1.0" morph="HR/Ncfsa">בְּ/רֵאשִׁ֖ית</w>
+          <w lemma="1254 a" morph="HVqp3ms">בָּרָ֣א</w>
+          <w lemma="430" n="1" morph="HNcmpa">אֱלֹהִ֑ים</w>
+          <w lemma="853" morph="HTo">אֵ֥ת</w>
+          <w lemma="d/8064" n="0.0" morph="HTd/Ncmpa">הַ/שָּׁמַ֖יִם</w>
+          <w lemma="c/853" morph="HC/To">וְ/אֵ֥ת</w>
+          <w lemma="d/776" n="0" morph="HTd/Ncfsa">הָ/אָֽרֶץ</w><seg type="x-sof-pasuq">׃</seg>
+        </verse>
+        <verse osisID="Gen.1.2">
+          <w lemma="c/d/776" n="1.1.1" morph="HC/Td/Ncfsa">וְ/הָ/אָ֗רֶץ</w>
+          <w lemma="1961" morph="HVqp3fs">הָיְתָ֥ה</w>
+          <w lemma="8414" n="1.1.0" morph="HNcmsa">תֹ֙הוּ֙</w>
+          <w lemma="c/922" n="1.1" morph="HC/Ncmsa">וָ/בֹ֔הוּ</w>
+          <w lemma="c/2822" n="1.0" morph="HC/Ncmsa">וְ/חֹ֖שֶׁךְ</w>
+          <w lemma="5921 a" morph="HR">עַל</w><seg type="x-maqqef">־</seg><w lemma="6440" morph="HNcmpc">פְּנֵ֣י</w>
+          <w lemma="8415" n="1">תְה֑וֹם</w>
+          <w lemma="c/7307" morph="HC/Ncfsc">וְ/ר֣וּחַ</w>
+          <w lemma="430" n="0.1" morph="HNcmpa">אֱלֹהִ֔ים</w>
+          <w lemma="7363 b" n="0.0">מְרַחֶ֖פֶת</w>
+          <w lemma="5921 a" morph="HR">עַל</w><seg type="x-maqqef">־</seg><w lemma="6440" morph="HNcmpc">פְּנֵ֥י</w>
+          <w lemma="d/4325" n="0" morph="HTd/Ncmda">הַ/מָּֽיִם</w><seg type="x-sof-pasuq">׃</seg>
+        </verse>
+        <verse osisID="Gen.1.3">
+          <w lemma="c/559">וַ/יֹּ֥אמֶר</w>
+          <w lemma="430" n="1.0">אֱלֹהִ֖ים</w>
+          <w lemma="1961">יְהִ֣י</w>
+          <w lemma="216" n="1">א֑וֹר</w>
+          <w lemma="c/1961">וַֽ/יְהִי</w><seg type="x-maqqef">־</seg><w lemma="216" n="0">אֽוֹר</w><seg type="x-sof-pasuq">׃</seg>
+        </verse>
+        <verse osisID="Gen.1.4">
+          <w lemma="c/7200">וַ/יַּ֧רְא</w>
+          <w lemma="430" n="1.0.0">אֱלֹהִ֛ים</w>
+          <w lemma="853">אֶת</w><seg type="x-maqqef">־</seg><w lemma="d/216" n="1.0">הָ/א֖וֹר</w>
+          <w lemma="3588 a">כִּי</w><seg type="x-maqqef">־</seg><w lemma="2896 a" n="1" morph="HNcmsa">ט֑וֹב</w>
+          <w lemma="c/914">וַ/יַּבְדֵּ֣ל</w>
+          <w lemma="430" n="0.1">אֱלֹהִ֔ים</w>
+          <w lemma="996">בֵּ֥ין</w>
+          <w lemma="d/216" n="0.0">הָ/א֖וֹר</w>
+          <w lemma="c/996">וּ/בֵ֥ין</w>
+          <w lemma="d/2822" n="0">הַ/חֹֽשֶׁךְ</w><seg type="x-sof-pasuq">׃</seg>
+        </verse>
+        <verse osisID="Gen.1.5">
+          <w lemma="c/7121">וַ/יִּקְרָ֨א</w>
+          <w lemma="430">אֱלֹהִ֤ים</w>
+          <seg type="x-paseq">׀</seg>
+          <w lemma="l/216" n="1.1.0">לָ/אוֹר֙</w>
+          <w lemma="3117" n="1.1">י֔וֹם</w>
+          <w lemma="c/l/2822" n="1.0">וְ/לַ/חֹ֖שֶׁךְ</w>
+          <w lemma="7121">קָ֣רָא</w>
+          <w lemma="3915" n="1">לָ֑יְלָה</w>
+          <w lemma="c/1961">וַֽ/יְהִי</w><seg type="x-maqqef">־</seg><w lemma="6153">עֶ֥רֶב</w>
+          <w lemma="c/1961">וַֽ/יְהִי</w><seg type="x-maqqef">־</seg><w lemma="1242" n="0.0">בֹ֖קֶר</w>
+          <w lemma="3117">י֥וֹם</w>
+          <w lemma="259" n="0">אֶחָֽד</w><seg type="x-sof-pasuq">׃</seg>
+          <seg type="x-pe">פ</seg>
+        </verse>
+        </chapter>
+      </div>
+    </osisText>
+</osis>

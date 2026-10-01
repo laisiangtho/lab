@@ -133,6 +133,18 @@ const EMPTY = Object.freeze({ lemma: '', translit: '', pronounce: '', part: '', 
  *          definition" and "that lexicon is not on this device" are different
  *          answers and the reader can act on only one of them.
  */
+/**
+ * A few words for an interlinear line: the first line of the definition, up
+ * to its first semicolon, no longer than a short phrase. STEPBible's entries
+ * open with exactly this ("to create"); a Strong's dictionary opens with its
+ * first rendering.
+ */
+export function glossOf(entry, { max = 28 } = {}) {
+  const first = String(entry?.define ?? '').split('\n')[0].split(/[;(]/)[0].replace(/[\s,.:]+$/, '').trim();
+  if (!first) return '';
+  return first.length > max ? `${first.slice(0, max - 1).trimEnd()}…` : first;
+}
+
 export function lookup(held, code) {
   const { testament, key } = splitCode(code);
   if (!key) return { code: String(code ?? ''), testament: '', entry: null, why: 'unreadable' };
@@ -144,6 +156,95 @@ export function lookup(held, code) {
   if (!where) return { code, testament: '', entry: null, why: available.length ? 'ambiguous' : 'none' };
   const book = held?.[where];
   if (!book) return { code, testament: where, entry: null, why: 'missing' };
-  const entry = book.entries?.[key] ?? null;
-  return { code, testament: where, entry, why: entry ? '' : 'absent' };
+  // A sense the lexicon does not split (H1254a against a plain Strong's) is
+  // read as the number it is a sense of.
+  let entry = book.entries?.[key] ?? book.entries?.[key.replace(/[a-z]$/, '')] ?? null;
+  // The other way round: a plain Strong's number against a lexicon that only
+  // has its senses (STEPBible's H1254a and H1254b, and no H1254). The first
+  // sense is the answer, and the senses are named so the reader knows it is
+  // one of several.
+  let senses = [];
+  if (!entry && /\d$/.test(key)) {
+    senses = Object.keys(book.entries ?? {}).filter((k) => k.length === key.length + 1 && k.startsWith(key) && /[a-z]$/.test(k)).sort();
+    entry = senses.length ? book.entries[senses[0]] : null;
+  }
+  return { code, testament: where, entry, why: entry ? '' : 'absent', senses };
+}
+
+/**
+ * STEPBible's brief lexicons of extended Strong's numbers — TBESH (Hebrew)
+ * and TBESG (Greek), CC BY 4.0 — as they are published: tab-separated text,
+ * a header and then one line a sense:
+ *
+ *   eStrong  dStrong            uStrong  word     translit  part    gloss       meaning
+ *   H1254a   H1254A =           H1254A   בָּרָא    ba.ra     H:V     to create   1) to create, shape …<br>…
+ *   H0430    H0430G = a Name of H3068G   אֱלֹהִים  e.lo.him  H:N-M   God         …
+ *
+ * The first column is the number as OpenScriptures and STEPBible tag their
+ * texts, sense letter included (`H1254a`), so it is the key. A number with
+ * several lines — a word and the names built on it — keeps its plain sense:
+ * the line whose second column says nothing after "=", or else the first.
+ * The meaning is HTML; it is kept as text, its line breaks as line breaks.
+ *
+ * @returns {{ testament: string, name: string, source: string, entries: Record<string, LexEntry> }}
+ */
+export function readStepLexicon(text, { source }) {
+  const lines = String(text ?? '').replace(/^\uFEFF/, '').split(/\r?\n/);
+  const title = (lines.find((line) => /^TBES[HG]\b/.test(line.trim())) ?? '').trim();
+  const entries = {};
+  const plain = {};
+  const letters = { H: 0, G: 0 };
+  for (const line of lines) {
+    if (!/^[HG]\d{1,5}[a-z]?\t/i.test(line)) continue;
+    const cells = line.split('\t');
+    if (cells.length < 8) continue;
+    const key = normalizeKey(cells[0]);
+    if (!key) continue;
+    letters[cells[0][0].toUpperCase()] += 1;
+    const isPlain = /=\s*$/.test(cells[1].trim());
+    if (entries[key] && (plain[key] || !isPlain)) continue;
+    entries[key] = {
+      ...EMPTY,
+      lemma: cells[3].trim(),
+      translit: cells[4].trim(),
+      part: cells[5].trim(),
+      define: [cells[6].trim(), htmlText(cells[7])].filter(Boolean).join('\n'),
+    };
+    plain[key] = isPlain;
+  }
+  const testament = letters.H >= letters.G ? 'H' : 'G';
+  if (!Object.keys(entries).length) fail(source, '$', 'no lexicon lines in this file (expected STEPBible TBESH or TBESG)');
+  return {
+    testament,
+    name: title.replace(/\s+-\s+STEPBible\.org.*$/, '') || `STEPBible ${testament === 'H' ? 'Hebrew' : 'Greek'}`,
+    source: title.includes('CC BY') ? 'STEPBible.org, CC BY 4.0' : 'STEPBible.org',
+    entries,
+  };
+}
+
+/** Whether a text is one of STEPBible's lexicons, by its own first line. */
+export const isStepLexicon = (text) => /^\uFEFF?TBES[HG]\b/.test(String(text ?? '').trimStart());
+
+/**
+ * A lexicon file of either kind a reader may bring: this app's JSON, or a
+ * STEPBible brief lexicon.
+ */
+export function readLexiconFile(text, { source }) {
+  if (isStepLexicon(text)) return readStepLexicon(text, { source });
+  let raw;
+  try { raw = JSON.parse(text); } catch {
+    fail(source, '$', 'not a lexicon this app reads: expected its JSON lexicon or STEPBible TBESH/TBESG');
+  }
+  return parseLexicon(raw, { source });
+}
+
+/** HTML as plain text: tags gone, line breaks kept, entities read. */
+function htmlText(html) {
+  return String(html ?? '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .trim();
 }

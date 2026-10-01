@@ -112,6 +112,12 @@ export const defaultSettings = Object.freeze({
   ribbonItems: null,
   /** Show Strong's numbers where a translation carries them. */
   strongs: false,
+  /**
+   * Under each verse, the original-language text the reader imported (Hebrew
+   * for the Old Testament, Greek for the New), a word at a time, each with its
+   * gloss from the lexicon where one is held.
+   */
+  interlinear: false,
   /** Show section headings (the translation's `story` and verse titles). */
   headings: true,
   /** Show the cross-reference lines under the verses that carry them. */
@@ -251,7 +257,7 @@ export function parseSettings(raw, { source, category }) {
     readingLeading: clamp(raw.readingLeading, READING.leading, defaultSettings.readingLeading),
     readingMeasure: clamp(raw.readingMeasure, READING.measure, defaultSettings.readingMeasure),
     uiSize: clamp(raw.uiSize, READING.ui, defaultSettings.uiSize),
-    mode, strongs: flag('strongs'), headings: flag('headings'), xrefs: flag('xrefs'),
+    mode, strongs: flag('strongs'), interlinear: flag('interlinear'), headings: flag('headings'), xrefs: flag('xrefs'),
     sourceFormat: SOURCE_FORMATS.includes(raw.sourceFormat) ? raw.sourceFormat : defaultSettings.sourceFormat,
     readingFont: READING_FONTS.includes(raw.readingFont) ? raw.readingFont : defaultSettings.readingFont,
     restoreTabs: flag('restoreTabs'), motion: flag('motion'),

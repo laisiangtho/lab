@@ -33,6 +33,20 @@ export default {
     let live = null;
     const waiting = [];
 
+    // One knowledge for every view that asks it, loaded the first time one
+    // does (or soon after startup, so "?" in the palette has answers to show).
+    let loading = null;
+    let knowledge = null;
+    const load = () => (loading ??= import('./knowledge.js').then(({ createKnowledge }) => {
+      knowledge = createKnowledge(ctx, { guideData });
+      return knowledge;
+    }));
+    ctx.provided.guide = { load, get loaded() { return knowledge; } };
+    shell.whenReady?.(() => {
+      const soon = window.requestIdleCallback ?? ((fn) => setTimeout(fn, 1500));
+      soon(() => { load().catch(() => {}); });
+    });
+
     const openWith = (question) => {
       if (question) waiting.push(question);
       shell.selectPane('right', 'guide');
@@ -50,9 +64,9 @@ export default {
         let disposed = false;
         let dispose = null;
         el.classList.add('guide-host');
-        import('./pane.js').then(({ mountGuide }) => {
+        Promise.all([import('./pane.js'), load()]).then(([{ mountGuide }, known]) => {
           if (disposed) return;
-          const pane = mountGuide(el, ctx, { guideData });
+          const pane = mountGuide(el, ctx, { knowledge: known });
           dispose = pane.dispose;
           live = pane;
           while (waiting.length) pane.ask(waiting.shift());
@@ -71,6 +85,27 @@ export default {
       title: L('guide.verb'),
       hint: L('guide.verbHint'),
       run: (text) => openWith(text),
+      // The palette's view of the knowledge: the best answers, as rows to
+      // press. Until the knowledge has loaded there is only the question.
+      suggest: (text) => {
+        if (!knowledge) { load().then(() => shell.refreshPalette?.()).catch(() => {}); return []; }
+        const found = knowledge.answer(text, { limit: 4 });
+        if (found.passage) return [];
+        return found.hits.map(({ entry }) => {
+          const action = knowledge.runnable(entry.does);
+          return {
+            id: `guide.${entry.id}`,
+            title: entry.title,
+            sub: entry.text,
+            icon: 'guide',
+            run: () => {
+              knowledge.remember(text, entry.id, +1);
+              if (action) action.run();
+              else openWith(text);
+            },
+          };
+        });
+      },
     });
 
     registry.setting({
@@ -110,6 +145,7 @@ export default {
             });
             if (!sure) return;
             await records.save(GUIDE_KEY, null);
+            knowledge?.forget();
             shell.notify(L('guide.forgotten'), 'ok');
             ui.refresh();
           },

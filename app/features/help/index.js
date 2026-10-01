@@ -60,18 +60,66 @@ export default {
           guidePane ? task('guide', L('pane.guide'), L('doc.t.guide'), '', () => shell.selectPane(guidePane.side, 'guide')) : null,
         ].filter(Boolean);
 
+        // The question first: Help is the knowledge laid out in the
+        // workspace, and asking is the quickest way through it. The answers
+        // open under the field; everything there is to know is below them.
+        const answers = h('div', { class: 'hp-answers', 'aria-live': 'polite' });
+        const topics = h('div', { class: 'hp-topics' });
+        const data = h('div', { class: 'hp-data' });
+        const field = h('input', {
+          class: 'hp-input', type: 'search', spellcheck: 'false', enterkeyhint: 'search',
+          placeholder: L('guide.placeholder'), 'aria-label': L('guide.placeholder'),
+        });
+        const askBox = h('form', {
+          class: 'hp-ask', role: 'search', hidden: true,
+          onsubmit: (e) => { e.preventDefault(); ask(field.value.trim()); },
+        }, icon('guide'), field, h('button', { class: 'btn primary hp-go', type: 'submit' }, L('guide.send')));
+
+        let knowledge = null;
+        let blocks = [];
+        const ask = (question, chosen = null) => {
+          if (!knowledge || !question) return;
+          import('../guide/cards.js').then(({ answerBlock }) => {
+            const block = answerBlock(ctx, knowledge, question, { chosen, help: false, again: () => ask(question, chosen) });
+            // The newest answer on top, and only a few: this is a page to come
+            // back to, not a transcript.
+            blocks = [block, ...blocks].slice(0, 3);
+            fill(answers, ...blocks);
+            block.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          });
+        };
+        const paintKnowledge = () => {
+          fill(topics, ...knowledge.topics().map((entry) => h('button', {
+            type: 'button', class: 'hp-topic', dataset: { entry: entry.id },
+            onclick: () => ask(entry.title, entry.id),
+          }, entry.title)));
+          import('../guide/cards.js').then(({ dataLine }) => fill(data, dataLine(knowledge)));
+        };
+        let off = null;
+        ctx.provided.guide?.load().then((known) => {
+          knowledge = known;
+          askBox.hidden = false;
+          paintKnowledge();
+          off = known.on('change', paintKnowledge);
+        }).catch((err) => fill(answers, h('p', { class: 'empty-hint' }, L('guide.failed', { why: err.message }))));
+
         el.append(
-          h('div', { class: 'note doc' },
-            h('h1', { class: 'inline-title' }, L('doc.help')),
-            h('p', { class: 'doc-lede' }, L('doc.help.lede')),
+          h('div', { class: 'note doc help-doc' },
+            askBox,
+            answers,
+            h('div', { class: 'doc-h' }, L('doc.help.do')),
             h('div', { class: 'task-grid' }, cards),
+            ctx.provided.guide ? h('div', { class: 'doc-h' }, L('doc.help.topics')) : null,
+            ctx.provided.guide ? topics : null,
             h('div', { class: 'doc-h' }, L('doc.help.more')),
             h('div', { class: 'task-grid' },
               task('cmd', L('doc.shortcuts'), L('doc.t.shortcuts'), '', () => shell.openDoc('shortcuts')),
               task('info', L('doc.about'), L('doc.t.about'), '', () => shell.openDoc('about')),
               task('settings', L('cmd.settings'), L('doc.t.settings'), '', () => shell.openDoc('settings')),
               task('db', L('doc.formats'), L('doc.t.formats'), '', () => shell.openDoc('formats')),
-              has('welcome.open') ? task('spark', L('doc.welcome'), L('doc.t.welcome'), '', () => shell.openDoc('welcome')) : null)));
+              has('welcome.open') ? task('spark', L('doc.welcome'), L('doc.t.welcome'), '', () => shell.openDoc('welcome')) : null),
+            ctx.provided.guide ? data : null));
+        return () => off?.();
       },
     });
 

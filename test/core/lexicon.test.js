@@ -87,3 +87,38 @@ test('a bare number is placed only when there is one place it could go', () => {
   assert.equal(lookup(hebrewOnly, '430').entry.define, 'gods in the ordinary sense');
   assert.equal(lookup({}, '430').why, 'none');
 });
+
+test('STEPBible brief lexicon: keyed by extended number, the plain sense kept, the meaning as text', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { readLexiconFile, lookup } = await import('../../app/core/lexicon.js');
+  const { root } = await import('../helpers.js');
+  const text = readFileSync(root('test/fixtures/originals/tbesh-extract.txt'), 'utf8');
+  const lex = readLexiconFile(text, { source: 'tbesh.txt' });
+  assert.equal(lex.testament, 'H');
+  assert.match(lex.name, /Translators Brief lexicon of Extended Strongs for Hebrew/);
+  assert.match(lex.source, /CC BY/);
+  assert.equal(lex.entries['1254a'].lemma.normalize('NFC'), 'בָּרָא'.normalize('NFC'));
+  assert.equal(lex.entries['1254a'].translit, 'ba.ra');
+  assert.match(lex.entries['1254a'].define, /^to create\n1\) to create, shape, form/);
+  assert.match(lex.entries['1254b'].define, /^to fatten/);
+  assert.match(lex.entries['1'].define, /^father\n1\) father of an individual/, 'the word, not the names built on it');
+  assert.ok(!/<|&nbsp;/.test(lex.entries['1'].define), 'no markup left');
+  const held = { H: lex };
+  assert.equal(lookup(held, 'H1254A').entry.translit, 'ba.ra', 'the sense as tagged');
+  assert.equal(lookup(held, 'H430').entry.translit, 'e.lo.him');
+  const plain = lookup(held, 'H1254');
+  assert.equal(plain.entry.translit, 'ba.ra', 'a plain number, as the KJV and WLC tag it, finds its first sense');
+  assert.deepEqual(plain.senses, ['1254a', '1254b'], 'and says it is one of two');
+  assert.deepEqual(lookup(held, 'H1254A').senses, [], 'a sense asked for by name is not one of several');
+});
+
+test('a gloss is the opening words of an entry, short enough to sit under a word', async () => {
+  const { glossOf } = await import('../../app/core/lexicon.js');
+  assert.equal(glossOf({ define: 'to create\n1) to create, shape, form' }), 'to create');
+  assert.equal(glossOf({ define: 'God; gods, judges, angels' }), 'God');
+  assert.equal(glossOf({ define: 'beginning (of time), first' }), 'beginning');
+  assert.equal(glossOf({ define: 'a very long gloss that goes on well past any column width' }).length, 28);
+  assert.match(glossOf({ define: 'a very long gloss that goes on well past any column width' }), /…$/);
+  assert.equal(glossOf(null), '');
+  assert.equal(glossOf({ define: '' }), '');
+});

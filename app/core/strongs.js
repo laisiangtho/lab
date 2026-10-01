@@ -36,7 +36,10 @@
 // Built fresh per use: a shared /g regex carries lastIndex between calls, so
 // a test() would move where the next matchAll() starts.
 const CODE = String.raw`[HG]?\d{1,5}[A-Za-z]?`;
-const TOKEN_SOURCE = String.raw`\{(${CODE})\}|<S>(${CODE})<\/S>|\[([HG]\d{1,5}[A-Za-z]?)\]`;
+// A morphology code may follow the number after a colon: {H1254:HVqp3ms}.
+// It may itself hold a colon (KJV's "strongMorph:TH8804"); it never holds a
+// brace or a space.
+const TOKEN_SOURCE = String.raw`\{(${CODE})(?::([^{}\s]+))?\}|<S>(${CODE})<\/S>|\[([HG]\d{1,5}[A-Za-z]?)\]`;
 const tokens = () => new RegExp(TOKEN_SOURCE, 'g');
 
 /** The last number in each of Strong's two lexicons. */
@@ -44,9 +47,10 @@ export const STRONGS_LAST = Object.freeze({ H: 8674, G: 5624 });
 
 /**
  * @param {string} text
- * @returns {{ text: string, codes: {code: string, at: number}[] }}
- *          `text` without the markup, and each code with the offset, in that
- *          text, of the end of the word it belongs to
+ * @returns {{ text: string, codes: {code: string, morph: string|null, at: number}[] }}
+ *          `text` without the markup, and each code — with its morphology
+ *          where the edition gives one — and the offset, in that text, of the
+ *          end of the word it belongs to
  */
 export function extractStrongs(text) {
   if (!hasStrongs(text)) return { text, codes: [] };
@@ -60,7 +64,7 @@ export function extractStrongs(text) {
   for (const match of text.matchAll(tokens())) {
     append(text.slice(last, match.index));
     // "word {H430}" belongs to "word", not to the space after it.
-    codes.push({ code: normalizeCode(match[1] ?? match[2] ?? match[3]), at: out.replace(/\s+$/u, '').length });
+    codes.push({ code: normalizeCode(match[1] ?? match[3] ?? match[4]), morph: match[2] ?? null, at: out.replace(/\s+$/u, '').length });
     last = match.index + match[0].length;
   }
   append(text.slice(last));
@@ -121,26 +125,27 @@ export function kindOf(code) {
  * up for them — unless `all` is asked for, which a writer does: a file written
  * out keeps everything the translation carries.
  *
- * @returns {{ text: string, code: string|null, codes: string[] }[]}
+ * @returns {{ text: string, code: string|null, codes: string[], morphs: (string|null)[] }[]}
+ *          `morphs[i]` is the morphology of `codes[i]`, where the edition gives one
  */
 export function strongsRuns(text, { all = false } = {}) {
   const { text: clean, codes } = extractStrongs(String(text ?? ''));
   const wanted = (code) => all || kindOf(code) === 'strongs';
-  if (!codes.some(({ code }) => wanted(code))) return [{ text: clean, code: null, codes: [] }];
+  const plain = (piece) => ({ text: piece, code: null, codes: [], morphs: [] });
+  if (!codes.some(({ code }) => wanted(code))) return [plain(clean)];
 
   const runs = [];
   let from = 0;
   let lastAt = -1;
-  for (const { code, at } of codes) {
+  for (const { code, morph, at } of codes) {
     const shown = wanted(code);
     // Another number on the word just read.
     if (at === lastAt) {
       const previous = runs[runs.length - 1];
       if (!shown) continue;
-      if (previous?.code) { previous.codes.push(code); continue; }
-      // The word's first number was the edition's own; this one is Strong's.
-      previous.code = code;
-      previous.codes = [code];
+      if (!previous.code) previous.code = code; // the first was the edition's own
+      previous.codes.push(code);
+      previous.morphs.push(morph);
       continue;
     }
     // The number belongs to the word ending at `at`: back to the last space,
@@ -148,12 +153,13 @@ export function strongsRuns(text, { all = false } = {}) {
     // without spaces put one tagged word straight after another. An edition
     // number still ends a word, or its word would be taken by the next one.
     const wordStart = Math.max(clean.lastIndexOf(' ', Math.max(at - 1, 0)) + 1, from);
-    if (wordStart > from) runs.push({ text: clean.slice(from, wordStart), code: null, codes: [] });
-    runs.push(shown ? { text: clean.slice(wordStart, at), code, codes: [code] } : { text: clean.slice(wordStart, at), code: null, codes: [] });
+    if (wordStart > from) runs.push(plain(clean.slice(from, wordStart)));
+    const word = clean.slice(wordStart, at);
+    runs.push(shown ? { text: word, code, codes: [code], morphs: [morph] } : plain(word));
     from = at;
     lastAt = at;
   }
-  if (from < clean.length) runs.push({ text: clean.slice(from), code: null, codes: [] });
+  if (from < clean.length) runs.push(plain(clean.slice(from)));
   return runs.filter((run) => run.text !== '');
 }
 
@@ -198,4 +204,29 @@ export function codeRanges(text) {
     offset += run.text.length;
   }
   return out;
+}
+
+/**
+ * The inline notation for one tagged word, from however an edition spells
+ * its numbers: `H7225`, `strong:H7225`, OpenScriptures' `b/7225` (a Hebrew
+ * prefix, then the number), a number with leading zeros, several at once.
+ * A number without its testament letter takes `letter` when the caller knows
+ * it from the book. The morphology, when there is one, belongs to the word's
+ * last number — the one the word itself stands for; earlier ones are its
+ * particles and prefixes.
+ *
+ * @param {string[]} raws
+ * @param {{ morph?: string|null, letter?: 'H'|'G'|null }} [options]
+ * @returns {string} e.g. "{H853}{H1254:HVqp3ms}", or "" when nothing is a number
+ */
+export function tagNotation(raws, { morph = null, letter = null } = {}) {
+  const codes = raws
+    // OpenScriptures writes a sense after a space: "1254 a" is 1254a.
+    .flatMap((raw) => String(raw ?? '').replace(/(\d)\s+([a-z])\b/gi, '$1$2').split(/[,\s]+/))
+    .map((part) => /(?:^|[/:])([HG]?)0*(\d{1,5})([a-z]?)$/i.exec(part.trim()))
+    .filter(Boolean)
+    .map(([, l, n, sense]) => `${(l || letter || '').toUpperCase()}${n}${sense.toUpperCase()}`);
+  if (!codes.length) return '';
+  const tidy = String(morph ?? '').replace(/[{}\s]+/g, '');
+  return codes.map((code, i) => (i === codes.length - 1 && tidy ? `{${code}:${tidy}}` : `{${code}}`)).join('');
 }

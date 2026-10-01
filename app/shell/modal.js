@@ -85,7 +85,10 @@ export function createModal() {
     input.setSelectionRange(text.length, text.length);
   }
 
-  return { element, open, close, setQuery, get isOpen() { return !element.hidden; } };
+  /** Ask the suggestions again — something they depend on has arrived. */
+  const refresh = () => { if (!element.hidden) paint(); };
+
+  return { element, open, close, setQuery, refresh, get isOpen() { return !element.hidden; } };
 }
 
 /**

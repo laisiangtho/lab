@@ -25,7 +25,8 @@
  */
 
 import { USFM } from './books.js';
-import { convert, sniff } from './index.js';
+import { isBrowserBible, readBrowserBible } from './browserbible.js';
+import { completeRaw, convert, sniff } from './index.js';
 import { localName, readXml } from './xmlread.js';
 
 /**
@@ -71,8 +72,10 @@ export function classify(files) {
  *   <id>_readaloud.zip     a chapter to a text file, verse numbers taken out
  *                          so a speech engine does not read them — nothing
  *                          left to say which verse is which
- *   <id>_browserBible.zip  pages built for one web reader
  *   <id>_html.zip          the website, a chapter to a page
+ *   <id>_browserBible.zip  only when its pages hold no verses this reader
+ *                          recognises; an ordinary one is read
+ *                          (formats/browserbible.js)
  *
  * `<id>_usfx.zip` is the same translation as data: verses, book names,
  * metadata, copyright and, for a tagged edition, its Strong's numbers.
@@ -89,6 +92,8 @@ export function otherEdition(files, archiveName = '') {
     const id = idFrom(base) || idFrom(from ?? '') || '';
     return { kind, id, instead: id ? `${id}_usfx.zip` : 'the USFX zip' };
   };
+  // A browserBible text is read (formats/browserbible.js), not turned away.
+  if (isBrowserBible(files)) return null;
   if (/_readaloud\.zip$/i.test(base)) return pick('readaloud');
   const read = names.find((name) => /_read\.txt$/i.test(name));
   if (read) return pick('readaloud', read);
@@ -109,6 +114,11 @@ export function otherEdition(files, archiveName = '') {
  *          adapter returns, ready for `parseTranslation`
  */
 export function readPack(files, { category, info = {}, source = 'archive' }) {
+  // A browserBible folder is pages, not scripture files; it has its own reader.
+  if (isBrowserBible(files)) {
+    const { raw, report } = readBrowserBible(files, { info: clean(info), source });
+    return { raw: completeRaw(raw, { source, category, info: clean(info) }), report };
+  }
   const { usable, meta, names, rights, scripture } = classify(files);
   if (!scripture.length) {
     const other = otherEdition(files, source);

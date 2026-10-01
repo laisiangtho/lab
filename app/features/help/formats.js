@@ -107,6 +107,14 @@ export function formatSections({ config }) {
       },
     },
     {
+      heading: 'Hebrew, Greek and lexicons',
+      body: [
+        'The original languages are read only from files brought to the app: the Westminster Leningrad Codex as OpenScriptures OSIS (morphhb), or a Hebrew or Greek text from eBible.org as USFX or browserBible. A Hebrew, Aramaic or Greek translation that carries Strong\'s numbers becomes the original that the word study and the interlinear line read from. Each tagged word is kept as word{H1254:HVqp3ms}: the number, and the morphology after a colon.',
+        'A browserBible zip is a folder of chapter pages (GN1.html …) and an info.json. Its index/ and indexlemma/ folders are search indexes derived from the same pages; they are not read. The app builds its own index of each translation\'s Strong\'s numbers — every word used for a number, and where — the first time a word in it is studied.',
+        'Lexicons: the app\'s own JSON, or STEPBible\'s TBESH (Hebrew) and TBESG (Greek) as published, imported as files. Morphology codes are written out from STEPBible\'s TEHMC and TEGMC tables. STEPBible data is CC BY 4.0, STEPBible.org (Tyndale House, Cambridge); the OpenScriptures Hebrew Bible is CC BY 4.0, openscriptures.org.',
+      ],
+    },
+    {
       heading: 'What is kept on this device',
       body: [
         'Everything is in one IndexedDB database named lai-siangtho, in the browser or in the desktop app\'s own profile. Nothing is sent anywhere: there is no account and no server that belongs to this app.',

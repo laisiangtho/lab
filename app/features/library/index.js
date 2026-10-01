@@ -4,6 +4,8 @@
  */
 
 import { describe, FORMATS, sniff, slug } from '../../core/formats/index.js';
+import { isBrowserBible } from '../../core/formats/browserbible.js';
+import { isStepLexicon } from '../../core/lexicon.js';
 import { classify, otherEdition, readMetadata } from '../../core/formats/pack.js';
 import { aboutText, lossOf, optionsFor, WRITERS } from '../../core/formats/write.js';
 import { twoLetter } from '../../core/langcode.js';
@@ -112,6 +114,7 @@ export default {
       });
       if (!file) return;
       if (/\.zip$/i.test(file.name) || isZip(file.bytes)) { await importArchive(file); return; }
+      if (isLexicon(file.text)) { await importLexicon(file); return; }
 
       const guesses = sniff(file.text, file.name);
       if (!guesses.length) {
@@ -184,6 +187,25 @@ export default {
       } finally {
         progress.delete(identify);
         repaint();
+      }
+    }
+
+    /** A lexicon file: STEPBible's TBESH/TBESG, or this app's own JSON lexicon. */
+    function isLexicon(text) {
+      if (isStepLexicon(text)) return true;
+      if (!/^\s*\{/.test(text ?? '')) return false;
+      return /"kind"\s*:\s*"lexicon"/.test(String(text).slice(0, 400));
+    }
+
+    async function importLexicon(file) {
+      if (!ctx.lexicons) throw new Error(L('lex.unavailable'));
+      try {
+        const lex = await ctx.lexicons.adopt(file.text, file.name);
+        shell.notify(L('lex.adopted', {
+          name: lex.name, n: Object.keys(lex.entries).length, testament: L(lex.testament === 'H' ? 'lex.hebrew' : 'lex.greek'),
+        }), 'ok');
+      } catch (err) {
+        shell.notify(`${file.name}: ${err.message}`, 'error');
       }
     }
 
@@ -268,6 +290,10 @@ export default {
         && !/\.(?:ttf|otf|woff2?|png|jpe?g|gif|pdf|zip|epub|mobi)$/i.test(entry.name));
       const files = [];
       for (const entry of wanted) {
+        // browserBible's search indexes are derived from the pages beside
+        // them and can run to tens of megabytes; their names are enough to
+        // say they were there.
+        if (/(^|\/)index(lemma)?\//.test(entry.name)) { files.push({ name: entry.name, text: '' }); continue; }
         try {
           files.push({ name: entry.name.split('/').pop(), text: await entry.text() });
         } catch {
@@ -287,6 +313,17 @@ export default {
      * metadata where it has any, so the reader confirms rather than types.
      */
     function packDescribe(files, archiveName) {
+      if (isBrowserBible(files)) {
+        let meta = {};
+        try { meta = JSON.parse(files.find((f) => f.name.split('/').pop() === 'info.json').text); } catch { /* the import says what is wrong */ }
+        const pages = files.filter((f) => /^[A-Z0-9]{2}\d{1,3}\.html$/.test(f.name.split('/').pop())).length;
+        return {
+          name: meta.name || meta.nameEnglish || '',
+          identify: slug(meta.abbr || meta.id || archiveName),
+          language: meta.lang || '',
+          summary: L('imp.packBrowserBible', { n: pages, indexes: files.some((f) => /(^|\/)index(lemma)?\//.test(f.name)) ? L('imp.packIndexes') : '' }),
+        };
+      }
       // The same question the assembler asks, asked the same way: this was
       // counting the copyright notice as a scripture file.
       const { meta, names, scripture } = classify(files);

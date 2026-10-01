@@ -10,6 +10,9 @@
  *                                                documents (plan progress, board, ink)
  *   notes         key: id                        value: note (keyed on the passage, not a translation)
  *   marks         key: "book.chapter.verse"      value: bookmark
+ *   lexicon       key: 'H' | 'G'                 value: a Strong's lexicon
+ *   guide         key: path                      value: a downloaded guide file
+ *   lemmas        key: identify                  value: { stamp, index } — core/lemmas.js
  *
  * Works in the main thread and in workers. Install and remove are single
  * transactions: a failed install leaves the previous copy untouched.
@@ -18,7 +21,7 @@
 import { plainVerses } from '../core/strongs.js';
 
 const DB_NAME = 'lai-siangtho';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 const DIAGNOSTIC_LIMIT = 400;
 
 /**
@@ -50,6 +53,10 @@ export async function openStore({ name = DB_NAME, onLost = null } = {}) {
       // catalog repository. Not in `records`: those travel in every settings
       // export, and these are the catalog's, fetched again at will. Added in v6.
       if (!d.objectStoreNames.contains('guide')) d.createObjectStore('guide', { keyPath: 'path' });
+      // A tagged translation's Strong's numbers gathered (core/lemmas.js),
+      // one row per translation, built the first time a word is studied.
+      // Rebuilt from the chapters at will, so never exported. Added in v7.
+      if (!d.objectStoreNames.contains('lemmas')) d.createObjectStore('lemmas', { keyPath: 'identify' });
     };
     req.onblocked = () => reject(new Error('Another window of this app is open with an older version of its storage. Close the other windows and reload.'));
     req.onsuccess = () => resolve(req.result);
@@ -229,9 +236,22 @@ class TranslationStore {
   }
 
   async remove(identify) {
-    const tx = this.#tx(['translations', 'chapters'], 'readwrite');
+    const tx = this.#tx(['translations', 'chapters', 'lemmas'], 'readwrite');
     tx.objectStore('chapters').delete(IDBKeyRange.bound([identify], [identify, []]));
     tx.objectStore('translations').delete(identify);
+    tx.objectStore('lemmas').delete(identify);
+    await done(tx);
+  }
+
+  /** A translation's gathered Strong's numbers, or null: { identify, stamp, index }. */
+  async getLemmas(identify) {
+    return (await request(this.#tx('lemmas').objectStore('lemmas').get(identify))) ?? null;
+  }
+
+  /** `stamp` says which install of the translation the index was built from. */
+  async putLemmas(identify, stamp, index) {
+    const tx = this.#tx('lemmas', 'readwrite');
+    tx.objectStore('lemmas').put({ identify, stamp, index });
     await done(tx);
   }
 

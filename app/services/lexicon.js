@@ -13,7 +13,7 @@
  * downloads the Greek.
  */
 
-import { parseLexicon, TESTAMENTS } from '../core/lexicon.js';
+import { parseLexicon, readLexiconFile, TESTAMENTS } from '../core/lexicon.js';
 import { fetchJson } from './library.js';
 
 export function createLexicons({ store, config }) {
@@ -69,6 +69,18 @@ export function createLexicons({ store, config }) {
     }
   }
 
+  /**
+   * A lexicon the reader brought: this app's JSON, or STEPBible's TBESH or
+   * TBESG. It takes the place of whatever was held for its testament.
+   */
+  async function adopt(text, name) {
+    const parsed = readLexiconFile(text, { source: name });
+    await store.putLexicon(parsed.testament, parsed, { bytes: text.length, name: parsed.name });
+    held.set(parsed.testament, parsed);
+    emit();
+    return parsed;
+  }
+
   async function remove(testament) {
     const which = String(testament).toUpperCase();
     await store.removeLexicon(which);
@@ -81,6 +93,7 @@ export function createLexicons({ store, config }) {
   return {
     load,
     install,
+    adopt,
     remove,
     /** What a lookup needs: the lexicons in memory, by testament. */
     get held() { return Object.fromEntries(held); },
