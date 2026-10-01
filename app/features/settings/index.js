@@ -377,6 +377,20 @@ export default {
                         label: L('cmd.reset'), glyph: 'undo',
                         onClick: () => { shell.ribbon.set(shell.ribbon.defaults()); refresh(); },
                       })
+                      : null,
+                    ui.action({
+                      name: L('set.statusItems'),
+                      hint: L('set.statusItemsHint', { n: shell.statusBar.items().length }),
+                      value: shell.statusBar.isCustom() ? L('val.yours') : L('val.default'),
+                      label: L('cmd.statusAdd'), glyph: 'plus',
+                      onClick: () => shell.statusBar.add(),
+                    }),
+                    shell.statusBar.isCustom()
+                      ? ui.action({
+                        name: L('cmd.statusReset'), hint: L('set.statusResetHint'),
+                        label: L('cmd.reset'), glyph: 'undo',
+                        onClick: () => { shell.statusBar.reset(); refresh(); },
+                      })
                       : null)),
 
                 section('reading', 'set.reading',
@@ -396,6 +410,7 @@ export default {
                     flag('headings', L('cmd.headings'), L('set.headingsHint')),
                     flag('xrefs', L('cmd.xrefs'), L('set.xrefsHint')),
                     flag('strongs', L('cmd.strongs'), L('set.strongsHint')),
+                    flag('tintStrongs', L('cmd.tintStrongs'), L('set.tintStrongsHint')),
                     flag('interlinear', L('cmd.interlinear'), L('set.interlinearHint')),
                     flag('paneTabs', L('set.paneTabs'), L('set.paneTabsHint')),
                     flag('restoreTabs', L('set.restore'), L('set.restoreHint'))),

@@ -118,7 +118,9 @@ export default {
           const notes = result.versionMismatch
             ? L('lib.versionMismatch', { catalog: result.versionMismatch.catalog, file: result.versionMismatch.file })
             : '';
-          shell.notify(notes ? L('lib.installedNoted', { name, notes }) : L('lib.installed', { name }), 'ok');
+          shell.notify(notes ? L('lib.installedNoted', { name, notes }) : L('lib.installed', { name }), 'ok', {
+            actions: [{ label: L('lib.readIt'), icon: 'book-open', run: () => shell.readTranslation(identify) }],
+          });
         }
       } catch (err) {
         shell.notify(`${name}: ${err.message}`, 'error');
@@ -214,7 +216,7 @@ export default {
           result.report?.notes ? L('imp.notesDropped', { n: result.report.notes }) : '',
           result.report?.skipped ? L('imp.skipped', { n: result.report.skipped }) : '',
         ].filter(Boolean).join(' · ');
-        shell.notify(L('imp.done', { name: answers.name || identify, notes }), 'ok');
+        shell.notify(L('imp.done', { name: answers.name || identify, notes }), 'ok', { actions: [{ label: L('lib.readIt'), icon: 'book-open', run: () => shell.readTranslation(identify) }] });
         showHome?.();
       } catch (err) {
         shell.notify(`${file.name}: ${err.message}`, 'error');
@@ -272,7 +274,13 @@ export default {
       shell.notify(L('sd.importing', { name: file.name }), 'info', { about: `study:${file.name}` });
       try {
         const meta = await ctx.study.importFile({ text: file.text, name: file.name, studyType: type });
-        shell.notify(L('sd.imported', { name: meta.name, n: meta.count, kind: L(`sd.type.${meta.type}`) }), 'ok', { about: `study:${file.name}` });
+        shell.notify(L('sd.imported', { name: meta.name, n: meta.count, kind: L(`sd.type.${meta.type}`) }), 'ok', {
+          about: `study:${file.name}`,
+          actions: meta.type === 'crossrefs' ? [] : [{
+            label: L('sd.show'), icon: meta.type === 'topics' ? 'tag' : 'book-open',
+            run: () => ctx.registry.verbs().find((verb) => verb.word === (meta.type === 'topics' ? 'topic' : 'define'))?.run(''),
+          }],
+        });
         showStudy?.();
       } catch (err) {
         shell.notify(`${file.name}: ${err.message}`, 'error', { about: `study:${file.name}` });
@@ -346,7 +354,7 @@ export default {
           report.named ? L('imp.withNames', { n: report.named }) : '',
           result.diagnostics.length ? L('lbl.differs', { n: result.diagnostics.length }) : '',
         ].filter(Boolean).join(' · ');
-        shell.notify(L('imp.done', { name: answers.name || identify, notes }), 'ok');
+        shell.notify(L('imp.done', { name: answers.name || identify, notes }), 'ok', { actions: [{ label: L('lib.readIt'), icon: 'book-open', run: () => shell.readTranslation(identify) }] });
         showHome?.();
       } catch (err) {
         shell.notify(`${file.name}: ${err.message}`, 'error');
@@ -1052,16 +1060,35 @@ export default {
               ]));
         }
 
+        /**
+         * The publisher's file, or the copy in the catalog repository. The
+         * desktop app goes to the publisher first; a web page to the copy,
+         * since a publisher's site seldom allows a page to read from it. Each
+         * falls back on the other, and only when both fail is the reader told
+         * — about the publisher's, which is the one the reader can act on.
+         */
         async function getStudy(src) {
           progress.set(`study:${src.id}`, L('lib.downloading'));
           run();
+          const hosted = ctx.config.repoFileUrl.replace('{path}', `study/${src.id}.json`);
+          const order = sources.viaApp ? [src.url, hosted] : [hosted, src.url];
           try {
-            const got = await sources.download(src.url, src.name);
+            let got = null;
+            let from = null;
+            const failed = new Map();
+            for (const url of order) {
+              try {
+                got = await sources.download(url, src.name);
+                from = url;
+                break;
+              } catch (err) {
+                failed.set(url, err);
+              }
+            }
             progress.delete(`study:${src.id}`);
-            const name = decodeURIComponent(new URL(src.url).pathname.split('/').pop());
+            if (!got) { notFetched(failed.get(src.url) ?? failed.get(hosted), src.name, src.page); return; }
+            const name = decodeURIComponent(new URL(from).pathname.split('/').pop());
             await importFile({ name, size: got.bytes.byteLength, bytes: got.bytes, text: got.text(), studyType: src.type });
-          } catch (err) {
-            shell.notify(`${err.message} ${L('sd.byHand', { page: src.page })}`, 'error');
           } finally {
             progress.delete(`study:${src.id}`);
             run();
@@ -1232,8 +1259,23 @@ export default {
             const got = await sources.download(parsed.href, name);
             await importFile({ name, size: got.bytes.byteLength, bytes: got.bytes, text: got.text() });
           } catch (err) {
-            shell.notify(err.message, 'error');
+            notFetched(err, name, parsed.href);
           }
+        }
+
+        /**
+         * A download that failed, said as what happened, with what does work:
+         * the page to save the file from, and adding the saved file.
+         */
+        function notFetched(err, name, page) {
+          const said = err?.code ? L(`dl.${err.code}`, { name, host: err.host ?? '', status: err.status ?? '' }) : `${name}: ${err?.message ?? err}`;
+          const open = ctx.platform?.capabilities?.openExternal;
+          shell.notify(said, 'error', {
+            actions: [
+              page && typeof open === 'function' ? { label: L('dl.openPage'), icon: 'link', run: () => Promise.resolve(open(page)).catch((e) => shell.notify(e.message, 'error')) } : null,
+              { label: L('dl.addFile'), icon: 'plus', run: () => importFile().catch((e) => shell.notify(e.message, 'error')) },
+            ].filter(Boolean),
+          });
         }
 
         /** A translation from getBible or eBible.org, straight in: the source already said what it is. */
@@ -1252,9 +1294,10 @@ export default {
               name: row.name, source: L(`lib.src.${row.source}`),
               notes: [`${L('lbl.books', { n: result.stats.books })}, ${L('lbl.verses', { n: result.stats.verses })}`, strongsLine(result.stats)]
                 .filter(Boolean).join(' · '),
-            }), 'ok');
+            }), 'ok', { actions: [{ label: L('lib.readIt'), icon: 'book-open', run: () => shell.readTranslation(row.identify) }] });
           } catch (err) {
-            shell.notify(`${row.name}: ${err.message}`, 'error');
+            if (err?.code) notFetched(err, row.name, row.page ?? null);
+            else shell.notify(`${row.name}: ${err.message}`, 'error');
           } finally {
             progress.delete(row.identify);
             run();

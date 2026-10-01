@@ -82,3 +82,27 @@ test('a kept reference, as a link and as text', async () => {
   assert.equal(refText([1, 2, 0, 2, 0], 'Gen'), 'Gen 2');
   assert.equal(refText([1, 1, 3, 1, 5], 'ကမ္ဘာ', (n) => String(n).replace(/\d/g, (d) => '၀၁၂၃၄၅၆၇၈၉'[d])), 'ကမ္ဘာ ၁:၃–၅');
 });
+
+test('the app\'s own JSON reads back as what was read', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { readStudyFile, toStudyJson } = await import('../../app/core/studydata.js');
+  const fixtureText = (name) => readFileSync(new URL(`../fixtures/studydata/${name}`, import.meta.url), 'utf8');
+  for (const [name, type] of [['openbible-gen1-1-5.txt', 'crossrefs'], ['easton-a-extract.xml', 'dictionary'], ['topics-thml.xml', 'topics']]) {
+    const read = readStudyFile(fixtureText(name), { source: name, type });
+    const again = readStudyFile(JSON.stringify(toStudyJson(read, { changes: 'test' })), { source: 'copy.json' });
+    assert.equal(again.type, type);
+    assert.equal(again.count, read.count, name);
+    assert.deepEqual(again.links ?? again.entries, read.links ?? read.entries, name);
+    assert.equal(again.licence, read.licence);
+  }
+});
+
+test('scripts/studydata.mjs: a dry run writes nothing, and a wrong type is an error', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const script = new URL('../../scripts/studydata.mjs', import.meta.url).pathname;
+  const fixturePath = new URL('../fixtures/studydata/easton-a-extract.xml', import.meta.url).pathname;
+  const out = execFileSync(process.execPath, [script, fixturePath, '--id', 'easton'], { encoding: 'utf8' });
+  assert.match(out, /6 entries/);
+  assert.match(out, /dry run: nothing written/);
+  assert.throws(() => execFileSync(process.execPath, [script, fixturePath, '--id', 'easton', '--type', 'topics'], { stdio: 'pipe' }), /reads easton as dictionary/);
+});

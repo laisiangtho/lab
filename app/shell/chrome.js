@@ -108,10 +108,15 @@ export function createChrome(root, ctx) {
   const app = h('div', { id: 'app' },
     h('div', { class: 'body-row' },
       h('nav', { class: 'ribbon' },
-        // Empty on purpose: the corner the window is dragged by, and where
-        // macOS draws its window buttons. The app's name is the window's and
-        // the browser tab's; a mark here only repeated the palette button.
-        h('div', { class: 'rib-head band-drag' }),
+        // The corner the window is dragged by holds the app's own menu: the
+        // places that are about the app rather than the reading — welcome
+        // and the tour, help, settings, updates. The button is small, and
+        // the corner around it still drags the window.
+        h('div', { class: 'rib-head band-drag' },
+          h('button', {
+            class: 'rib-menu', title: L('cmd.appMenu'), 'aria-label': L('cmd.appMenu'), 'aria-haspopup': 'menu',
+            onclick: (event) => openAppMenu(event.currentTarget),
+          }, icon('menu'))),
         ribRail,
         ribFoot),
       sides.left.element,
@@ -739,6 +744,7 @@ export function createChrome(root, ctx) {
     body.dataset.ribbon = s.ribbon ? 'on' : 'off';
     refreshRibbonState();
     body.dataset.status = s.statusBar ? 'on' : 'off';
+    body.dataset.tint = s.tintStrongs ? 'on' : 'off';
     for (const side of ['left', 'right']) {
       const open = side === 'left' ? s.leftSidebar : s.rightSidebar;
       const empty = sides[side].empty;
@@ -1025,6 +1031,16 @@ export function createChrome(root, ctx) {
     });
   }
 
+  /** The app's menu: each row a command this build has, in the order a reader looks for it. */
+  const APP_MENU = Object.freeze(['welcome.open', 'welcome.tour', 'help.open', 'help.shortcuts', 'settings.open', 'library.open', 'library.check', 'help.about']);
+  function openAppMenu(anchor) {
+    const commands = registry.commands();
+    openMenu(anchor, APP_MENU
+      .map((id) => commands.find((c) => c.id === id))
+      .filter(Boolean)
+      .map((c) => ({ id: c.id, title: c.title, icon: c.icon ?? 'cmd', run: () => run(c.id) })));
+  }
+
   /** What can be done to one button, from the button itself. */
   function openRibbonMenu(anchor, id) {
     openMenu(anchor, [
@@ -1081,7 +1097,16 @@ export function createChrome(root, ctx) {
    * once, for the same reason.
    * @param {{ action?: { label: string, run: () => void }, about?: string }} [options]
    */
-  function notify(message, kind = 'info', { action = null, about = null } = {}) {
+  /**
+   * A message, and what can be done about it.
+   *
+   * `actions` are buttons ({ label, run, icon? }) — "Read it", "Open the
+   * page", "Undo"; `action` is one of them, as callers had it. A web address
+   * in the text is a link of its own, opened outside the app. A message with
+   * something to do stays longer, and has a close button.
+   */
+  function notify(message, kind = 'info', { action = null, actions = [], about = null } = {}) {
+    const doing = [...(action ? [action] : []), ...actions].filter(Boolean);
     for (const old of [...toasts.children]) {
       if ((about && old.dataset.about === about) || old.dataset.message === message) old.remove();
     }
@@ -1089,14 +1114,42 @@ export function createChrome(root, ctx) {
     const toast = h('div', {
       class: cls, role: kind === 'error' ? 'alert' : 'status',
       dataset: { message, ...(about ? { about } : {}) },
-    }, icon(kind === 'error' ? 'alert' : 'info'), h('span', {}, message));
-    if (action) {
+    }, icon(kind === 'error' ? 'alert' : kind === 'ok' ? 'check' : 'info'), h('span', { class: 'toast-msg' }, ...linked(String(message))));
+    if (doing.length) {
+      toast.classList.add('has-acts');
       toast.append(
-        h('button', { class: 'toast-act', onclick: () => { toast.remove(); action.run(); } }, action.label),
+        h('span', { class: 'toast-acts' }, doing.map((one) => h('button', {
+          class: 'toast-act', onclick: () => { toast.remove(); one.run(); },
+        }, one.icon ? icon(one.icon) : null, one.label))),
         h('button', { class: 'toast-x', title: L('cmd.close'), 'aria-label': L('cmd.close'), onclick: () => toast.remove() }, icon('x')));
     }
     toasts.append(toast);
-    keepWhileHeld(toast, action ? 30000 : kind === 'error' ? 9000 : 3500);
+    // A success with a next step ("Read it") is an offer, not a question, and
+    // goes sooner than an undo or an update waiting to be taken: on a phone
+    // it sits over what the reader is pressing next.
+    keepWhileHeld(toast, doing.length ? (kind === 'ok' ? 8000 : 30000) : kind === 'error' ? 9000 : 3500);
+  }
+
+  /** A message's text, its https addresses as links that open outside the app. */
+  function linked(text) {
+    const out = [];
+    let at = 0;
+    for (const found of text.matchAll(/https:\/\/[^\s<>"“”]+[^\s<>"“”.,;:!?)\]]/g)) {
+      if (found.index > at) out.push(text.slice(at, found.index));
+      const url = found[0];
+      out.push(h('a', {
+        class: 'toast-link', href: url, target: '_blank', rel: 'noopener',
+        onclick: (event) => {
+          const open = ctx.platform?.capabilities?.openExternal;
+          if (typeof open !== 'function') return;
+          event.preventDefault();
+          Promise.resolve(open(url)).catch((err) => notify(err.message, 'error'));
+        },
+      }, url.replace(/^https:\/\//, '')));
+      at = found.index + url.length;
+    }
+    if (at < text.length) out.push(text.slice(at));
+    return out;
   }
 
   /**

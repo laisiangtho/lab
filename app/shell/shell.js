@@ -6,6 +6,7 @@
 
 import { createChrome } from './chrome.js';
 import { createModal } from './modal.js';
+import { openMenu } from './menu.js';
 import { createFormDialog } from './formdialog.js';
 import { lookup } from '../core/lexicon.js';
 import { createNavPop } from './navpop.js';
@@ -84,6 +85,15 @@ export function createShell(root, ctx) {
      * is why nothing in the app could ever open a second tab.
      */
     openChapter: (book, chapter, options) => workspace.openChapter(book, chapter, options),
+    /** Read a translation: it becomes the one in the first pane, and the reading comes forward. */
+    /** The status bar's items, for Settings. */
+    statusBar: {
+      items: () => statusItems(),
+      add: () => openStatusAdd(),
+      reset: () => setStatusItems(statusDefaults()),
+      isCustom: () => ctx.settings.get().statusItems !== null,
+    },
+    readTranslation: (identify) => { workspace.setPaneTranslation(0, identify); workspace.openChapter(ctx.state.get().book, ctx.state.get().chapter); },
     openSwitcher,
     openPalette,
     /** The palette with something already typed in it: a verb to finish, say. */
@@ -159,6 +169,9 @@ export function createShell(root, ctx) {
     // command of its own.
     registerPaneCommands();
     chrome = createChrome(root, ctx);
+    // The bar's empty space has the menu too: the way back for an item taken off.
+    const bar = chrome.element.querySelector('.statusbar');
+    bar?.addEventListener('contextmenu', (event) => { event.preventDefault(); openStatusMenu(bar); });
     workspace = createWorkspace(ctx, chrome);
     verseBar = createVerseBar(ctx);
     readingPanel = createReadingPanel(ctx);
@@ -249,6 +262,7 @@ export function createShell(root, ctx) {
     command('reading.panel', L('cmd.reading'), () => readingPanel.toggle(document.querySelector('.statusbar .sb-reading') ?? document.body), { icon: 'type' });
     command('reading.mode', L('cmd.mode'), toggleMode, { keys: 'Mod+e', icon: 'edit', needsChapter: true, state: () => ctx.state.get().mode === 'source' });
     command('reading.strongs', L('cmd.strongs'), toggleStrongs, { icon: 'tag', needsChapter: true, state: () => ctx.state.get().strongs });
+    command('reading.tint', L('cmd.tintStrongs'), () => toggleFlag('tintStrongs', L('cmd.tintStrongs')), { icon: 'strongs', needsChapter: true, state: () => ctx.state.get().tintStrongs });
     command('reading.interlinear', L('cmd.interlinear'), toggleInterlinear, { icon: 'study', needsChapter: true, state: () => ctx.state.get().interlinear });
     command('reading.headings', L('cmd.headings'), () => toggleShown('headings', 'cmd.headings'), { icon: 'heading', needsChapter: true, state: () => ctx.state.get().headings });
     command('reading.xrefs', L('cmd.xrefs'), () => toggleShown('xrefs', 'cmd.xrefs'), { icon: 'link', needsChapter: true, state: () => ctx.state.get().xrefs });
@@ -841,10 +855,11 @@ export function createShell(root, ctx) {
       return button;
     };
 
-    const left = [
-      h('button', { class: 'sb', title: L('cmd.translation'), onclick: () => openTranslationPicker(0) },
+    const on = (flag) => ({ class: `sb sb-flag${flag ? ' is-on' : ''}`, 'aria-pressed': String(Boolean(flag)) });
+    const built = {
+      translation: () => h('button', { class: 'sb', title: L('cmd.translation'), onclick: () => openTranslationPicker(0) },
         icon('book'), h('span', {}, workspace.primaryName())),
-      chapterOnly(h('button', {
+      passage: () => chapterOnly(h('button', {
         class: 'sb', title: `${workspace.englishRef(book, chapter)} — ${L('cmd.switcher')}`,
         'aria-label': `${L('cmd.switcher')}: ${workspace.englishRef(book, chapter)}`,
         onclick: () => openSwitcher(book),
@@ -852,22 +867,82 @@ export function createShell(root, ctx) {
       // Before any chapter has been measured there is nothing to report, and
       // "0 words" would be a claim about the passage rather than about the
       // absence of a measurement.
-      h('span', { class: 'sb hide-sm', title: L('lbl.wordsIn', { ref: label }) },
+      words: () => h('span', { class: 'sb hide-sm', title: L('lbl.wordsIn', { ref: label }) },
         icon('quote'), h('span', {}, counts ? L('lbl.words', { n: counts.words }) : L('val.unmeasured'))),
-      h('span', { class: 'sb hide-sm', title: L('lbl.versesIn', { ref: label }) },
+      verses: () => h('span', { class: 'sb hide-sm', title: L('lbl.versesIn', { ref: label }) },
         icon('lay-list'), h('span', {}, counts ? L('lbl.verses', { n: counts.verses }) : L('val.unmeasured'))),
-    ];
-    const right = [
-      h('button', { class: 'sb sb-reading', onclick: (e) => readingPanel.toggle(e.currentTarget) }, icon('type'), `${readingSize}px · ${L(`val.${layout}`)}`),
-      chapterOnly(h('button', { class: 'sb', onclick: toggleMode }, icon(mode === 'source' ? 'edit' : 'eye'), L(`val.${mode}`))),
-      chapterOnly(h('button', { class: 'sb', onclick: toggleStrongs },
-        h('span', { class: `dot${strongs ? '' : ' off'}` }), L('cmd.strongs'))),
-      chapterOnly(h('button', { class: 'sb', onclick: () => toggleFlag('syncScroll', L('cmd.sync')) },
-        h('span', { class: `dot${syncScroll ? '' : ' off'}` }), L('cmd.sync'))),
-      h('button', { class: 'sb', title: storage.title, onclick: () => workspace.openDoc('about') },
+      reading: () => h('button', { class: 'sb sb-reading', title: L('cmd.reading'), onclick: (e) => readingPanel.toggle(e.currentTarget) }, icon('type'), `${readingSize}px · ${L(`val.${layout}`)}`),
+      mode: () => chapterOnly(h('button', { class: 'sb', title: L('cmd.mode'), onclick: toggleMode }, icon(mode === 'source' ? 'edit' : 'eye'), L(`val.${mode}`))),
+      strongs: () => chapterOnly(h('button', { ...on(strongs), title: L('cmd.strongs'), onclick: toggleStrongs },
+        icon('strongs'), h('span', {}, L('cmd.strongs')))),
+      sync: () => chapterOnly(h('button', { ...on(syncScroll), title: L('cmd.sync'), onclick: () => toggleFlag('syncScroll', L('cmd.sync')) },
+        icon('sync-scroll'), h('span', {}, L('cmd.sync')))),
+      storage: () => h('button', { class: 'sb', title: storage.title, onclick: () => workspace.openDoc('about') },
         icon('db'), h('span', {}, storage.text)),
-    ];
+    };
+    const shown = statusItems();
+    const draw = (item) => {
+      const el = built[item.id]();
+      el.dataset.status = item.id;
+      el.addEventListener('contextmenu', (event) => { event.preventDefault(); event.stopPropagation(); openStatusMenu(el, item.id); });
+      return el;
+    };
+    const left = shown.filter((item) => item.side === 'left').map(draw);
+    const right = shown.filter((item) => item.side === 'right').map(draw);
     chrome.setStatus(left, right);
+  }
+
+  /**
+   * What the status bar can show, in its default order. Every item can be
+   * taken off and put back, as the ribbon's buttons can: from an item's own
+   * menu (right-click or long press), from the bar's empty space, and from
+   * Settings → Appearance.
+   */
+  const STATUS_ITEMS = Object.freeze([
+    { id: 'translation', side: 'left', icon: 'book', name: () => L('cmd.translation') },
+    { id: 'passage', side: 'left', icon: 'book-open', name: () => L('sb.passage') },
+    { id: 'words', side: 'left', icon: 'quote', name: () => L('sb.words') },
+    { id: 'verses', side: 'left', icon: 'lay-list', name: () => L('sb.verses') },
+    { id: 'reading', side: 'right', icon: 'type', name: () => L('cmd.reading') },
+    { id: 'mode', side: 'right', icon: 'eye', name: () => L('cmd.mode') },
+    { id: 'strongs', side: 'right', icon: 'strongs', name: () => L('cmd.strongs') },
+    { id: 'sync', side: 'right', icon: 'sync-scroll', name: () => L('cmd.sync') },
+    { id: 'storage', side: 'right', icon: 'db', name: () => L('sb.storage') },
+  ]);
+  const statusDefaults = () => STATUS_ITEMS.map((item) => item.id);
+  function statusItems() {
+    const wanted = ctx.settings.get().statusItems ?? statusDefaults();
+    return wanted.map((id) => STATUS_ITEMS.find((item) => item.id === id)).filter(Boolean);
+  }
+  function setStatusItems(ids) {
+    const order = statusDefaults().filter((id) => ids.includes(id));
+    const same = order.length === STATUS_ITEMS.length;
+    ctx.state.set({ statusItems: same ? null : order });
+    renderStatus();
+  }
+  function removeStatusItem(id) {
+    const before = statusItems().map((item) => item.id);
+    setStatusItems(before.filter((x) => x !== id));
+    const name = STATUS_ITEMS.find((item) => item.id === id)?.name() ?? id;
+    chrome.notify(L('msg.statusRemoved', { name }), 'info', { action: { label: L('cmd.undo'), run: () => setStatusItems(before) } });
+  }
+  function openStatusAdd() {
+    const held = new Set(statusItems().map((item) => item.id));
+    const missing = STATUS_ITEMS.filter((item) => !held.has(item.id));
+    if (!missing.length) { chrome.notify(L('msg.statusFull')); return; }
+    modal.open({
+      placeholder: L('ph.statusAdd'),
+      items: missing.map((item) => ({ id: item.id, title: item.name(), icon: item.icon })),
+      onPick: (item) => setStatusItems([...held, item.id]),
+    });
+  }
+  function openStatusMenu(anchor, id = null) {
+    const item = id ? STATUS_ITEMS.find((one) => one.id === id) : null;
+    openMenu(anchor, [
+      item ? { id: 'remove', title: L('cmd.statusRemove', { name: item.name() }), icon: 'x', run: () => removeStatusItem(id) } : null,
+      { id: 'add', title: L('cmd.statusAdd'), icon: 'plus', run: () => openStatusAdd() },
+      { id: 'reset', title: L('cmd.statusReset'), icon: 'undo', run: () => setStatusItems(statusDefaults()) },
+    ].filter(Boolean));
   }
 
   /** What the counts in the status bar last measured, and the storage readout. */

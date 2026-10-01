@@ -186,6 +186,35 @@ newest first.
   topic searched for. From the palette, `define grace` and `topic prayer`.
   The word study links to the dictionary's article on the word when there is
   one.
+- Messages can carry several buttons and say what to do next: an installed
+  translation offers *Read it*, imported study data *Show*. A web address in
+  a message is a link. With buttons, the text keeps a readable width and the
+  buttons go under it on a phone.
+- A failed download says what happened — no connection, a site that could
+  not be reached, a site that answered but does not allow a web page to read
+  the file (CORS), or an HTTP error — instead of guessing, with *Open the
+  page* and *Add the file*.
+- Study data's *Get* uses copies in the catalog repository (`study/`) where a
+  web page cannot read from the publisher; the desktop app goes to the
+  publisher first. `scripts/studydata.mjs` makes the copies (dry run by
+  default).
+- The status bar: every item has an icon (Strong's numbers and synchronised
+  scrolling had a dot), and each can be taken off and put back like the
+  ribbon's buttons — right-click an item, right-click the bar, or Settings →
+  Appearance.
+- A menu button in the ribbon's corner: Welcome, the tour, Help, shortcuts,
+  Settings, the Library, updates, About.
+- Words with a Strong's number are a shade toward the accent while the
+  numbers are hidden (Reading → Show, or Settings → Reading).
+- A walkthrough: a few steps round the screen, each lighting one part. It
+  starts once on its own, the first time a new reader has a chapter on
+  screen; it can be taken again from Welcome, the menu, the palette or the
+  Guide, and kept from starting in Settings → Study.
+- The Guide works out answers: the time and the date, how many books,
+  chapters and verses (in the Bible, a testament, a book or a chapter), where
+  the reading is, what it is, where to begin, the app's version, greetings,
+  and "play the walkthrough again". English, Norwegian and Burmese ways of
+  asking are all read. What it cannot answer it says so, with what it can.
 
 
 ### 26.10.01.3 — 1 October 2026

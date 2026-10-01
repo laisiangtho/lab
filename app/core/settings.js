@@ -110,6 +110,8 @@ export const defaultSettings = Object.freeze({
    * those when it draws, rather than the parser refusing the file.
    */
   ribbonItems: null,
+  /** The status bar's items, in order; null is the default set. */
+  statusItems: null,
   /** Show Strong's numbers where a translation carries them. */
   strongs: false,
   /**
@@ -118,6 +120,14 @@ export const defaultSettings = Object.freeze({
    * gloss from the lexicon where one is held.
    */
   interlinear: false,
+  /**
+   * Words carrying a Strong's number are a shade apart from the rest while
+   * the numbers themselves are hidden, so a reader sees which words can be
+   * studied without the text being marked up.
+   */
+  tintStrongs: true,
+  /** Start the walkthrough on its own, once, on a first run. */
+  tour: true,
   /**
    * Where sidebars are drawers (a phone, a narrow window), open a pane in a
    * workspace tab instead: a drawer is the wrong shape for a search or a word
@@ -263,11 +273,12 @@ export function parseSettings(raw, { source, category }) {
     readingLeading: clamp(raw.readingLeading, READING.leading, defaultSettings.readingLeading),
     readingMeasure: clamp(raw.readingMeasure, READING.measure, defaultSettings.readingMeasure),
     uiSize: clamp(raw.uiSize, READING.ui, defaultSettings.uiSize),
-    mode, strongs: flag('strongs'), interlinear: flag('interlinear'), paneTabs: flag('paneTabs'), headings: flag('headings'), xrefs: flag('xrefs'),
+    mode, strongs: flag('strongs'), interlinear: flag('interlinear'), tintStrongs: flag('tintStrongs'), tour: flag('tour'), paneTabs: flag('paneTabs'), headings: flag('headings'), xrefs: flag('xrefs'),
     sourceFormat: SOURCE_FORMATS.includes(raw.sourceFormat) ? raw.sourceFormat : defaultSettings.sourceFormat,
     readingFont: READING_FONTS.includes(raw.readingFont) ? raw.readingFont : defaultSettings.readingFont,
     restoreTabs: flag('restoreTabs'), motion: flag('motion'),
     ribbonItems: commandList(raw.ribbonItems, source, '$.ribbonItems'),
+    statusItems: commandList(raw.statusItems, source, '$.statusItems'),
     sidebarLeft: Object.freeze(rows('sidebarLeft')), sidebarRight: Object.freeze(rows('sidebarRight')),
     sidebarKnown: Object.freeze([...new Set(known)]),
     tabs: Object.freeze(tabs), activeTab: Number.isInteger(raw.activeTab) && raw.activeTab >= 0 ? Math.min(raw.activeTab, Math.max(tabs.length - 1, 0)) : 0,

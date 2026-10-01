@@ -283,6 +283,15 @@ body[data-shell="on"][data-right="shut"] .tabbar{padding-inline-end:var(--wc-w)}
 .rib-head{
   height:var(--bar-h);flex:0 0 auto;display:flex;align-items:center;justify-content:center;
 }
+/* The app menu: a quiet button in the corner, the window still dragged by
+   the space around it. */
+.rib-menu{
+  -webkit-app-region:no-drag;app-region:no-drag;
+  width:30px;height:30px;border-radius:var(--radius-m);display:grid;place-items:center;
+  color:var(--text-faint);
+}
+.rib-menu:hover,.rib-menu[aria-expanded="true"]{background:var(--bg-hover);color:var(--text-normal)}
+.rib-menu svg{width:17px;height:17px}
 .rib-rail{
   flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;
   padding:7px 0 0;gap:2px;overflow:hidden;
@@ -1008,6 +1017,10 @@ body.study-in-margin .outline-study{display:none}
   color:inherit;border-bottom:1px dotted var(--c-orange);cursor:help;position:relative;
 }
 .strongs.is-hidden-code{border-bottom-color:transparent}
+/* With the numbers hidden, a tagged word is a shade toward the accent: there
+   to see, not to read around. Hover deepens it. */
+body[data-tint="on"] .strongs.is-hidden-code{color:color-mix(in srgb,var(--text-normal) 74%,var(--accent-2));transition:color .12s,background-color .12s;border-radius:3px}
+body[data-tint="on"] .strongs.is-hidden-code:hover{color:var(--accent-2);background:var(--accent-fade)}
 .tag-inline{
   font-family:var(--font-ui);font-size:.76em;padding:1px 7px;border-radius:999px;
   background:var(--accent-fade);color:var(--accent-2);text-decoration:none;vertical-align:.1em;
@@ -1270,6 +1283,9 @@ body[data-status="off"] .statusbar{display:none}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--c-green)}
 .dot.warn{background:var(--c-orange)}
 .dot.off{background:var(--base-40)}
+/* A setting the bar switches: its icon green when on, as the dot it replaced. */
+.statusbar .sb-flag.is-on svg{color:var(--c-green)}
+.statusbar .sb-flag:not(.is-on) svg{opacity:.7}
 
 /* ---- overlays: graph / canvas / ink --------------------------------------*/
 .overlay-view{position:absolute;inset:0;background:var(--bg-primary);display:flex;flex-direction:column}

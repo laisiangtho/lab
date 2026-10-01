@@ -300,3 +300,16 @@ export function refText([book, chapter, verse, toChapter = chapter, toVerse = ve
   if (toChapter === chapter && toVerse === verse) return start;
   return toChapter === chapter ? `${start}–${n(toVerse)}` : `${start}–${n(toChapter)}:${n(toVerse)}`;
 }
+
+/**
+ * A read study file as this app's own JSON — what the catalog repository
+ * hosts under study/, and what `readStudyFile` reads back unchanged.
+ */
+export function toStudyJson(read, { changes = '' } = {}) {
+  if (!STUDY_TYPES.includes(read?.type)) throw new Error(`toStudyJson: no study data type ${JSON.stringify(read?.type)}`);
+  const head = {
+    app: 'lai-siangtho', kind: 'studydata', schema: STUDY_SCHEMA, type: read.type,
+    name: read.name, source: read.source, licence: read.licence, ...(changes ? { changes } : {}),
+  };
+  return read.type === 'crossrefs' ? { ...head, links: read.links } : { ...head, entries: read.entries };
+}

@@ -382,6 +382,10 @@ export async function installFromLibrary(page, identify, { timeout = 60000 } = {
     await page.locator('.lib-src[data-source="catalog"]').click();
     await row.first().waitFor();
   }
+  // Messages from an install before stay while the pointer is on them, and
+  // on a phone the last one sits over this row's button; they are not what
+  // this is for, so they are closed first.
+  await page.evaluate(() => document.querySelectorAll('.toast').forEach((el) => el.remove()));
   // By what it does rather than what it says, so a run in Burmese finds it too.
   const button = page.locator(`[data-identify="${identify}"] button[data-place="install:${identify}"]`);
   if (await button.count()) await button.click();

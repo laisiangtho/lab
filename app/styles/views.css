@@ -577,6 +577,14 @@ body.is-dragging-tab .sidebar[data-empty="true"] .side-body::after {
   font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
 .toast-act:hover { background: var(--accent); color: var(--text-on-accent); }
+.toast-acts { display: inline-flex; flex-wrap: wrap; gap: 6px; flex: 0 0 auto; }
+/* With buttons, the text keeps a readable width and the buttons go under it
+   when the line is too narrow for both — a phone, or a long message. */
+.toast.has-acts { flex-wrap: wrap; row-gap: 6px; }
+.toast.has-acts .toast-msg { flex: 1 1 10em; min-width: 0; }
+.toast.has-acts .toast-acts { margin-inline-start: auto; }
+.toast-act svg { width: 13px; height: 13px; margin-inline-end: 4px; vertical-align: -2px; }
+.toast-link { color: var(--accent-2); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
 .toast-x { padding: 2px; color: var(--text-faint); cursor: pointer; background: none; }
 .toast-x:hover { color: var(--text-normal); }
 .toast-x svg { width: 13px; height: 13px; }
@@ -1896,3 +1904,32 @@ label.set-row:hover { background: var(--bg-hover); }
 .rf-topic-note { margin: 0; font-size: var(--fs-ui-m); line-height: 1.55; color: var(--text-muted); }
 .rf-refs { padding: 0; }
 .ws-dict { margin-top: 4px; }
+
+/* ---- the walkthrough -------------------------------------------------------
+   The page stays usable: the layer passes the pointer through everywhere but
+   the card. The ring's shadow is the dimming, so the lit part is simply the
+   hole in it. */
+.tour { position: fixed; inset: 0; z-index: 400; pointer-events: none; }
+.tour-ring {
+  position: fixed; border-radius: var(--radius-l);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 9999px color-mix(in srgb, #000 46%, transparent);
+  transition: left .2s ease, top .2s ease, width .2s ease, height .2s ease;
+}
+.tour.is-center .tour-ring { left: 50%; top: 50%; width: 0; height: 0; box-shadow: 0 0 0 9999px color-mix(in srgb, #000 46%, transparent); }
+.tour-card {
+  position: fixed; pointer-events: auto; width: min(340px, calc(100vw - 24px));
+  display: flex; flex-direction: column; gap: 8px; padding: 14px 16px 12px;
+  background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: var(--radius-l);
+  box-shadow: var(--shadow-l); color: var(--text-normal); font-size: var(--fs-ui-m);
+  transition: left .2s ease, top .2s ease;
+}
+.tour.is-center .tour-card { left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.tour-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tour-n { font-size: var(--fs-ui-s); color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.tour-skip { font-size: var(--fs-ui-s); color: var(--text-faint); background: none; }
+.tour-skip:hover { color: var(--text-normal); }
+.tour-t { margin: 0; font-size: 16px; font-weight: 600; }
+.tour-b { margin: 0; line-height: 1.55; color: var(--text-muted); }
+.tour-acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
+.tour-acts .btn svg { width: 14px; height: 14px; }
+@media (prefers-reduced-motion: reduce) { .tour-ring, .tour-card { transition: none; } }

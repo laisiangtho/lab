@@ -98,7 +98,7 @@ test('the guide', options, async (t) => {
 
   await t.test('a question it cannot answer says so and offers a search', async () => {
     const x = await ask('quantum chromodynamics');
-    assert.match(await x.locator('.gd-miss').innerText(), /Nothing in the guide answers that yet/);
+    assert.match(await x.locator('.gd-miss').innerText(), /That one is beyond what I know/);
     await x.locator('.gd-do', { hasText: 'Search the Bible' }).click();
     await page.waitForTimeout(500);
     assert.equal(await page.locator('.search-pane > .field input').first().inputValue(), 'quantum chromodynamics');

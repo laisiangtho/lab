@@ -55,6 +55,7 @@ This is Phase 2 of the project. The Phase 1 single-file `index.html` is preserve
 | `npm run icons -- [--apply \| --out DIR]` | Every PNG icon drawn again from `public/icons/icon.svg` — an open book with a red ribbon, one colour, no background — set in from the edge for desktops and on a tile for Android's adaptive icon (dry run by default; see `assets/icons/README.md`) |
 | `node scripts/lexicon.mjs <hebrew> <greek> [--source strongs\|step] [--out DIR --apply]` | Build `lexicon/strongs-{h,g}.json` for the catalog repository: by default from Strong's own dictionaries (public domain; Open Scriptures' JSON edition, CC BY-SA), checked with the app's own parser (dry run by default) |
 | `node scripts/versification.mjs <TVTMS.txt> [--apply]` | Regenerate `app/core/versification-data.js`, the English ↔ Hebrew verse map, from STEPBible's TVTMS (dry run by default) |
+| `node scripts/studydata.mjs <file> --id openbible\|easton\|nave [--out DIR --apply]` | Turn a publisher's study data file into the app's JSON for the catalog repository's `study/` folder, where the web build's *Get* finds it (dry run by default) |
 | `node scripts/morphology.mjs <TEHMC> <TEGMC> [--apply]` | Rebuild `app/core/morph-data.js` from STEPBible's morphology tables (dry run by default) |
 | `node scripts/guide-check.mjs <folder>` | Check guide data (a `guide/` folder) the way the app reads it; exits 1 on any problem |
 | `npm run version:stamp -- --apply` | Stamp today's date and the next build number |

@@ -98,7 +98,7 @@ export function createReadingPanel(ctx) {
       'aria-pressed': String(id === s.layout),
       onclick: () => { ctx.state.set({ layout: id }); paint(); },
     }, L(`val.${id}`))));
-    shown.replaceChildren(...[['headings', 'cmd.headings'], ['xrefs', 'cmd.xrefs'], ['strongs', 'cmd.strongs'], ['interlinear', 'cmd.interlinear']].map(([key, name]) => h('button', {
+    shown.replaceChildren(...[['headings', 'cmd.headings'], ['xrefs', 'cmd.xrefs'], ['strongs', 'cmd.strongs'], ['tintStrongs', 'cmd.tintStrongs'], ['interlinear', 'cmd.interlinear']].map(([key, name]) => h('button', {
       'aria-pressed': String(Boolean(s[key])), dataset: { show: key },
       onclick: () => { ctx.state.set({ [key]: !ctx.state.get()[key] }); paint(); },
     }, L(name))));

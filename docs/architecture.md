@@ -771,6 +771,46 @@ accents set aside, and lists the topics a chapter is filed under. Nothing is
 hosted: Get downloads from the publisher, and where a site does not let a web
 page download from it, the reader is sent to its page to save the file.
 
+## 3d-x-c-iv. Downloads a web page may not read
+
+A page may read another site's reply only if the site allows it (CORS); the
+browser reports a refusal, a site that could not be reached and a lost
+connection as the same error. `services/sources.js` tells them apart with a
+second request that asks for nothing back (`mode: 'no-cors'`): answered, the
+refusal was the browser's on the site's behalf. The error carries `code`
+(offline, unreachable, cors, status), and the Library says which, with
+*Open the page* and *Add the file*. The desktop app downloads outside the
+browser (`fetchBytes`) and is not limited by this.
+
+Study data's publishers (openbible.info, ccel.org) are static sites likely
+to refuse. The catalog repository can hold copies under `study/<id>.json`,
+in the app's own study JSON, made by `scripts/studydata.mjs` from the
+publisher's file with its source and licence kept and the change stated.
+*Get* on the web tries the copy first, then the publisher; the desktop app
+the publisher first, then the copy. A missing copy is not reported: the
+publisher's failure is the one a reader can act on.
+
+## 3d-x-c-v. The walkthrough and the worked-out answers
+
+`features/welcome/tour.js` lights one element at a time (a ring whose
+shadow dims the rest) with a card beside it; the layer passes the pointer
+through everywhere but the card. A step names its target by selector and is
+passed over when that is not on screen, so one list serves a desktop and a
+phone. It starts on its own once — on a first run (the welcome was shown),
+when a chapter is on screen, and not when `settings.tour` is off or the
+browser is automated (`navigator.webdriver`: the tests and the crawl take it
+when they ask for it). `records.tour` keeps whether it is still owed.
+
+`core/converse.js` recognises the questions the guide works out rather than
+looks up, in English, Norwegian and Burmese whatever the interface language,
+and what a count is of. `features/guide/knowledge.js` answers them before
+anything is looked up — "how many verses in John 3" names a passage but is
+not a request to go there — from the clock, `category.json` and the reading,
+as an entry like any other. Counts are the canon's (31,106 verses), and the
+answer says a translation that numbers differently may differ. "What can you
+do" stays with the written topic for it. Nothing is sent anywhere: a
+question the guide cannot answer is said to be one.
+
 ## 3d-x-d. One knowledge, three views
 
 Help and the Guide answer from one knowledge (`features/guide/knowledge.js`):

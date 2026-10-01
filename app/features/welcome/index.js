@@ -1,23 +1,46 @@
 /**
  * The first run: what this is, and the three things worth knowing before the
- * reader is left alone with it.
+ * reader is left alone with it — then, once there is something to read, a
+ * short walkthrough of the screen.
  *
  * An app with this many panes, panels and keys can be read as either simple or
- * impenetrable depending on the first ninety seconds. What it cannot afford is
- * a tour: nobody reads one, and anything hidden behind a tour is hidden. So
- * this is one screen, shown once, with buttons that do the thing rather than
- * describe it — and it is in Help afterwards, because "where was that screen
- * that explained it" is a real question.
- *
- * It is offered, never forced: it opens beside the Library rather than instead
- * of it, and a reader who came here to read is one press away from reading.
+ * impenetrable depending on the first ninety seconds. The welcome is one
+ * screen, shown once, with buttons that do the thing rather than describe it.
+ * The walkthrough (tour.js) comes after, not before: until a translation is
+ * installed there is no reading to point at. It starts on its own once, for a
+ * reader on their first run, and nothing depends on it — every step names a
+ * thing that has its own button, key or menu. It can be skipped at any step,
+ * taken again from Welcome, the app menu, the palette or the Guide, and kept
+ * from starting on its own in Settings → Study.
  */
 
 import { h } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
+import { runTour } from './tour.js';
 
 const KEY = 'welcome';
+const TOUR_KEY = 'tour';
+
+/**
+ * The walkthrough's steps, in the order the eye meets them. A step whose
+ * target is not on screen is passed over: a phone has no ribbon, and shows
+ * its own bar instead.
+ */
+const STEPS = Object.freeze([
+  { id: 'hello', target: null },
+  { id: 'reading', target: '.leaf[data-role="primary"] .chapter' },
+  { id: 'verse', target: '.leaf[data-role="primary"] .vnum' },
+  { id: 'passage', target: '.leaf[data-role="primary"] .crumbs' },
+  { id: 'tabs', target: '.tabbar .tabstrip' },
+  { id: 'ribbon', target: '.ribbon .rib-rail' },
+  { id: 'phone', target: '.mobile-bar' },
+  { id: 'left', target: '#side-left' },
+  { id: 'right', target: '#side-right' },
+  { id: 'status', target: '.statusbar' },
+  { id: 'menu', target: '.rib-menu' },
+  { id: 'ask', target: null },
+]);
 
 export default {
   id: 'welcome',
@@ -27,6 +50,58 @@ export default {
     const seen = () => records.get(KEY, null)?.seen === true;
     const remember = () => records.save(KEY, { seen: true, at: new Date().toISOString() })
       .catch(() => { /* being shown twice is not worth a message */ });
+
+    // --- the walkthrough ---------------------------------------------------
+
+    let tour = null;
+    const steps = () => STEPS.map((step) => ({
+      ...step, title: L(`tour.${step.id}.t`), body: L(`tour.${step.id}.b`),
+    }));
+    function takeTour() {
+      if (tour) return;
+      tour = runTour(steps(), {
+        onEnd: (how) => {
+          tour = null;
+          records.save(TOUR_KEY, { pending: false, how, at: new Date().toISOString() }).catch(() => {});
+        },
+      });
+    }
+
+    /**
+     * Starts on its own once: on a first run (the welcome was shown), when
+     * there is a chapter on screen to point at, and not if the reader said
+     * not to. An automated browser — the tests, the crawl — is not a new
+     * reader, and is left to take the tour when it asks for it.
+     */
+    let waiting = null;
+    function maybeTour() {
+      if (tour || records.get(TOUR_KEY, null)?.pending !== true) return;
+      if (ctx.settings.get().tour === false || navigator.webdriver) return;
+      clearTimeout(waiting);
+      waiting = setTimeout(() => {
+        const reading = document.querySelector('.leaf[data-role="primary"] .vblock');
+        const busy = document.querySelector('.scrim:not([hidden]), .modal-scrim:not([hidden])');
+        if (reading && reading.offsetParent && !busy && records.get(TOUR_KEY, null)?.pending === true) takeTour();
+      }, 900);
+    }
+
+    registry.command({
+      id: 'welcome.tour',
+      title: L('tour.cmd'),
+      icon: 'guide',
+      run: () => takeTour(),
+    });
+
+    registry.setting({
+      id: 'welcome.tour',
+      section: 'study',
+      order: 95,
+      build: (ui) => ui.toggle({
+        name: L('tour.set'), hint: L('tour.setHint'),
+        value: ctx.settings.get().tour !== false,
+        onChange: (on) => ctx.state.set({ tour: on }),
+      }),
+    });
 
     registry.command({
       id: 'welcome.open',
@@ -41,9 +116,14 @@ export default {
     // and the answer must not depend on which of them finishes first.
     const greeting = !seen() && shell.claimFirstRun();
     shell.whenReady(() => {
-      if (!greeting) return;
-      shell.openDoc('welcome');
-      remember();
+      if (greeting) {
+        shell.openDoc('welcome');
+        remember();
+        records.save(TOUR_KEY, { pending: true, at: new Date().toISOString() }).catch(() => {});
+      }
+      ctx.state.subscribe(maybeTour);
+      ctx.library.on('change', maybeTour);
+      maybeTour();
     });
 
     registry.doc({
@@ -85,6 +165,7 @@ export default {
             fact('note', L('wl.threeBody'))),
 
           h('div', { class: 'wl-more' },
+            link(L('tour.cmd'), () => takeTour()),
             link(L('doc.help'), () => shell.openDoc('help')),
             has('help.formats') ? link(L('doc.formats'), () => shell.openDoc('formats')) : null)));
       },

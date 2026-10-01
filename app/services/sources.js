@@ -2,11 +2,12 @@
  * Fetching from the translation sources, and from any address the reader
  * types. The lists themselves are read by core/sources.js.
  *
- * A page may fetch from a site only if the site allows it, and many Bible
- * sites do not. Where the platform can download on the page's behalf (the
- * desktop app, `fetchBytes`), everything goes through that; on the web a
- * refusal is told apart from being offline, and the reader is told what does
- * work — the desktop app, or saving the file and adding it with Add your own.
+ * A page may read what another site sends only if the site allows it (CORS),
+ * and many Bible sites do not. Where the platform can download on the page's
+ * behalf (the desktop app, `fetchBytes`), everything goes through that. On
+ * the web a failure says which it was — no connection, a site that could not
+ * be reached, a site that answered but does not allow it, an HTTP status —
+ * as `err.code`, so the caller can offer what does work.
  */
 
 import { readEbibleCsv, readGetBibleList } from '../core/sources.js';
@@ -31,14 +32,38 @@ export function createSources({ store, platform, config }) {
       try {
         response = await fetch(u.href, { cache: 'no-cache' });
       } catch {
-        if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error(`${label}: there is no connection`);
-        throw new Error(`${label}: ${u.host} does not let web pages download from it. The desktop app can; or save the file and add it with Add your own.`);
+        throw await whyNot(u, label);
       }
-      if (!response.ok) throw new Error(`${label}: HTTP ${response.status} from ${u.host}`);
+      if (!response.ok) throw failure('status', `${label}: HTTP ${response.status} from ${u.host}`, u, { status: response.status });
       bytes = new Uint8Array(await response.arrayBuffer());
       type = response.headers.get('content-type') ?? '';
     }
     return { bytes, type, text: () => new TextDecoder().decode(bytes) };
+  }
+
+  /**
+   * Why a download a web page asked for failed. A browser reports a site
+   * that does not allow other pages to read it (no CORS header), a site that
+   * could not be reached, and a lost connection as one and the same error,
+   * so a second request is made that asks for nothing back (`no-cors`): if
+   * that one is answered, the site is there and the refusal is the
+   * browser's on its behalf.
+   */
+  async function whyNot(u, label) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      return failure('offline', `${label}: there is no connection`, u);
+    }
+    try {
+      await fetch(u.href, { mode: 'no-cors', cache: 'no-store' });
+    } catch {
+      return failure('unreachable', `${label}: ${u.host} could not be reached`, u);
+    }
+    return failure('cors', `${label}: ${u.host} answered, but does not allow a web page to read what it sends (it sends no CORS header). The desktop app is not limited by this.`, u);
+  }
+
+  /** An error a caller can act on: `code` is offline, unreachable, cors or status. */
+  function failure(code, message, u, more = {}) {
+    return Object.assign(new Error(message), { code, host: u.host, url: u.href, ...more });
   }
 
   const READERS = {

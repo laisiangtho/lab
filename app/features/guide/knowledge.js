@@ -19,7 +19,9 @@
  */
 
 import { ask, createIndex, learn, readMemory } from '../../core/guide.js';
-import { currentLocale, hasString, L, stringKeys } from '../../shell/i18n.js';
+import { intentOf, scopeOf } from '../../core/converse.js';
+import { BUILT_AT, VERSION } from '../../version.js';
+import { currentLocale, hasString, L, stringKeys, when } from '../../shell/i18n.js';
 import { GUIDE_KEY } from './index.js';
 
 /**
@@ -160,6 +162,10 @@ export function createKnowledge(ctx, { guideData }) {
    * @returns {{ passage: object|null, hits: { entry: object, score: number, learned: boolean }[] }}
    */
   function answer(question, { limit = 3 } = {}) {
+    // Worked out before anything is looked up: "how many verses in John 3"
+    // names a passage, and is a question about it, not a way to go there.
+    const said = worked(question);
+    if (said) return { passage: null, hits: [{ entry: said, score: 10, learned: false }] };
     const passage = shell.readPassage(question);
     if (passage?.book) return { passage, hits: [] };
     return { passage: null, hits: distinct(ask(index, question, { memory, limit: limit + 5 })).slice(0, limit) };
@@ -196,6 +202,123 @@ export function createKnowledge(ctx, { guideData }) {
       return { glyph: 'cmd', label: L('guide.tryIt'), run: () => shell.openPaletteWith(does.palette) };
     }
     return null;
+  }
+
+  // --- answers worked out ---------------------------------------------------
+
+  /** The translations on this device, kept current for answers asked synchronously. */
+  let installed = [];
+  const countInstalled = () => ctx.store.list().then((rows) => { installed = rows; }).catch(() => {});
+  countInstalled();
+  ctx.library?.on('change', countInstalled);
+
+  const number = (n) => new Intl.NumberFormat(currentLocale()).format(n);
+  const bookName = (id) => shell.workspace.bookName(id);
+  /**
+   * A book, and a chapter if one is written, from typed text: in the
+   * translation's own names first, then the canon's English names and
+   * abbreviations — "psalms" is asked while a Danish Bible is open.
+   */
+  function readBook(text) {
+    const own = shell.readPassage(text);
+    if (own?.book) return own;
+    const found = /^([1-3]?\s*[\p{L}][\p{L}\s.]*?)\s*(\d+)?$/u.exec(String(text).trim().toLowerCase());
+    if (!found) return null;
+    const name = found[1].replace(/\s+/g, ' ').replace(/\.$/, '').trim();
+    const plain = (value) => String(value).toLowerCase().replace(/\s+/g, ' ').trim();
+    const book = ctx.category.books.find((b) => [b.name, b.shortname, ...(b.abbr ?? [])].some((n) => plain(n) === name))
+      ?? ctx.category.books.find((b) => plain(b.name).replace(/s$/, '') === name.replace(/s$/, ''));
+    return book ? { book: book.id, chapter: Number(found[2] ?? 1) } : null;
+  }
+
+  const live = (id, title, text = '', does = null) => ({ id: `live.${id}`, title, text, does, prior: 1, live: true });
+
+  /**
+   * The answer to a question of the kinds core/converse.js recognises, as an
+   * entry like any other — a title, a sentence, a button — or null. The
+   * counts are the canon's (category.json): a translation that numbers
+   * differently differs by a few verses.
+   */
+  function worked(question) {
+    const found = intentOf(question);
+    if (!found) return null;
+    const { category, state } = ctx;
+    const now = new Date();
+    const at = state.get();
+    const reading = installed.length && at.book ? passageName(shell, { book: at.book, chapter: at.chapter }) : null;
+    const versesOf = (book) => category.book(book).verses.reduce((n, v) => n + v, 0);
+    const books = (testament) => category.books.filter((b) => !testament || b.testament === testament);
+    const sum = (list, of) => list.reduce((n, b) => n + of(b), 0);
+    const testamentName = (id) => L(id === 1 ? 'cv.ot' : 'cv.nt');
+    switch (found.intent) {
+      case 'time':
+        return live('time', L('cv.time', { time: now.toLocaleTimeString(currentLocale(), { hour: '2-digit', minute: '2-digit' }) }),
+          L('cv.timeNote', { date: now.toLocaleDateString(currentLocale(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }));
+      case 'date':
+        return live('date', L('cv.date', { date: now.toLocaleDateString(currentLocale(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }),
+          L('cv.dateNote', { time: when.time(now) }));
+      case 'books':
+      case 'chapters':
+      case 'verses': {
+        const scope = scopeOf(found.rest, readBook);
+        if (scope.scope === 'unknown') return live('nobook', L('cv.noBook', { text: scope.text }), L('cv.noBookNote'));
+        if (scope.scope === 'bible') {
+          const [ot, nt] = [books(1), books(2)];
+          if (found.intent === 'books') return live('books', L('cv.books', { n: number(ot.length + nt.length) }), L('cv.booksNote', { ot: number(ot.length), nt: number(nt.length) }));
+          if (found.intent === 'chapters') return live('chapters', L('cv.chapters', { n: number(sum([...ot, ...nt], (b) => b.chapters)) }), L('cv.split', { ot: number(sum(ot, (b) => b.chapters)), nt: number(sum(nt, (b) => b.chapters)) }));
+          return live('verses', L('cv.verses', { n: number(sum([...ot, ...nt], (b) => versesOf(b.id))) }), `${L('cv.split', { ot: number(sum(ot, (b) => versesOf(b.id))), nt: number(sum(nt, (b) => versesOf(b.id))) })} ${L('cv.numbering')}`);
+        }
+        if (scope.scope === 'testament') {
+          const list = books(scope.testament);
+          const span = L('cv.span', { first: bookName(list[0].id), last: bookName(list.at(-1).id) });
+          const n = found.intent === 'books' ? list.length : found.intent === 'chapters' ? sum(list, (b) => b.chapters) : sum(list, (b) => versesOf(b.id));
+          return live(`${found.intent}.t${scope.testament}`, L(`cv.${found.intent}In`, { n: number(n), where: testamentName(scope.testament) }), span);
+        }
+        const book = category.book(scope.book);
+        const go = { passage: { book: book.id, chapter: scope.scope === 'chapter' ? scope.chapter : 1 } };
+        if (scope.scope === 'chapter' && found.intent === 'verses') {
+          if (scope.chapter > book.chapters) return live('nochapter', L('cv.noChapter', { book: bookName(book.id), n: number(book.chapters) }), '', { passage: { book: book.id, chapter: 1 } });
+          return live('verses.c', L('cv.versesIn', { n: number(category.verseCount(book.id, scope.chapter)), where: passageName(shell, { book: book.id, chapter: scope.chapter }) }), L('cv.numbering'), go);
+        }
+        if (found.intent === 'books') return live('books.one', L('cv.oneBook', { book: bookName(book.id) }), '', go);
+        if (found.intent === 'chapters') return live('chapters.b', L('cv.chaptersIn', { n: number(book.chapters), where: bookName(book.id) }), L('cv.bookIn', { testament: testamentName(book.testament) }), go);
+        return live('verses.b', L('cv.versesIn', { n: number(versesOf(book.id)), where: bookName(book.id) }), `${L('cv.inChapters', { n: number(book.chapters) })} ${L('cv.numbering')}`, go);
+      }
+      case 'translations':
+        return installed.length
+          ? live('translations', L('cv.translations', { n: number(installed.length) }), installed.slice(0, 8).map((row) => row.info?.shortname || row.identify).join(', '), { doc: 'library' })
+          : live('translations', L('cv.noTranslations'), L('cv.noTranslationsNote'), { doc: 'library' });
+      case 'where':
+        if (/\b(?:you|du)\b/.test(String(question).toLowerCase())) {
+          return live('whereyou', L('cv.whereYou'), reading ? L('cv.whereYouNote', { where: reading, tr: shell.workspace.primaryName() }) : L('cv.privateNote'));
+        }
+        return reading
+          ? live('where', L('cv.where', { where: reading }), L('cv.whereNote', { tr: shell.workspace.primaryName() }), { passage: { book: at.book, chapter: at.chapter } })
+          : live('where', L('cv.nowhere'), L('cv.noTranslationsNote'), { doc: 'library' });
+      case 'who':
+        return live('who', L('cv.who'), L('cv.whoNote'), { doc: 'help' });
+      // Answered by the written topic for it, which says the same at more length.
+      case 'help':
+        return null;
+      case 'start':
+        return installed.length
+          ? live('start', L('cv.start'), L('cv.startNote'), { cmd: 'welcome.tour' })
+          : live('start', L('cv.noTranslations'), L('cv.noTranslationsNote'), { doc: 'library' });
+      case 'tour':
+        return live('tour', L('tour.cmd'), L('cv.tourNote'), { cmd: 'welcome.tour' });
+      case 'version':
+        return live('version', L('cv.version', { version: VERSION }), L('cv.versionNote', { date: when.date(BUILT_AT) }), { doc: 'about' });
+      case 'hello':
+        return live('hello', L('cv.hello'), L('cv.helloNote'));
+      case 'how':
+        return live('how', L('cv.how'), L('cv.helloNote'));
+      case 'thanks':
+        return live('thanks', L('cv.thanks'), L('cv.thanksNote'));
+      case 'bye':
+        return live('bye', L('cv.bye'), L('cv.byeNote'));
+      default:
+        return null;
+    }
   }
 
   function remember(question, id, delta) {
