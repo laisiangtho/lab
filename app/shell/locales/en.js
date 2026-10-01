@@ -152,7 +152,7 @@ export default {
   'lib.remove': 'Remove',
   'lib.offline': 'Offline',
   'lib.suggested': 'Your language',
-  'lib.noneYours': 'Nothing here yet. “Add your own” takes a file you have — this app’s JSON, USFM, Zefania, OSIS, USFX, or a spreadsheet of verses.',
+  'lib.noneYours': 'Nothing here yet. “Add your own” takes a file you have — this app’s JSON, USFM, Zefania, OSIS, USFX, USX, a browserBible zip, or a spreadsheet of verses.',
   'lib.heldWhy': 'What this copy holds, and where it parts from the canon. Every edition differs somewhere; the translation information has the detail.',
   'lib.keep': 'Ask to keep offline',
   'lib.kept': 'The browser agreed to keep this data.',

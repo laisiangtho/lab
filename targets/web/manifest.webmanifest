@@ -1,15 +1,39 @@
 {
   "name": "Lai Siangtho",
   "short_name": "Lai Siangtho",
+  "description": "Read and study the Bible offline: translations side by side in their own scripts, notes and projects, and word study in the Hebrew and Greek.",
+  "categories": [
+    "books",
+    "education"
+  ],
+  "lang": "en",
+  "dir": "auto",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#181818",
   "theme_color": "#181818",
   "icons": [
-    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" },
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

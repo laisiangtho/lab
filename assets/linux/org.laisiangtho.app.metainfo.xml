@@ -14,10 +14,18 @@
   <summary>Read and study the Bible, offline</summary>
   <description>
     <p>
-      Lai Siangtho is a Bible reader and study tool. Translations are kept on
-      the device and read offline, side by side, with notes and bookmarks that
-      stay with the passage rather than with one translation.
+      Lai Siangtho is a Bible to read and to work in. Translations are
+      downloaded once and kept on the device, read side by side in their own
+      scripts and languages, with no account and nothing uploaded.
     </p>
+    <ul>
+      <li>Parallel reading, levelled verse by verse, with synchronised scrolling</li>
+      <li>Search that counts every match, with whole words and regular expressions</li>
+      <li>Notes, bookmarks, tags, reading plans, memory verses and study projects that belong to the passage, not to one translation</li>
+      <li>Strong's numbers, a lexicon, word study and an interlinear line from Hebrew and Greek texts the reader imports</li>
+      <li>Translations from the Lai Siangtho catalog, getBible, eBible.org or a file in USFM, USX, USFX, OSIS, Zefania or browserBible form</li>
+      <li>Verse cards, printable sheets and exports to every format it reads</li>
+    </ul>
   </description>
   <launchable type="desktop-id">org.laisiangtho.app.desktop</launchable>
   <url type="homepage">https://laisiangtho.github.io/</url>

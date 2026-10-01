@@ -164,7 +164,7 @@ export default {
   'lib.remove': 'Fjern',
   'lib.offline': 'Frakoblet',
   'lib.suggested': 'Ditt språk',
-  'lib.noneYours': 'Ingenting her ennå. «Legg til din egen» tar imot en fil du har — denne appens JSON, USFM, Zefania, OSIS, USFX eller et regneark med vers.',
+  'lib.noneYours': 'Ingenting her ennå. «Legg til din egen» tar imot en fil du har — denne appens JSON, USFM, Zefania, OSIS, USFX, USX, en browserBible-zip eller et regneark med vers.',
   'lib.heldWhy': 'Hva denne kopien inneholder, og hvor den avviker fra kanon. Alle utgaver avviker et sted; informasjonen om oversettelsen har detaljene.',
   'lib.keep': 'Be om å beholde frakoblet',
   'lib.kept': 'Nettleseren gikk med på å beholde disse dataene.',

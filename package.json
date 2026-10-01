@@ -2,7 +2,7 @@
   "name": "lai-siangtho",
   "productName": "Lai Siangtho",
   "version": "26.10.1",
-  "description": "Bible reading and study — web (PWA) and desktop (Electron) from one codebase",
+  "description": "Read and study the Bible offline: translations side by side in their own scripts, notes and projects, and word study in the Hebrew and Greek.",
   "author": {
     "name": "Lai Siangtho"
   },

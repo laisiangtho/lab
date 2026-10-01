@@ -90,11 +90,13 @@ newest first.
   as one file, gzipped, or a compressed zip — with or without Strong's
   numbers, headings and cross-references, with the reader's notes, compact or
   readable — always carrying the copyright.
-- A guide that answers questions about the app in the reader's own words,
-  in English, Norwegian or Burmese, with the button that does what was asked;
-  it adapts to the answers a reader uses, on the device only.
-- Import the reader's own translations — this app's JSON, USFM, Zefania, OSIS,
-  USFX, a spreadsheet, or a whole eBible.org archive — checked against the canon
+- Help and a guide that answer questions about the app in the reader's own
+  words, in English, Norwegian or Burmese, with the button that does what was
+  asked — one knowledge, asked from the Help page, the Guide pane or `?` in
+  the palette; it adapts to the answers a reader uses, on the device only.
+- Import the reader's own translations — this app's JSON, USFM, USX, Zefania,
+  OSIS, USFX, browserBible, a spreadsheet, or a whole eBible.org archive, with
+  Strong's numbers and morphology kept — checked against the canon
   exactly as a published one is. Nothing is uploaded anywhere.
 - A report on how each translation differs from the canon, and a way to look a
   translation over for faults.
@@ -115,8 +117,8 @@ newest first.
   sidebars open is handled like a narrow one.
 - Settings, every one with a sentence saying what it does, exported and
   imported with the reader's notes, bookmarks and projects.
-- Help, Shortcuts (generated from the commands), About, Data and formats, and
-  a Welcome shown on the very first run.
+- Help (opening on a question), Shortcuts (generated from the commands),
+  About, Data and formats, and a Welcome shown on the very first run.
 - Nothing fails silently: a feature that cannot start is named, a full quota
   says what to do, an incomplete download offers Download again, and an app
   that cannot start offers Try again and Erase stored data.
@@ -151,6 +153,16 @@ newest first.
 ---
 
 ## Releases
+
+### 26.10.01.2 — 1 October 2026
+
+- The app describes itself in its listings: the web page and its install
+  manifest carry a description and categories, and the Linux software-centre
+  entry lists what the app does.
+- The Library's empty "Yours" list names every format it reads, browserBible
+  and USX included.
+- README rewritten to open with what the app does and how to get it;
+  `docs/roadmap.md` added.
 
 ### 26.10.01.1 — 1 October 2026
 
