@@ -8,8 +8,8 @@ copyright: Copyright © 2016–2026 Khen Solomon Lethil
 # buildVersion goes into the macOS and Windows metadata; buildNumber becomes the
 # package revision of the .deb and .rpm (26.9.29-11), so a second build on the
 # same day installs as an upgrade over the first.
-buildVersion: "2"
-buildNumber: "2"
+buildVersion: "3"
+buildNumber: "3"
 # Releases are read by the desktop update check (targets/desktop/electron/ipc.js);
 # both point at the same repository.
 publish:
