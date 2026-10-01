@@ -157,12 +157,18 @@ export function mountStudy(el, ctx) {
       fill(into, note(L('ws.noVerse', { name })));
       return;
     }
-    const [words, morph] = await Promise.all([
-      ctx.lemmas.verseWords(source.identify, at.book, at.chapter, at.verse),
+    // The verse as the original numbers it: Malachi 4:1 in an English Bible
+    // is Hebrew 3:19.
+    const from = at.identify ? await ctx.lemmas.numbering(at.identify) : 'english';
+    const [{ words, at: read }, morph] = await Promise.all([
+      ctx.lemmas.verseWords(source.identify, at.book, at.chapter, at.verse, { from }),
       morphTables(),
     ]);
     if (!live()) return;
-    const where = refLabel(at);
+    const moved = read.length !== 1 || read[0].chapter !== at.chapter || read[0].verse !== at.verse;
+    const where = moved
+      ? `${refLabel(at)} = ${read.map((ref) => `${shell.workspace.number(ref.chapter)}:${shell.workspace.number(ref.verse)}`).join(', ')}`
+      : refLabel(at);
     if (!words.length) {
       fill(into, note(L('ws.verseMissing', { name, where })));
       return;

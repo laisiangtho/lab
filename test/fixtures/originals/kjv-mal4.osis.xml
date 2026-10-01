@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><osis xmlns="http://www.bibletechnologies.net/2003/OSIS/namespace" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.bibletechnologies.net/2003/OSIS/namespace http://www.bibletechnologies.net/osisCore.2.1.1.xsd">
+<osisText osisIDWork="KJV" osisRefWork="defaultReferenceScheme" xml:lang="en">
+<header>
+  <work osisWork="KJV">
+    <title>King James Version (1769) with Strongs Numbers and Morphology</title>
+    <identifier type="OSIS">Bible.KJV</identifier>
+    <scope>Gen-Rev</scope>
+    <refSystem>Bible.KJV</refSystem>
+  </work>
+  <work osisWork="defaultReferenceScheme">
+    <refSystem>Bible.KJV</refSystem>
+  </work>
+  <work osisWork="strong">
+    <refSystem>Dict.Strongs</refSystem>
+  </work>
+  <work osisWork="robinson">
+    <refSystem>Dict.Robinsons</refSystem>
+  </work>
+  <work osisWork="strongMorph">
+    <refSystem>Dict.strongMorph</refSystem>
+  </work>
+</header>
+<div type="book" osisID="Mal" canonical="true">
+<chapter osisID="Mal.4" chapterTitle="CHAPTER 4.">
+<title type="chapter">CHAPTER 4.</title>
+<verse osisID="Mal.4.1" sID="Mal.4.1"/><w lemma="strong:H03117">For, behold, the day</w> <w morph="strongMorph:TH8802" lemma="strong:H0935">cometh</w>, <w morph="strongMorph:TH8802" lemma="strong:H01197">that shall burn</w> <w lemma="strong:H08574">as an oven</w>; <w lemma="strong:H02086">and all the proud</w>, <w morph="strongMorph:TH8802" lemma="strong:H06213">yea, and all that do</w> <w lemma="strong:H07564">wickedly</w>, <w lemma="strong:H07179">shall be stubble</w>: <w lemma="strong:H03117">and the day</w> <w morph="strongMorph:TH8802" lemma="strong:H0935">that cometh</w> <w morph="strongMorph:TH8765" lemma="strong:H03857">shall burn them up</w>, <w morph="strongMorph:TH8804" lemma="strong:H0559">saith</w> <w lemma="strong:H03068">the <seg><divineName>Lord</divineName></seg></w> <w lemma="strong:H06635">of hosts</w>, <w morph="strongMorph:TH8799" lemma="strong:H05800">that it shall leave</w> <w lemma="strong:H08328">them neither root</w> <w lemma="strong:H06057">nor branch</w>.<verse eID="Mal.4.1"/>
+<verse osisID="Mal.4.2" sID="Mal.4.2"/><milestone type="x-p" subType="x-added" marker="¶"/><w lemma="strong:H03373">But unto you that fear</w> <w lemma="strong:H08034">my name</w> <w lemma="strong:H08121">shall the Sun</w> <w lemma="strong:H06666">of righteousness</w> <w morph="strongMorph:TH8804" lemma="strong:H02224">arise</w> <w lemma="strong:H04832">with healing</w> <w lemma="strong:H03671">in his wings</w>; <w morph="strongMorph:TH8804" lemma="strong:H03318">and ye shall go forth</w>, <w morph="strongMorph:TH8804" lemma="strong:H06335">and grow up</w> <w lemma="strong:H05695">as calves</w> <w lemma="strong:H04770">of the stall</w>.<verse eID="Mal.4.2"/>
+<verse osisID="Mal.4.3" sID="Mal.4.3"/><w morph="strongMorph:TH8804" lemma="strong:H06072">And ye shall tread down</w> <w lemma="strong:H07563">the wicked</w>; <w lemma="strong:H0665">for they shall be ashes</w> <w lemma="strong:H03709">under the soles</w> <w lemma="strong:H07272">of your feet</w> <w lemma="strong:H03117">in the day</w> <w morph="strongMorph:TH8802" lemma="strong:H06213">that I shall do</w> <transChange type="added">this</transChange>, <w morph="strongMorph:TH8804" lemma="strong:H0559">saith</w> <w lemma="strong:H03068">the <seg><divineName>Lord</divineName></seg></w> <w lemma="strong:H06635">of hosts</w>.<verse eID="Mal.4.3"/>
+<verse osisID="Mal.4.4" sID="Mal.4.4"/><milestone type="x-p" marker="¶"/><w morph="strongMorph:TH8798" lemma="strong:H02142">Remember</w> <w lemma="strong:H08451">ye the law</w> <w lemma="strong:H04872">of Moses</w> <w lemma="strong:H05650">my servant</w>, <w morph="strongMorph:TH8765" lemma="strong:H06680">which I commanded</w> <w lemma="strong:H02722">unto him in Horeb</w> <w lemma="strong:H03478">for all Israel</w>, <transChange type="added">with</transChange> <w lemma="strong:H02706">the statutes</w> <w lemma="strong:H04941">and judgments</w>.<verse eID="Mal.4.4"/>
+<verse osisID="Mal.4.5" sID="Mal.4.5"/><milestone type="x-p" subType="x-added" marker="¶"/><w morph="strongMorph:TH8802" lemma="strong:H07971">Behold, I will send</w> <w lemma="strong:H0452">you Elijah</w> <w lemma="strong:H05030">the prophet</w> <w lemma="strong:H06440">before</w> <w morph="strongMorph:TH8800" lemma="strong:H0935">the coming</w> <w lemma="strong:H01419">of the great</w> <w morph="strongMorph:TH8737" lemma="strong:H03372">and dreadful</w> <w lemma="strong:H03117">day</w> <w lemma="strong:H03068">of the <seg><divineName>Lord</divineName></seg></w>:<verse eID="Mal.4.5"/>
+<verse osisID="Mal.4.6" sID="Mal.4.6"/><w morph="strongMorph:TH8689" lemma="strong:H07725">And he shall turn</w> <w lemma="strong:H03820">the heart</w> <w lemma="strong:H01">of the fathers</w> <w lemma="strong:H01121">to the children</w>, <w lemma="strong:H03820">and the heart</w> <w lemma="strong:H01121">of the children</w> <w lemma="strong:H01">to their fathers</w>, <w morph="strongMorph:TH8799" lemma="strong:H0935">lest I come</w> <w morph="strongMorph:TH8689" lemma="strong:H05221">and smite</w> <w lemma="strong:H0776">the earth</w> <w lemma="strong:H02764">with a curse</w>.<verse eID="Mal.4.6"/>
+</chapter>
+</div>
+</osisText>
+</osis>

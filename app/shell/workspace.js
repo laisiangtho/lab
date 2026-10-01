@@ -13,6 +13,7 @@
 import { alignChapter } from '../core/align.js';
 import { SOURCE_FORMATS } from '../core/settings.js';
 import { taggedWords } from '../core/lemmas.js';
+import { mapVerse } from '../core/versification.js';
 import { glossOf, lookup } from '../core/lexicon.js';
 import { createResolver } from '../core/reference.js';
 import { fromMarkdown, toMarkdown } from '../core/source.js';
@@ -707,15 +708,13 @@ export function createWorkspace(ctx, chrome) {
     const order = panesOf(state.get());
 
     const { book, chapter } = state.get();
-    const [loaded, interlinear] = await Promise.all([
-      Promise.all(order.map(async (identify, index) => {
-        const { meta, resolver } = await openTranslation(identify);
-        return { identify, index, meta, resolver, verses: await store.getChapter(identify, book, chapter, { markup: true }) };
-      })),
-      interlinearFor(book, chapter).catch(() => null),
-    ]);
+    const loaded = await Promise.all(order.map(async (identify, index) => {
+      const { meta, resolver } = await openTranslation(identify);
+      return { identify, index, meta, resolver, verses: await store.getChapter(identify, book, chapter, { markup: true }) };
+    }));
     if (!current()) return;
-    loaded[0].interlinear = interlinear;
+    loaded[0].interlinear = await interlinearFor(loaded[0], book, chapter).catch(() => null);
+    if (!current()) return;
 
     // The translation carries its own book names, and it loads after the first
     // paint. When the primary one changes, everything that shows a book name —
@@ -793,19 +792,33 @@ export function createWorkspace(ctx, chrome) {
    * written, and a gloss for each number. Null when the line is off or there
    * is no original to show.
    */
-  async function interlinearFor(book, chapter) {
+  async function interlinearFor(pane, book, chapter) {
     if (!state.get().interlinear || !ctx.lemmas) return null;
     const testament = book <= 39 ? 'H' : 'G';
     const source = await ctx.lemmas.original(testament);
     if (!source) return null;
-    const key = `${source.identify}:${source.installedAt ?? ''}:${book}:${chapter}`;
-    let verses = originalChapters.get(key);
-    if (!verses) {
-      const raw = await store.getChapter(source.identify, book, chapter, { markup: true });
-      verses = {};
-      for (const [n, verse] of Object.entries(raw ?? {})) verses[n] = taggedWords(verse.text);
-      if (originalChapters.size > 24) originalChapters.delete(originalChapters.keys().next().value);
-      originalChapters.set(key, verses);
+    // One original chapter's tagged words, kept for the chapters read lately.
+    const wordsOf = async (c) => {
+      const key = `${source.identify}:${source.installedAt ?? ''}:${book}:${c}`;
+      if (!originalChapters.has(key)) {
+        const raw = await store.getChapter(source.identify, book, c, { markup: true });
+        const out = {};
+        for (const [n, verse] of Object.entries(raw ?? {})) out[n] = taggedWords(verse.text);
+        if (originalChapters.size > 24) originalChapters.delete(originalChapters.keys().next().value);
+        originalChapters.set(key, out);
+      }
+      return originalChapters.get(key);
+    };
+    // Each verse of the translation, as the original numbers it: Malachi 4
+    // in an English Bible is Hebrew 3:19–24, a psalm's verse 1 its verse 3.
+    const [from, to] = await Promise.all([ctx.lemmas.numbering(pane.identify), ctx.lemmas.numbering(source.identify)]);
+    const verses = {};
+    for (const key of Object.keys(pane.verses ?? {})) {
+      const words = [];
+      for (const ref of mapVerse({ book, chapter, verse: Number(key) }, from, to)) {
+        words.push(...((await wordsOf(ref.chapter))[ref.verse] ?? []));
+      }
+      if (words.length) verses[key] = words;
     }
     return {
       identify: source.identify,

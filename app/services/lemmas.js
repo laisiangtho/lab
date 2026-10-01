@@ -14,6 +14,7 @@
  */
 
 import { addChapter, INDEX_FORMAT, taggedWords } from '../core/lemmas.js';
+import { mapVerse, numberingOf } from '../core/versification.js';
 
 const HEBREW = new Set(['he', 'hbo', 'heb', 'arc', 'oar']);
 const GREEK = new Set(['grc', 'gre', 'ell', 'el']);
@@ -68,12 +69,39 @@ export function createLemmas({ store }) {
     return all.find((meta) => originalOf(meta) === testament) ?? null;
   }
 
-  /** The tagged words of one verse of a translation, with their morphology. */
-  async function verseWords(identify, book, chapter, verse) {
-    const verses = await store.getChapter(identify, book, chapter, { markup: true });
-    const found = verses?.[verse];
-    return found ? taggedWords(found.text) : [];
+  /** Which numbering each text follows (core/versification.js), asked once. */
+  const numberings = new Map();
+  async function numbering(identify) {
+    if (!numberings.has(identify)) {
+      numberings.set(identify, (async () => {
+        const has = async (book, chapter) => Boolean(await store.getChapter(identify, book, chapter));
+        const [malachi4, joel4, meta] = await Promise.all([has(39, 4), has(29, 4), metaOf(identify)]);
+        return numberingOf((book) => (book === 39 ? malachi4 : joel4), { hebrew: originalOf(meta) === 'H' });
+      })());
+    }
+    return numberings.get(identify);
   }
 
-  return { index, original, verseWords };
+  /**
+   * The tagged words of one verse of a text, with their morphology — the
+   * verse given in `from`'s numbering, so Malachi 4:1 in an English Bible
+   * finds Hebrew 3:19 in the original. `at` says which verses of the text
+   * were read.
+   *
+   * @returns {Promise<{ words: object[], at: { book: number, chapter: number, verse: number }[] }>}
+   */
+  async function verseWords(identify, book, chapter, verse, { from = null } = {}) {
+    const to = await numbering(identify);
+    const at = from ? mapVerse({ book, chapter, verse }, from, to) : [{ book, chapter, verse }];
+    const words = [];
+    const chapters = new Map();
+    for (const ref of at) {
+      if (!chapters.has(ref.chapter)) chapters.set(ref.chapter, await store.getChapter(identify, book, ref.chapter, { markup: true }));
+      const found = chapters.get(ref.chapter)?.[ref.verse];
+      if (found) words.push(...taggedWords(found.text));
+    }
+    return { words, at };
+  }
+
+  return { index, original, verseWords, numbering };
 }
