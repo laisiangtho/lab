@@ -13,6 +13,10 @@
  *   lexicon       key: 'H' | 'G'                 value: a Strong's lexicon
  *   guide         key: path                      value: a downloaded guide file
  *   lemmas        key: identify                  value: { stamp, index } — core/lemmas.js
+ *   study         key: id                        value: what a study data set is (no data)
+ *   studyrows     key: [id, part]                value: { id, part, data } — a set's data, by
+ *                                                chapter ("b.c") for cross-references, or
+ *                                                whole ("entries") for topics and a dictionary
  *
  * Works in the main thread and in workers. Install and remove are single
  * transactions: a failed install leaves the previous copy untouched.
@@ -21,7 +25,7 @@
 import { plainVerses } from '../core/strongs.js';
 
 const DB_NAME = 'lai-siangtho';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 const DIAGNOSTIC_LIMIT = 400;
 
 /**
@@ -57,6 +61,11 @@ export async function openStore({ name = DB_NAME, onLost = null } = {}) {
       // one row per translation, built the first time a word is studied.
       // Rebuilt from the chapters at will, so never exported. Added in v7.
       if (!d.objectStoreNames.contains('lemmas')) d.createObjectStore('lemmas', { keyPath: 'identify' });
+      // Study data the reader imported (core/studydata.js): what each set is,
+      // listed without its data, and the data by part, so the reading surface
+      // reads one chapter's cross-references and not 340,000. Added in v8.
+      if (!d.objectStoreNames.contains('study')) d.createObjectStore('study', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('studyrows')) d.createObjectStore('studyrows', { keyPath: ['id', 'part'] });
     };
     req.onblocked = () => reject(new Error('Another window of this app is open with an older version of its storage. Close the other windows and reload.'));
     req.onsuccess = () => resolve(req.result);
@@ -240,6 +249,40 @@ class TranslationStore {
     tx.objectStore('chapters').delete(IDBKeyRange.bound([identify], [identify, []]));
     tx.objectStore('translations').delete(identify);
     tx.objectStore('lemmas').delete(identify);
+    await done(tx);
+  }
+
+  // --- study data ------------------------------------------------------------
+
+  /** Every study data set on this device, without its data. */
+  async studySets() {
+    return request(this.#tx('study').objectStore('study').getAll());
+  }
+
+  /**
+   * Keep a study data set, replacing one with the same id, in one
+   * transaction: a failed import leaves the previous copy as it was.
+   *
+   * @param {object} meta what the set is: { id, type, name, source, licence, count, … }
+   * @param {Record<string, unknown>} parts its data by part
+   */
+  async putStudySet(meta, parts) {
+    const tx = this.#tx(['study', 'studyrows'], 'readwrite');
+    tx.objectStore('studyrows').delete(IDBKeyRange.bound([meta.id], [meta.id, []]));
+    tx.objectStore('study').put(meta);
+    for (const [part, data] of Object.entries(parts)) tx.objectStore('studyrows').put({ id: meta.id, part, data });
+    await done(tx);
+  }
+
+  /** One part of a set's data, or null. */
+  async studyPart(id, part) {
+    return (await request(this.#tx('studyrows').objectStore('studyrows').get([id, part])))?.data ?? null;
+  }
+
+  async removeStudySet(id) {
+    const tx = this.#tx(['study', 'studyrows'], 'readwrite');
+    tx.objectStore('studyrows').delete(IDBKeyRange.bound([id], [id, []]));
+    tx.objectStore('study').delete(id);
     await done(tx);
   }
 

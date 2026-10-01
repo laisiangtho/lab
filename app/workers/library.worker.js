@@ -19,11 +19,12 @@
  */
 
 import { parseCategory } from '../core/category.js';
-import { convert } from '../core/formats/index.js';
+import { convert, slug } from '../core/formats/index.js';
 import { readPack } from '../core/formats/pack.js';
 import { write } from '../core/formats/write.js';
 import { hasStrongs } from '../core/strongs.js';
 import { parseTranslation } from '../core/translation.js';
+import { readStudyFile } from '../core/studydata.js';
 import { openStore } from '../services/store.js';
 
 let storePromise = null;
@@ -33,7 +34,7 @@ self.addEventListener('message', async ({ data }) => {
   const { id, type } = data;
   const post = (msg) => self.postMessage({ id, ...msg });
   try {
-    const jobs = { install, import: importFile, pack: importPack, export: exportFiles, probe };
+    const jobs = { install, import: importFile, pack: importPack, export: exportFiles, probe, study: importStudy };
     if (!jobs[type]) throw new Error(`library worker: unknown request type ${type}`);
     storePromise ??= openStore();
     category ??= parseCategory(data.category);
@@ -43,6 +44,26 @@ self.addEventListener('message', async ({ data }) => {
     post({ type: 'error', message: err?.message ?? String(err) });
   }
 });
+
+/**
+ * Study data the reader brought (core/studydata.js): read, then kept by part
+ * — a chapter's cross-references to a row, a dictionary whole — in one
+ * transaction. A set with the same name and type replaces the one before.
+ */
+async function importStudy({ text, name, studyType }, post) {
+  post({ type: 'progress', phase: 'convert' });
+  const read = readStudyFile(text, { source: name, type: studyType ?? null });
+  const id = `${read.type}:${slug(read.name)}`;
+  const parts = read.type === 'crossrefs' ? read.links : { entries: read.entries };
+  const meta = {
+    id, type: read.type, format: read.format, name: read.name, source: read.source, licence: read.licence,
+    count: read.count, outside: read.outside ?? 0, file: name, bytes: text.length, installedAt: new Date().toISOString(),
+  };
+  post({ type: 'progress', phase: 'write' });
+  const store = await storePromise;
+  await store.putStudySet(meta, parts);
+  return { meta };
+}
 
 async function install({ identify, url }, post) {
   post({ type: 'progress', phase: 'download', received: 0 });

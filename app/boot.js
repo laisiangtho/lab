@@ -22,6 +22,7 @@ import { createLibrary, fetchJson } from './services/library.js';
 import { createLangPacks } from './services/langpacks.js';
 import { createLexicons } from './services/lexicon.js';
 import { createLemmas } from './services/lemmas.js';
+import { createStudyData } from './services/studydata.js';
 import { createRecords } from './services/records.js';
 import { createSearch } from './services/search.js';
 import { createSettings } from './services/settings.js';
@@ -89,6 +90,7 @@ async function boot({ root, platform, features, config: overrides }) {
     langPacks: createLangPacks({ records, config }),
     lexicons,
     lemmas: createLemmas({ store }),
+    study: createStudyData({ store, library }),
     /**
      * What one feature lends another, by name — the guide's knowledge, which
      * the Help page asks too. The context is frozen; this one object is not,

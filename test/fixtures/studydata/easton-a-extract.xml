@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ThML PUBLIC 
+    "-//CCEL/DTD Theological Markup Language//EN"
+    "http://www.ccel.org/dtd/ThML10.dtd">
+<!--
+<?xml-stylesheet type="text/xml"
+    href="http://www.ccel.org/ss/thml.html.xsl" ?>
+<?xml-stylesheet type="text/xsl"
+    href="http://www.ccel.org/ss/thml.html.xsl" ?>
+-->
+    
+<!-- Copyright Christian Classics Ethereal Library -->
+<ThML>
+
+<ThML.head>
+<generalInfo>
+ <description><i>Easton's Bible Dictionary</i> (formerly known as the 
+<i>Illustrated Bible Dictionary</i>) is a classic source for Bible 
+scholars.  
+It was published in 1897, three years after the author's death.  Easton 
+was a Scottish Presbyterian minister who is known primarily for his 
+masterful reference work.  <i>Easton's</i> contains both short, 
+dictionary-like 
+entries on words, people, and places, as well as longer, 
+encyclopedia-esque accounts.  The entries are based on 19th century 
+Christian thought, and so are not without bias - Easton's theology is 
+decidedly Protestant - but the <i>Dictionary</i> is, according to 
+reviewers, 
+still useful and relevant for everyone.  This dictionary provides 
+excellent background information on a variety of Biblical topics, and is 
+also available through Amazon.com for the Kindle, something many users 
+find helpful for their e-Bible reading.<br /><br />Abby Zwart<br />CCEL 
+Staff Writer 
+</description>
+ <pubHistory />
+ <comments />
+</generalInfo>
+
+<printSourceInfo>
+ <published>1897</published>
+</printSourceInfo>
+
+<electronicEdInfo>
+ <publisherID>ccel</publisherID>
+ <authorID>easton</authorID>
+ <bookID>ebd2</bookID>
+ <workID>ebd2</workID>
+ <bkgID>eastons_bible_dictionary_(easton)</bkgID>
+ <version>2.0</version>
+ <series />
+
+ <DC>
+  <DC.Title>Easton's Bible Dictionary</DC.Title>
+  <DC.Creator sub="Author" scheme="short-form">Easton, M.G.</DC.Creator>
+  <DC.Creator sub="Author" scheme="file-as">M.G. Easton</DC.Creator>
+  <DC.Creator sub="Author" scheme="ccel">easton</DC.Creator>
+  <DC.Publisher>Grand Rapids, MI: Christian Classics Ethereal Library</DC.Publisher>
+  <DC.Subject scheme="LCCN">BS440</DC.Subject>
+  <DC.Subject scheme="lcsh1">The Bible</DC.Subject>
+    <DC.Subject scheme="lcsh2">Works about the Bible</DC.Subject>
+    <DC.Subject scheme="ccel">All; Reference; Dictionary; Bibles; </DC.Subject>
+  <DC.Date sub="Created">2000-07-09</DC.Date>
+  <DC.Type>Text.Dictionary</DC.Type>
+  <DC.Format scheme="IMT">text/html</DC.Format>
+  <DC.Identifier scheme="URL">/ccel/easton/ebd2.html</DC.Identifier>
+  <DC.Source>Online Bible</DC.Source>
+  <DC.Source scheme="URL" />
+  <DC.Language scheme="ISO639-3">eng</DC.Language>
+  <DC.Rights>Public Domain</DC.Rights>
+ </DC>
+
+</electronicEdInfo>
+</ThML.head>
+<ThML.body xml:space="preserve">
+
+<div1 title="Title Page" prev="toc" next="EBD" id="TP">
+<scripCom type="Commentary" target="/ccel/easton/ebd2.html?term=Matthew,%20Gospel%20according%20to" id="TP-p0.1" />
+<h1 id="TP-p0.2">Illustrated Bible Dictionary</h1>
+<h2 id="TP-p0.3">M. G. Easton</h2>
+<p id="TP-p1"> </p>
+<h3 id="TP-p1.1">Third Edition</h3>
+<h3 id="TP-p1.2">1897</h3>
+<p style="text-align:center" id="TP-p2">Due to the nature of this etext, the
+illustrated portions of this Dictionary have not been included.</p>
+
+</div1>
+
+<div1 title="Easton's Bible Dictionary" prev="TP" next="a" id="EBD">
+
+<div2 title="A" prev="EBD" next="b" id="a">
+<glossary id="a-p0.1">
+<term id="a-p0.2">A</term>
+
+<def id="a-p0.3">
+<p id="a-p1">Alpha, the first letter of the Greek alphabet, as Omega is the
+last. These letters occur in the text of <scripRef passage="Rev. 1:8" id="a-p1.1" parsed="|Rev|1|8|0|0" osisRef="Bible:Rev.1.8">Rev. 1:8</scripRef>, <scripRef passage="Rev 1:11" id="a-p1.2" parsed="|Rev|1|11|0|0" osisRef="Bible:Rev.1.11">11</scripRef>; <scripRef passage="Rev 21:6" id="a-p1.3" parsed="|Rev|21|6|0|0" osisRef="Bible:Rev.21.6">21:6</scripRef>;
+<scripRef passage="Rev 22:13" id="a-p1.4" parsed="|Rev|22|13|0|0" osisRef="Bible:Rev.22.13">22:13</scripRef>, and are represented by “Alpha” and “Omega” respectively
+(omitted in R.V., 1:11). They mean “the first and last.” (Comp.
+<scripRef passage="Heb. 12:2" id="a-p1.5" parsed="|Heb|12|2|0|0" osisRef="Bible:Heb.12.2">Heb. 12:2</scripRef>; <scripRef passage="Isa. 41:4" id="a-p1.6" parsed="|Isa|41|4|0|0" osisRef="Bible:Isa.41.4">Isa. 41:4</scripRef>; <scripRef passage="Isa 44:6" id="a-p1.7" parsed="|Isa|44|6|0|0" osisRef="Bible:Isa.44.6">44:6</scripRef>; <scripRef passage="Rev. 1:11" id="a-p1.8" parsed="|Rev|1|11|0|0" osisRef="Bible:Rev.1.11">Rev. 1:11</scripRef>, <scripRef passage="Rev 1:17" id="a-p1.9" parsed="|Rev|1|17|0|0" osisRef="Bible:Rev.1.17">17</scripRef>; <scripRef passage="Rev 2:8" id="a-p1.10" parsed="|Rev|2|8|0|0" osisRef="Bible:Rev.2.8">2:8</scripRef>.) In the symbols
+of the early Christian Church these two letters are frequently
+combined with the cross or with Christ’s monogram to denote his
+divinity.</p>
+</def>
+
+<term id="a-p1.11">Aaron</term>
+
+<def id="a-p1.12">
+<p id="a-p2">The eldest son of Amram and Jochebed, a daughter of Levi (<scripRef passage="Ex. 6:20" id="a-p2.1" parsed="|Exod|6|20|0|0" osisRef="Bible:Exod.6.20">Ex. 6:20</scripRef>). Some explain the name as meaning mountaineer, others
+mountain of strength, illuminator. He was born in Egypt three
+years before his brother Moses, and a number of years after his
+sister Miriam (2:1, 4; 7:7). He married Elisheba, the daughter of
+Amminadab of the house of Judah (6:23; <scripRef passage="1 Chr. 2:10" id="a-p2.2" parsed="|1Chr|2|10|0|0" osisRef="Bible:1Chr.2.10">1 Chr. 2:10</scripRef>), by whom he
+had four sons, Nadab and Abihu, Eleazar and Ithamar. When the
+time for the deliverance of Isarael out of Egypt drew nigh, he
+was sent by God (<scripRef passage="Ex. 4:14" id="a-p2.3" parsed="|Exod|4|14|0|0" osisRef="Bible:Exod.4.14">Ex. 4:14</scripRef>, <scripRef passage="Ex. 4:27-30" id="a-p2.4" parsed="|Exod|4|27|4|30" osisRef="Bible:Exod.4.27-Exod.4.30">27-30</scripRef>) to meet his long-absent
+brother, that he might co-operate with him in all that they were
+required to do in bringing about the Exodus. He was to be the
+“mouth” or “prophet” of Moses, i.e., was to speak for him,
+because he was a man of a ready utterance (7:1, 2, 9, 10, 19). He
+was faithful to his trust, and stood by Moses in all his
+interviews with Pharaoh.</p>
+
+<p id="a-p3">When the ransomed tribes fought their first battle with Amalek
+in Rephidim, Moses stood on a hill overlooking the scene of the
+conflict with the rod of God in his outstretched hand. On this
+occasion he was attended by Aaron and Hur, his sister’s husband,
+who held up his wearied hands till Joshua and the chosen
+warriors of Israel gained the victory (17:8-13).</p>
+
+<p id="a-p4">Afterwards, when encamped before Sinai, and when Moses at the
+command of God ascended the mount to receive the tables of the
+law, Aaron and his two sons, Nadab and Abihu, along with seventy
+of the elders of Israel, were permitted to accompany him part of
+the way, and to behold afar off the manifestation of the glory
+of Israel’s God (<scripRef passage="Ex. 19:24" id="a-p4.1" parsed="|Exod|19|24|0|0" osisRef="Bible:Exod.19.24">Ex. 19:24</scripRef>; <scripRef passage="Ex 24:9-11" id="a-p4.2" parsed="|Exod|24|9|24|11" osisRef="Bible:Exod.24.9-Exod.24.11">24:9-11</scripRef>). While Moses remained on
+the mountain with God, Aaron returned unto the people; and
+yielding through fear, or ignorance, or instability of
+character, to their clamour, made unto them a golden calf, and
+set it up as an object of worship (<scripRef passage="Ex. 32:4" id="a-p4.3" parsed="|Exod|32|4|0|0" osisRef="Bible:Exod.32.4">Ex. 32:4</scripRef>; <scripRef passage="Ps. 106:19" id="a-p4.4" parsed="|Ps|106|19|0|0" osisRef="Bible:Ps.106.19">Ps. 106:19</scripRef>). On the
+return of Moses to the camp, Aaron was sternly rebuked by him
+for the part he had acted in this matter; but he interceded for
+him before God, who forgave his sin (<scripRef passage="Deut. 9:20" id="a-p4.5" parsed="|Deut|9|20|0|0" osisRef="Bible:Deut.9.20">Deut. 9:20</scripRef>).</p>
+
+<p id="a-p5">On the mount, Moses received instructions regarding the system
+of worship which was to be set up among the people; and in
+accordance therewith Aaron and his sons were consecrated to the
+priest’s office (<scripRef passage="Lev. 8" id="a-p5.1" parsed="|Lev|8|0|0|0" osisRef="Bible:Lev.8">Lev. 8</scripRef>; <scripRef passage="Lev 9" id="a-p5.2" parsed="|Lev|9|0|0|0" osisRef="Bible:Lev.9">9</scripRef>). Aaron, as high priest, held
+henceforth the prominent place appertaining to that office.</p>
+
+<p id="a-p6">When Israel had reached Hazeroth, in “the wilderness of
+Paran,” Aaron joined with his sister Miriam in murmuring against
+Moses, “because of the Ethiopian woman whom he had married,”
+probably after the death of Zipporah. But the Lord vindicated
+his servant Moses, and punished Miriam with leprosy (<scripRef passage="Num. 12" id="a-p6.1" parsed="|Num|12|0|0|0" osisRef="Bible:Num.12">Num. 12</scripRef>).
+Aaron acknowledged his own and his sister’s guilt, and at the
+intercession of Moses they were forgiven.</p>
+
+<p id="a-p7">Twenty years after this, when the children of Israel were
+encamped in the wilderness of Paran, Korah, Dathan, and Abiram
+conspired against Aaron and his sons; but a fearful judgment
+from God fell upon them, and they were destroyed, and the next
+day thousands of the people also perished by a fierce
+pestilence, the ravages of which were only stayed by the
+interposition of Aaron (<scripRef passage="Num. 16" id="a-p7.1" parsed="|Num|16|0|0|0" osisRef="Bible:Num.16">Num. 16</scripRef>). That there might be further
+evidence of the divine appointment of Aaron to the priestly
+office, the chiefs of the tribes were each required to bring to
+Moses a rod bearing on it the name of his tribe. And these,
+along with the rod of Aaron for the tribe of Levi, were laid up
+overnight in the tabernacle, and in the morning it was found
+that while the other rods remained unchanged, that of Aaron “for
+the house of Levi” budded, blossomed, and yielded almonds (<scripRef passage="Num. 17:1-10" id="a-p7.2" parsed="|Num|17|1|17|10" osisRef="Bible:Num.17.1-Num.17.10">Num. 17:1-10</scripRef>). This rod was afterwards preserved in the tabernacle
+(<scripRef passage="Heb. 9:4" id="a-p7.3" parsed="|Heb|9|4|0|0" osisRef="Bible:Heb.9.4">Heb. 9:4</scripRef>) as a memorial of the divine attestation of his
+appointment to the priesthood.</p>
+
+<p id="a-p8">Aaron was implicated in the sin of his brother at Meribah
+(<scripRef passage="Num. 20:8-13" id="a-p8.1" parsed="|Num|20|8|20|13" osisRef="Bible:Num.20.8-Num.20.13">Num. 20:8-13</scripRef>), and on that account was not permitted to enter
+the Promised Land. When the tribes arrived at Mount Hor, “in the
+edge of the land of Edom,” at the command of God Moses led Aaron
+and his son Eleazar to the top of that mountain, in the sight of
+all the people. There he stripped Aaron of his priestly
+vestments, and put them upon Eleazar; and there Aaron died on
+the top of the mount, being 123 years old (<scripRef passage="Num. 20:23-29" id="a-p8.2" parsed="|Num|20|23|20|29" osisRef="Bible:Num.20.23-Num.20.29">Num. 20:23-29</scripRef>. Comp.
+<scripRef passage="Deut. 10:6" id="a-p8.3" parsed="|Deut|10|6|0|0" osisRef="Bible:Deut.10.6">Deut. 10:6</scripRef>; <scripRef passage="Deut 32:50" id="a-p8.4" parsed="|Deut|32|50|0|0" osisRef="Bible:Deut.32.50">32:50</scripRef>), and was “gathered unto his people.” The
+people, “even all the house of Israel,” mourned for him thirty
+days. Of Aaron’s sons two survived him, Eleazar, whose family
+held the high-priesthood till the time of Eli; and Ithamar, in
+whose family, beginning with Eli, the high-priesthood was held
+till the time of Solomon. Aaron’s other two sons had been struck
+dead (<scripRef passage="Lev. 10:1" id="a-p8.5" parsed="|Lev|10|1|0|0" osisRef="Bible:Lev.10.1">Lev. 10:1</scripRef>, <scripRef passage="Lev 10:2" id="a-p8.6" parsed="|Lev|10|2|0|0" osisRef="Bible:Lev.10.2">2</scripRef>) for the daring impiety of offering “strange
+fire” on the alter of incense.</p>
+
+<p id="a-p9">The Arabs still show with veneration the traditionary site of
+Aaron’s grave on one of the two summits of Mount Hor, which is
+marked by a Mohammedan chapel. His name is mentioned in the
+Koran, and there are found in the writings of the rabbins many
+fabulous stories regarding him.</p>
+
+<p id="a-p10">He was the first anointed priest. His descendants, “the house
+of Aaron,” constituted the priesthood in general. In the time of
+David they were very numerous (<scripRef passage="1 Chr. 12:27" id="a-p10.1" parsed="|1Chr|12|27|0|0" osisRef="Bible:1Chr.12.27">1 Chr. 12:27</scripRef>). The other branches
+of the tribe of Levi held subordinate positions in connection
+with the sacred office. Aaron was a type of Christ in his
+official character as the high priest. His priesthood was a
+“shadow of heavenly things,” and was intended to lead the people
+of Israel to look forward to the time when “another priest”
+would arise “after the order of Melchizedek” (<scripRef passage="Heb. 6:20" id="a-p10.2" parsed="|Heb|6|20|0|0" osisRef="Bible:Heb.6.20">Heb. 6:20</scripRef>). (See <a href="/ccel/easton/ebd2.m.html?term=moses" id="a-p10.3">MOSES</a>.)</p>
+</def>
+
+<term id="a-p10.4">Aaronites</term>
+
+<def id="a-p10.5">
+<p id="a-p11">The descendants of Aaron, and therefore priests. Jehoiada, the
+father of Benaiah, led 3,700 Aaronites as “fighting men” to the
+support of David at Hebron (<scripRef passage="1 Chr. 12:27" id="a-p11.1" parsed="|1Chr|12|27|0|0" osisRef="Bible:1Chr.12.27">1 Chr. 12:27</scripRef>). Eleazar (<scripRef passage="Num. 3:32" id="a-p11.2" parsed="|Num|3|32|0|0" osisRef="Bible:Num.3.32">Num. 3:32</scripRef>),
+and at a later period Zadok (<scripRef passage="1 Chr. 27:17" id="a-p11.3" parsed="|1Chr|27|17|0|0" osisRef="Bible:1Chr.27.17">1 Chr. 27:17</scripRef>), was their chief.</p>
+</def>
+
+<term id="a-p11.4">Abaddon</term>
+
+<def id="a-p11.5">
+<p id="a-p12">Destruction, the Hebrew name (equivalent to the Greek Apollyon,
+i.e., destroyer) of “the angel of the bottomless pit” (<scripRef passage="Rev. 9:11" id="a-p12.1" parsed="|Rev|9|11|0|0" osisRef="Bible:Rev.9.11">Rev. 9:11</scripRef>). It is rendered “destruction” in <scripRef passage="Job 28:22" id="a-p12.2" parsed="|Job|28|22|0|0" osisRef="Bible:Job.28.22">Job 28:22</scripRef>; <scripRef passage="Job 31:12" id="a-p12.3" parsed="|Job|31|12|0|0" osisRef="Bible:Job.31.12">31:12</scripRef>; <scripRef passage="Job 26:6" id="a-p12.4" parsed="|Job|26|6|0|0" osisRef="Bible:Job.26.6">26:6</scripRef>;
+<scripRef passage="Prov. 15:11" id="a-p12.5" parsed="|Prov|15|11|0|0" osisRef="Bible:Prov.15.11">Prov. 15:11</scripRef>; <scripRef passage="Prov 27:20" id="a-p12.6" parsed="|Prov|27|20|0|0" osisRef="Bible:Prov.27.20">27:20</scripRef>. In the last three of these passages the
+Revised Version retains the word “Abaddon.” We may regard this
+word as a personification of the idea of destruction, or as
+sheol, the realm of the dead.</p>
+</def>
+
+<term id="a-p12.7">Abagtha</term>
+
+<def id="a-p12.8">
+<p id="a-p13">One of the seven eunuchs in Ahasuerus’s court (<scripRef passage="Esther 1:10" id="a-p13.1" parsed="|Esth|1|10|0|0" osisRef="Bible:Esth.1.10">Esther 1:10</scripRef>;
+<scripRef passage="Esther 2:21" id="a-p13.2" parsed="|Esth|2|21|0|0" osisRef="Bible:Esth.2.21">2:21</scripRef>).</p>
+</def>
+
+<term id="a-p13.3">Abana</term>
+
+<def id="a-p13.4">
+<p id="a-p14">Stony (Heb. marg. “Amanah,” perennial), the chief river of
+Damascus (<scripRef passage="2 Kings 5:12" id="a-p14.1" parsed="|2Kgs|5|12|0|0" osisRef="Bible:2Kgs.5.12">2 Kings 5:12</scripRef>). Its modern name is Barada, the
+Chrysorrhoas, or “golden stream,” of the Greeks. It rises in a
+cleft of the Anti-Lebanon range, about 23 miles north-west of
+Damascus, and after flowing southward for a little way parts
+into three smaller streams, the central one flowing through
+Damascus, and the other two on each side of the city, diffusing
+beauty and fertility where otherwise there would be barrenness.</p>
+</def>
+</glossary>
+</div2>
+</div1>
+</ThML.body>
+</ThML>

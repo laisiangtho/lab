@@ -713,7 +713,10 @@ export function createWorkspace(ctx, chrome) {
       return { identify, index, meta, resolver, verses: await store.getChapter(identify, book, chapter, { markup: true }) };
     }));
     if (!current()) return;
-    loaded[0].interlinear = await interlinearFor(loaded[0], book, chapter).catch(() => null);
+    [loaded[0].interlinear, loaded[0].studyRefs] = await Promise.all([
+      interlinearFor(loaded[0], book, chapter).catch(() => null),
+      studyRefsFor(loaded[0], book, chapter).catch(() => null),
+    ]);
     if (!current()) return;
 
     // The translation carries its own book names, and it loads after the first
@@ -829,6 +832,35 @@ export function createWorkspace(ctx, chrome) {
     };
   }
 
+  /**
+   * The cross-references the reader imported, for each verse of a chapter as
+   * the translation numbers it. The sets number as English Bibles do
+   * (OpenBible.info follows the KJV), so a Hebrew-numbered text is read
+   * through the verse map both ways: where its verse is in the set, and where
+   * each verse the set names is in the text.
+   */
+  async function studyRefsFor(pane, book, chapter) {
+    if (!ctx.study || state.get().xrefs === false) return null;
+    if (!(await ctx.study.list()).some((set) => set.type === 'crossrefs')) return null;
+    const numbering = book <= 39 && ctx.lemmas ? await ctx.lemmas.numbering(pane.identify) : 'english';
+    const out = {};
+    for (const key of Object.keys(pane.verses ?? {})) {
+      const found = [];
+      for (const at of mapVerse({ book, chapter, verse: Number(key) }, numbering, 'english')) {
+        found.push(...((await ctx.study.crossrefs(at.book, at.chapter))[at.verse] ?? []));
+      }
+      if (!found.length) continue;
+      out[key] = numbering === 'english' ? found : found.map((link) => {
+        const [b, c, v, c2, v2] = link.ref;
+        if (!v || b > 39) return link;
+        const first = mapVerse({ book: b, chapter: c, verse: v }, 'english', numbering)[0];
+        const last = mapVerse({ book: b, chapter: c2, verse: v2 }, 'english', numbering).at(-1);
+        return { ...link, ref: [b, first.chapter, first.verse, last.chapter, last.verse] };
+      });
+    }
+    return Object.keys(out).length ? out : null;
+  }
+
   function buildLeaf(pane, all, { book, chapter }, { float = null } = {}) {
     const { mode, layout, strongs, headings, xrefs } = state.get();
     const annotations = ctx.annotations.chapterIndex(book, chapter);
@@ -840,6 +872,7 @@ export function createWorkspace(ctx, chrome) {
         ctx, meta: pane.meta, resolver: pane.resolver, verses: pane.verses, book, chapter,
         compare, layout, annotations, strongs, headings, xrefs,
         interlinear: compare ? null : (pane.interlinear ?? null),
+        studyRefs: compare ? null : (pane.studyRefs ?? null),
         primaryVerses: compare ? all[0].verses : null,
         // A cross-reference names a verse, and used to arrive at the top of
         // the chapter with nothing marked — the one link in the app that did

@@ -60,6 +60,9 @@
 .xref:hover { background: var(--accent-fade); }
 /* A reference whose book abbreviation is not resolved: readable, not a link. */
 .xref-plain { border-bottom: 1px dotted var(--base-40); cursor: help; }
+.xrefs.is-study { opacity: .92; }
+.xref-mark svg { width: 11px; height: 11px; vertical-align: -1px; margin-inline-end: 4px; color: var(--text-faint); }
+.xref-more { color: var(--text-muted); }
 
 /* A hair of padding stops the first heading's margin collapsing through the
    chapter's top edge, so levelling the columns measures what it applies. */
@@ -1763,6 +1766,12 @@ label.set-row:hover { background: var(--bg-hover); }
 .lib-web-note { display: flex; gap: 6px; align-items: flex-start; margin-top: 10px; font-size: var(--fs-ui-s); color: var(--c-orange); line-height: 1.5; }
 .lib-web-note svg, .lib-banner svg { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }
 .lib-banner.is-warn { background: color-mix(in srgb, var(--c-orange) 12%, transparent); color: var(--c-orange); }
+/* Study data: what each kind is, then what is here, then where more is. */
+.sd-what { margin: -2px 0 8px; color: var(--text-muted); font-size: var(--fs-ui-s); }
+.sd-group + .sd-group { margin-top: 18px; }
+.sd-credit { overflow-wrap: anywhere; }
+.sd-sources .library-item { border: 1px dashed var(--border); background: transparent; }
+.sd-sources .lib-mark { opacity: .6; }
 .lib-panel { padding: 18px 20px; border-radius: 12px; background: var(--bg-secondary); box-shadow: inset 0 0 0 1px var(--border); }
 .lib-panel p { max-width: 560px; line-height: 1.55; }
 .lib-panel .btn svg { width: 14px; height: 14px; }
@@ -1859,3 +1868,31 @@ label.set-row:hover { background: var(--bg-hover); }
 .hp-data .gd-data { max-width: none; align-items: flex-start; margin-top: 22px; }
 @media (hover: none) { .hp-topic { min-height: 38px; } }
 .ws-gloss { font-size: var(--fs-ui-m); font-weight: 600; color: var(--text-normal); }
+
+/* Reference pane: a dictionary or topical index, searched and read. */
+.rf { gap: 10px; }
+.rf-head { display: flex; flex-direction: column; gap: 8px; }
+.rf-tabs { display: flex; gap: 4px; padding: 2px; border-radius: var(--radius-m); background: var(--bg-secondary); }
+.rf-tab { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; border-radius: var(--radius-s); color: var(--text-muted); font-size: var(--fs-ui-s); }
+.rf-tab svg { width: 14px; height: 14px; }
+.rf-tab[aria-selected="true"] { background: var(--bg-primary); color: var(--text-normal); box-shadow: 0 0 0 1px var(--border); }
+.rf-find { display: flex; align-items: center; gap: 6px; }
+.rf-find svg { width: 14px; height: 14px; color: var(--text-faint); flex: 0 0 auto; }
+.rf-q { flex: 1; min-width: 0; }
+.rf-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.rf-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.rf-term { width: 100%; display: flex; align-items: baseline; gap: 10px; padding: 6px 8px; border-radius: var(--radius-m); text-align: start; }
+.rf-term:hover { background: var(--bg-hover); }
+.rf-term-t { flex: 1; min-width: 0; color: var(--text-normal); font-size: var(--fs-ui-m); overflow-wrap: anywhere; }
+.rf-term-s { color: var(--text-faint); font-size: var(--fs-ui-s); font-variant-numeric: tabular-nums; }
+.rf-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; color: var(--accent-2); font-size: var(--fs-ui-s); }
+.rf-back svg { width: 14px; height: 14px; }
+.rf-entry-head { display: flex; flex-direction: column; gap: 2px; }
+.rf-entry-t { margin: 0; font-family: var(--font-text); font-size: 22px; font-weight: 600; color: var(--text-normal); }
+.rf-article { display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-ui-m); line-height: 1.6; color: var(--text-normal); overflow-wrap: anywhere; }
+.rf-article p { margin: 0; }
+.rf-article .ws-ref { display: inline; min-height: 0; padding: 0 2px; border: 0; border-radius: var(--radius-s); background: none; color: var(--accent-2); font-size: inherit; }
+.rf-article .ws-ref:hover { background: var(--accent-fade); }
+.rf-topic-note { margin: 0; font-size: var(--fs-ui-m); line-height: 1.55; color: var(--text-muted); }
+.rf-refs { padding: 0; }
+.ws-dict { margin-top: 4px; }

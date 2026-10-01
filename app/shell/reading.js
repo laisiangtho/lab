@@ -11,6 +11,7 @@ import { verseLabel } from '../core/align.js';
 import { strongsRuns } from '../core/strongs.js';
 import { VERSE_LAYOUTS } from '../core/settings.js';
 import { parseReferences } from '../core/reference.js';
+import { refOf, refText } from '../core/studydata.js';
 import { localizeNumber } from '../core/translation.js';
 import { h } from './dom.js';
 import { icon } from './icons.js';
@@ -115,7 +116,8 @@ export function chapterNote(p) {
             class: 'verse-note-dot', title: L('lbl.notes', { n: noteCount }), 'aria-label': L('lbl.notes', { n: noteCount }),
             onclick: (e) => p.onVerse?.(key, e.currentTarget, { extend: e.shiftKey }),
           }, icon('note')) : null)),
-      verse.ref && !compare && p.xrefs !== false ? refsLine(verse.ref, meta, p.resolver, p.onRef, p.onPeek) : null));
+      verse.ref && !compare && p.xrefs !== false ? refsLine(verse.ref, meta, p.resolver, p.onRef, p.onPeek) : null,
+      p.studyRefs?.[key] && !compare && p.xrefs !== false ? studyRefsLine(p.studyRefs[key], meta, p, ctx) : null));
   }
   note.append(chapterEl);
 
@@ -177,6 +179,35 @@ function refsLine(text, meta, resolver, onRef, onPeek) {
       )
       : h('span', { class: 'xref-plain', title: `Unresolved reference: ${part.unresolved}` }, part.text),
   ]));
+}
+
+/** Imported cross-references a line shows before "N more". */
+const STUDY_REFS_AT_ONCE = 6;
+
+/**
+ * Cross-references the reader imported (OpenBible.info's, say), under the
+ * translation's own: the most voted first, the rest a press away.
+ */
+function studyRefsLine(links, meta, p, ctx) {
+  const name = (book) => meta.books[book]?.shortname ?? ctx.category.book(book).shortname;
+  const digits = (n) => localizeNumber(n, meta.digit);
+  const line = h('p', { class: 'xrefs is-study', title: L('sd.type.crossrefs') });
+  const link = ({ ref }) => wireRef(
+    h('button', { class: 'xref', type: 'button', title: L('peek.hint') }, refText(ref, name(ref[0]), digits)),
+    refOf(ref),
+    { open: (r, options) => p.onRef(r, options), peek: p.onPeek ?? null },
+  );
+  const show = (upTo) => {
+    const shown = links.slice(0, upTo);
+    line.replaceChildren(h('span', { class: 'xref-mark', 'aria-hidden': 'true' }, icon('link')),
+      ...shown.flatMap((one, i) => [i ? ' · ' : null, link(one)]).filter(Boolean),
+      links.length > upTo ? h('button', {
+        class: 'xref xref-more', type: 'button',
+        onclick: () => show(links.length),
+      }, ` ${L('sd.more', { n: links.length - upTo })}`) : null);
+  };
+  show(STUDY_REFS_AT_ONCE);
+  return line;
 }
 
 function coveredVerses(verses) {

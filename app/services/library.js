@@ -137,6 +137,19 @@ export function createLibrary({ store, categoryRaw, config }) {
     return call({ type: 'export', identify, format, books, options, notes, category: categoryRaw }, identify);
   }
 
+  /**
+   * Study data from a file (core/studydata.js), read and kept in the worker.
+   * `studyType` decides how a ThML reference work is read, when the reader
+   * said; otherwise the file's own shape does.
+   *
+   * @returns {Promise<{ meta: object }>}
+   */
+  async function importStudy({ text, name, studyType = null }) {
+    const result = await call({ type: 'study', text, name, studyType, category: categoryRaw }, `study:${name}`);
+    emit('study');
+    return result;
+  }
+
   /** @returns {Promise<{ strongs: boolean, headings: boolean, references: boolean }>} */
   async function probe(identify) {
     return (await call({ type: 'probe', identify, category: categoryRaw }, identify)).has;
@@ -185,6 +198,7 @@ export function createLibrary({ store, categoryRaw, config }) {
     install,
     importTranslation,
     importPack,
+    importStudy,
     exportTranslation,
     probe,
     remove,

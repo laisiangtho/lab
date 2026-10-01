@@ -732,6 +732,45 @@ entries that put the start of the definition with the derivation (θεός read
 itself etymology. Every file records its source, licence and the changes made,
 as both licences ask.
 
+## 3d-x-c-ii. Two verse numberings
+
+English Bibles number the Old Testament as the KJV does; the Hebrew Bible
+otherwise in some 2,000 verses. `core/versification.js` maps a verse either
+way (`mapVerse`) from a table generated out of STEPBible's TVTMS
+(`scripts/versification.mjs`, CC BY 4.0; the English–Hebrew table only,
+sub-verse letters set aside). Which numbering a text follows is read from
+what it has (`numberingOf`): only an English-numbered Bible has Malachi 4,
+only a Hebrew-numbered one Joel 4; a text with neither follows its language.
+The word study, the interlinear line and imported cross-references go
+through it; reading a translation is never renumbered.
+
+## 3d-x-c-iii. Study data
+
+Cross-references, topical indexes and Bible dictionaries the reader brings,
+on the Library's third page. `core/studydata.js` reads three formats —
+OpenBible.info's cross-reference list (text or zip), CCEL's ThML reference
+works (`<term>`/`<def>`, verses as `<scripRef osisRef>`), and the app's own
+JSON (`STUDY_SCHEMA`) — into sets of one type each. A ThML work can be either
+kind, so the reader is asked, with a guess from how much of it is prose per
+verse; a publisher's "Get" already says which. A reference is kept as
+`[book, chapter, verse, toChapter, toVerse]`, verse 0 a whole chapter.
+
+The library worker reads and writes a set in one transaction (IndexedDB
+version 8: `study` for each set's description, `studyrows` for its parts):
+cross-references by chapter, so drawing a chapter reads one row a set; a
+dictionary or index whole, read the first time it is opened. A set with the
+same type and name replaces the one before. `services/studydata.js` merges
+the sets for the reading and forgets what it read when one changes.
+
+Imported cross-references are drawn under the translation's own, sorted by
+OpenBible.info's votes (links voted below zero are left out), six at once.
+They number as English Bibles do; for a Hebrew-numbered text each verse is
+mapped to find its links and each link mapped back. The Reference pane
+(`features/reference`) searches dictionaries and indexes by term, case and
+accents set aside, and lists the topics a chapter is filed under. Nothing is
+hosted: Get downloads from the publisher, and where a site does not let a web
+page download from it, the reader is sent to its page to save the file.
+
 ## 3d-x-d. One knowledge, three views
 
 Help and the Guide answer from one knowledge (`features/guide/knowledge.js`):

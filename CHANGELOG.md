@@ -167,6 +167,25 @@ newest first.
   them) are put back.
 - Lexicon entries may carry a `gloss`; the interlinear line and the word
   study use it. A STEPBible lexicon imported by hand gives its own glosses.
+- Verse numbers are mapped between English Bibles and the Hebrew Bible
+  (Malachi 4:1 is Hebrew 3:19, a psalm's title is Hebrew verse 1): the word
+  study and the interlinear line find the original's verse, and the word
+  study says where it is ("Malachi 4:1 = 3:19"). The table comes from
+  STEPBible's TVTMS (CC BY 4.0) through `scripts/versification.mjs`.
+- Study data, a third page of the Library: cross-references, topical indexes
+  and Bible dictionaries, got from their publishers in one press
+  (OpenBible.info's cross-references, Nave's Topical Bible, Easton's Bible
+  Dictionary) or added from a file — OpenBible.info's text file or zip, a
+  CCEL ThML reference work (asked whether it is a dictionary or a topical
+  index), or the app's own JSON.
+- Imported cross-references show under each verse, the most voted first and
+  the rest a press away, mapped to a Hebrew-numbered text's verses; the
+  cross-reference setting covers them.
+- A Reference pane: a dictionary searched and read, its verses as links that
+  open and peek; the topics the chapter being read is filed under, or any
+  topic searched for. From the palette, `define grace` and `topic prayer`.
+  The word study links to the dictionary's article on the word when there is
+  one.
 
 
 ### 26.10.01.3 — 1 October 2026

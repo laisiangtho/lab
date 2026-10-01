@@ -192,6 +192,7 @@ export function createShell(root, ctx) {
     ctx.annotations.on('change', () => workspace.render());
     // A lexicon arriving gives the interlinear line its glosses.
     ctx.lexicons?.on('change', () => { if (ctx.state.get().interlinear) workspace.render(); });
+    ctx.study?.on('change', () => workspace.render());
 
     applyHash();
     window.addEventListener('hashchange', applyHash);

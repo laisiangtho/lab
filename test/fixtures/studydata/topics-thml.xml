@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Constructed for the tests in the layout of CCEL's ThML topical works; not CCEL's text. -->
+<ThML>
+<ThML.head>
+<electronicEdInfo>
+<DC>
+<DC.Title>A Topical Index (test)</DC.Title>
+</DC>
+</electronicEdInfo>
+<printSourceInfo><published>2026</published></printSourceInfo>
+</ThML.head>
+<ThML.body>
+<glossary>
+<term>Creation</term>
+<def><p><scripRef passage="Gen. 1:1-31" osisRef="Bible:Gen.1.1-Gen.1.31">Gen. 1:1-31</scripRef>; <scripRef passage="Gen. 2:1-3" osisRef="Bible:Gen.2.1-Gen.2.3">Gen. 2:1-3</scripRef>; <scripRef passage="Ps. 33:6" osisRef="Bible:Ps.33.6">Ps. 33:6</scripRef>; <scripRef passage="John 1:3" osisRef="Bible:John.1.3">John 1:3</scripRef>; <scripRef passage="Heb. 11:3" osisRef="Bible:Heb.11.3">Heb. 11:3</scripRef>.</p></def>
+<term>Light</term>
+<def><p><scripRef passage="Gen. 1:3-5" osisRef="Bible:Gen.1.3-Gen.1.5">Gen. 1:3-5</scripRef>; <scripRef passage="Ps. 27:1" osisRef="Bible:Ps.27.1">Ps. 27:1</scripRef>; <scripRef passage="Ps. 119:105" osisRef="Bible:Ps.119.105">Ps. 119:105</scripRef>; <scripRef passage="John 8:12" osisRef="Bible:John.8.12">John 8:12</scripRef>; <scripRef passage="1 John 1:5" osisRef="Bible:1John.1.5">1 John 1:5</scripRef>.</p></def>
+<term>Darkness</term>
+<def><p><scripRef passage="Gen. 1:2" osisRef="Bible:Gen.1.2">Gen. 1:2</scripRef>; <scripRef passage="Ex. 10:21-23" osisRef="Bible:Exod.10.21-Exod.10.23">Ex. 10:21-23</scripRef>; <scripRef passage="Matt. 27:45" osisRef="Bible:Matt.27.45">Matt. 27:45</scripRef>.</p></def>
+<term>Prayer</term>
+<def><p><scripRef passage="Matt. 6:5-13" osisRef="Bible:Matt.6.5-Matt.6.13">Matt. 6:5-13</scripRef>; <scripRef passage="Phil. 4:6" osisRef="Bible:Phil.4.6">Phil. 4:6</scripRef>; <scripRef passage="1 Thess. 5:17" osisRef="Bible:1Thess.5.17">1 Thess. 5:17</scripRef>; <scripRef passage="Jas. 5:16" osisRef="Bible:Jas.5.16">Jas. 5:16</scripRef>.</p></def>
+</glossary>
+</ThML.body>
+</ThML>

@@ -99,6 +99,7 @@ export function mountStudy(el, ctx) {
         found.senses?.length > 1
           ? note(L('lex.senses', { list: found.senses.map((k) => `${found.testament}${k.toUpperCase()}`).join(', ') }))
           : null);
+      dictionaryLink(into, entry);
       return;
     }
     if (found.why === 'missing' || found.why === 'none') {
@@ -120,6 +121,32 @@ export function mountStudy(el, ctx) {
       return;
     }
     fill(into, note(L(found.why === 'ambiguous' ? 'lex.ambiguous' : 'lex.absent')));
+  }
+
+  /**
+   * The imported dictionaries' article on the word, where one has it: by the
+   * lexicon's gloss ("God", "grace"), else by the first of the KJV's words for
+   * it. A link to the Reference pane, added when found; nothing when not.
+   */
+  function dictionaryLink(into, entry) {
+    if (!ctx.study) return;
+    const mine = turn;
+    const words = [entry.gloss, ...String(entry.kjv ?? '').replace(/\([^)]*\)/g, '').split(/[,;]/)]
+      .map((word) => String(word ?? '').replace(/[^\p{L}\p{N}' -]/gu, '').trim())
+      .filter((word) => word && word.length > 1)
+      .slice(0, 4);
+    (async () => {
+      for (const word of words) {
+        const hits = await ctx.study.lookup(word);
+        if (mine !== turn) return;
+        if (!hits.length) continue;
+        into.append(h('div', { class: 'ws-row ws-dict' }, h('button', {
+          class: 'btn soft',
+          onclick: () => ctx.registry.verbs().find((verb) => verb.word === 'define')?.run(hits[0].term),
+        }, icon('book-open'), L('ws.inDictionary', { term: hits[0].term }))));
+        return;
+      }
+    })().catch(() => {});
   }
 
   /** A long entry, folded to its first lines until asked for whole. */
@@ -260,9 +287,10 @@ export function mountStudy(el, ctx) {
   }
 
   const offLexicon = ctx.lexicons?.on('change', () => { if (target) show(); });
+  const offStudy = ctx.study?.on('change', () => { if (target) show(); });
   show(null);
   return {
     show: (next) => show(next),
-    dispose: () => { turn += 1; offLexicon?.(); },
+    dispose: () => { turn += 1; offLexicon?.(); offStudy?.(); },
   };
 }

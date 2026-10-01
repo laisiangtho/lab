@@ -6,6 +6,7 @@
 import { describe, FORMATS, sniff, slug } from '../../core/formats/index.js';
 import { isBrowserBible } from '../../core/formats/browserbible.js';
 import { isStepLexicon } from '../../core/lexicon.js';
+import { sniffStudy } from '../../core/studydata.js';
 import { classify, otherEdition, readMetadata } from '../../core/formats/pack.js';
 import { aboutText, lossOf, optionsFor, WRITERS } from '../../core/formats/write.js';
 import { twoLetter } from '../../core/langcode.js';
@@ -35,6 +36,29 @@ const KEY = 'library';
 
 /** The feature record holding the export dialog's last answers. */
 const EXPORT_KEY = 'library.export';
+
+/**
+ * Where each kind of study data can be had, as its publisher gives it out.
+ * "Get" downloads the file and imports it as if it had been chosen; where a
+ * site will not let a web page download from it, the reader is told so and
+ * pointed at the page to save the file from.
+ */
+const STUDY_SOURCES = Object.freeze([
+  {
+    id: 'openbible', type: 'crossrefs', name: 'OpenBible.info cross-references', licence: 'CC BY 4.0',
+    url: 'https://a.openbible.info/data/cross-references.zip', page: 'https://www.openbible.info/labs/cross-references/',
+  },
+  {
+    id: 'nave', type: 'topics', name: 'Nave’s Topical Bible (1896)', licence: 'public domain',
+    url: 'https://ccel.org/ccel/n/nave/bible.xml', page: 'https://ccel.org/ccel/nave/bible',
+  },
+  {
+    id: 'easton', type: 'dictionary', name: 'Easton’s Bible Dictionary (1897)', licence: 'public domain',
+    url: 'https://ccel.org/ccel/e/easton/ebd2.xml', page: 'https://ccel.org/ccel/easton/ebd2',
+  },
+]);
+const STUDY_TYPES = Object.freeze(['crossrefs', 'topics', 'dictionary']);
+const STUDY_ICON = Object.freeze({ crossrefs: 'link', topics: 'tag', dictionary: 'book-open' });
 export default {
   id: 'library',
   setup(ctx) {
@@ -50,6 +74,15 @@ export default {
     let openSource = null;
     /** Set while the Library is open: shows what is on this device, where a file just added now is. */
     let showHome = null;
+    /** The page the Library opens on next, when something asked for one while it was shut. */
+    let pendingPage = null;
+    /** Show the Study data page — open, or the next time the Library opens. */
+    let studyGo = null;
+    const showStudy = () => {
+      if (studyGo) studyGo();
+      else pendingPage = 'study';
+      ctx.shell.openDoc('library');
+    };
 
     async function check() {
       try {
@@ -115,6 +148,7 @@ export default {
       if (!file) return;
       if (/\.zip$/i.test(file.name) || isZip(file.bytes)) { await importArchive(file); return; }
       if (isLexicon(file.text)) { await importLexicon(file); return; }
+      if (sniffStudy(file.text)) { await importStudyFile(file, file.studyType ?? null); return; }
 
       const guesses = sniff(file.text, file.name);
       if (!guesses.length) {
@@ -210,6 +244,45 @@ export default {
     }
 
     /**
+     * Study data: cross-references, a topical index, a dictionary
+     * (core/studydata.js). A ThML reference work can be read either as a
+     * dictionary or as a topical index, so the reader is asked which, with
+     * the work's own title to go on; the other formats say what they are.
+     */
+    async function importStudyFile(file, studyType = null) {
+      if (!ctx.study) { shell.notify(L('sd.unavailable'), 'error'); return; }
+      const found = sniffStudy(file.text);
+      let type = studyType ?? found?.type ?? null;
+      if (!type && found?.format === 'thml') {
+        const title = /<DC\.Title>([\s\S]*?)<\/DC\.Title>/.exec(file.text)?.[1]?.replace(/<[^>]+>/g, '').trim() ?? file.name;
+        const answers = await shell.form({
+          title: L('sd.readAs'),
+          lede: L('sd.readAsLede', { file: title }),
+          confirm: L('imp.do'),
+          fields: [{
+            id: 'type', label: L('sd.readAsField'), type: 'choice',
+            value: /topic/i.test(title) ? 'topics' : 'dictionary',
+            options: ['dictionary', 'topics'].map((id) => ({ id, label: L(`sd.type.${id}`), sub: L(`sd.typeHint.${id}`) })),
+          }],
+        });
+        if (!answers) return;
+        type = answers.type;
+      }
+      progress.set(`study:${file.name}`, L('lib.converting'));
+      shell.notify(L('sd.importing', { name: file.name }), 'info', { about: `study:${file.name}` });
+      try {
+        const meta = await ctx.study.importFile({ text: file.text, name: file.name, studyType: type });
+        shell.notify(L('sd.imported', { name: meta.name, n: meta.count, kind: L(`sd.type.${meta.type}`) }), 'ok', { about: `study:${file.name}` });
+        showStudy?.();
+      } catch (err) {
+        shell.notify(`${file.name}: ${err.message}`, 'error', { about: `study:${file.name}` });
+      } finally {
+        progress.delete(`study:${file.name}`);
+        repaint?.();
+      }
+    }
+
+    /**
      * A published bundle, as a zip.
      *
      * This is how a translation actually arrives — `engkjvcpb_usfx.zip` from
@@ -227,6 +300,10 @@ export default {
         shell.notify(`${file.name}: ${err.message}`, 'error');
         return;
       }
+
+      // OpenBible.info's cross-references come as a zip of one text file.
+      const study = classify(files).scripture.length ? null : files.find((f) => sniffStudy(f.text));
+      if (study) { await importStudyFile({ ...study, size: study.text.length }, file.studyType ?? null); return; }
 
       // A download from eBible.org that is not the data: say which one is.
       const other = classify(files).scripture.length ? null : otherEdition(files, file.name);
@@ -689,6 +766,7 @@ export default {
       run: () => importFile().catch((err) => shell.notify(err.message, 'error')),
     });
     registry.command({ id: 'library.open', title: L('doc.library'), icon: 'library', ribbon: true, opens: 'library', run: () => ctx.shell.openDoc('library') });
+    registry.command({ id: 'library.study', title: L('sd.cmd'), icon: 'library', run: () => showStudy() });
 
     registry.doc({
       id: 'library',
@@ -705,7 +783,8 @@ export default {
          * the Library opens whenever something is here; with nothing here,
          * there is nothing to show but where to get it.
          */
-        let page = null;
+        let page = pendingPage;
+        pendingPage = null;
         let source = SOURCE_IDS.includes(saved?.source) ? saved.source : 'catalog';
         let query = '';
         /** A source's list once read, by id: { rows, fetchedAt } or { error }. */
@@ -759,7 +838,7 @@ export default {
         };
 
         async function render() {
-          const [rows, storage] = await Promise.all([library.status(), storageStatus()]);
+          const [rows, storage, sets] = await Promise.all([library.status(), storageStatus(), ctx.study ? ctx.study.list() : []]);
           if (disposed) return;
           const here = rows.filter((row) => row.held);
           page ??= here.length ? 'home' : 'more';
@@ -768,9 +847,11 @@ export default {
 
           fill(tabs,
             tab('home', 'book', L('lib.tab.home'), here.length),
-            tab('more', 'download', L('lib.tab.more'), null));
+            tab('more', 'download', L('lib.tab.more'), null),
+            ctx.study ? tab('study', 'study', L('lib.tab.study'), sets.length) : null);
 
           if (page === 'home') paintHome(here, storage);
+          else if (page === 'study') paintStudy(sets);
           else await paintMore(rows, here);
           fitBar();
         }
@@ -902,6 +983,89 @@ export default {
             .map(([lang, list]) => h('div', { class: 'library-group' },
               h('h2', {}, lang, h('span', { class: 'lib-group-n' }, String(list.length))),
               h('ul', { class: 'library-list' }, list.map(draw))));
+        }
+
+        // --- Study data ----------------------------------------------------------
+
+        /**
+         * What the reading can draw on besides translations: cross-references,
+         * topical indexes and dictionaries, each kind with what is here and
+         * where more is to be had. Lexicons keep their place in Settings →
+         * Study, where they have always been; a lexicon file brought here is
+         * still recognised and goes there.
+         */
+        function paintStudy(sets) {
+          find.hidden = true;
+          say(sets.length ? L('sd.held', { n: sets.length }) : '');
+          fill(rail);
+          fill(acts, action('plus', L('sd.import'), () => importFile().catch((err) => shell.notify(err.message, 'error'))));
+          const busy = [...progress.entries()].filter(([key]) => key.startsWith('study:'));
+          keepPlace(body, () => fill(body,
+            busy.length ? h('p', { class: 'lib-banner' }, icon('sync'), busy.map(([, text]) => text).join(' · ')) : null,
+            ...STUDY_TYPES.map((type) => {
+              const mine = sets.filter((set) => set.type === type);
+              const offered = STUDY_SOURCES.filter((src) => src.type === type);
+              return h('div', { class: 'library-group sd-group', dataset: { type } },
+                h('h2', {}, L(`sd.type.${type}`), h('span', { class: 'lib-group-n' }, String(mine.length))),
+                h('p', { class: 'sd-what' }, L(`sd.typeHint.${type}`)),
+                mine.length ? h('ul', { class: 'library-list' }, mine.map(studyItem)) : null,
+                h('ul', { class: 'library-list sd-sources' }, offered.map((src) => studySourceItem(src, mine))));
+            })));
+        }
+
+        function studyItem(set) {
+          return h('li', { class: 'library-item state-installed sd-item', dataset: { study: set.id } },
+            h('span', { class: 'lib-mark', 'aria-hidden': 'true' }, icon(STUDY_ICON[set.type])),
+            h('div', { class: 'library-meta' },
+              h('strong', {}, set.name),
+              h('span', { class: 'muted' }, [L(`sd.count.${set.type}`, { n: set.count }), formatBytes(set.bytes), when.date(set.installedAt)].join(' · ')),
+              h('span', { class: 'muted sd-credit' }, [set.source, set.licence].filter(Boolean).join(' · '))),
+            h('div', { class: 'library-actions' },
+              h('button', {
+                class: 'lib-act', title: L('sd.remove'), 'aria-label': `${L('sd.remove')}: ${set.name}`,
+                onclick: async () => {
+                  const sure = await shell.confirm({ title: L('sd.removeTitle', { name: set.name }), body: L('sd.removeBody'), confirm: L('sd.remove'), danger: true });
+                  if (!sure) return;
+                  await ctx.study.remove(set.id);
+                  shell.notify(L('sd.removed', { name: set.name }), 'ok');
+                },
+              }, icon('trash'))));
+        }
+
+        /** A publisher's edition: get it, or go to its page to save it by hand. */
+        function studySourceItem(src, mine) {
+          const have = mine.some((set) => set.name.toLowerCase().includes(src.name.split(/[’'(]/)[0].trim().toLowerCase().slice(0, 12)));
+          const busy = progress.get(`study:${src.id}`);
+          return h('li', { class: 'library-item sd-source', dataset: { source: src.id } },
+            h('span', { class: 'lib-mark', 'aria-hidden': 'true' }, icon('download')),
+            h('div', { class: 'library-meta' },
+              h('strong', {}, src.name),
+              h('span', { class: 'muted' }, [src.licence, new URL(src.url).host].join(' · '))),
+            h('div', { class: 'library-actions' }, busy
+              ? h('span', { class: 'muted' }, busy)
+              : [
+                h('a', { class: 'lib-act', href: src.page, target: '_blank', rel: 'noopener', title: L('sd.page'), 'aria-label': `${L('sd.page')}: ${src.name}` }, icon('link')),
+                h('button', {
+                  class: `btn ${have ? 'soft' : 'primary'}`, dataset: { get: src.id },
+                  onclick: () => getStudy(src),
+                }, icon(have ? 'sync' : 'download'), L(have ? 'sd.getAgain' : 'sd.get')),
+              ]));
+        }
+
+        async function getStudy(src) {
+          progress.set(`study:${src.id}`, L('lib.downloading'));
+          run();
+          try {
+            const got = await sources.download(src.url, src.name);
+            progress.delete(`study:${src.id}`);
+            const name = decodeURIComponent(new URL(src.url).pathname.split('/').pop());
+            await importFile({ name, size: got.bytes.byteLength, bytes: got.bytes, text: got.text(), studyType: src.type });
+          } catch (err) {
+            shell.notify(`${err.message} ${L('sd.byHand', { page: src.page })}`, 'error');
+          } finally {
+            progress.delete(`study:${src.id}`);
+            run();
+          }
         }
 
         // --- Get more ----------------------------------------------------------
@@ -1121,6 +1285,8 @@ export default {
 
         openSource = (id) => { page = 'more'; pick(id); };
         showHome = () => go('home');
+        studyGo = () => go('study');
+        const offStudy = ctx.study?.on('change', run);
         const offChange = library.on('change', run);
         const offProgress = library.on('progress', ({ detail }) => {
           const phase = { download: L('lib.downloading'), convert: L('lib.converting'), validate: L('lib.validating'), write: L('lib.saving') }[detail.phase];
@@ -1128,7 +1294,7 @@ export default {
           run();
         });
         run();
-        return () => { disposed = true; repaint = () => {}; openSource = null; showHome = null; sized.disconnect(); offChange(); offProgress(); };
+        return () => { disposed = true; repaint = () => {}; openSource = null; showHome = null; studyGo = null; sized.disconnect(); offChange(); offProgress(); offStudy?.(); };
       },
     });
 

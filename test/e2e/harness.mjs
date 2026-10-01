@@ -123,9 +123,10 @@ export async function launch(options = {}) {
     return route.fulfill({ status: 200, headers, body: JSON.stringify(body) });
   });
 
-  // The Library's other sources, getBible and eBible.org, answered from the
-  // fixtures too: a test never reaches the real sites.
-  await context.route(/^https:\/\/(api\.getbible\.net|ebible\.org)\//, async (route) => {
+  // The Library's other sources, getBible and eBible.org, and the study data
+  // publishers (OpenBible.info, CCEL), answered from the fixtures too: a test
+  // never reaches the real sites.
+  await context.route(/^https:\/\/(api\.getbible\.net|ebible\.org|a\.openbible\.info|ccel\.org)\//, async (route) => {
     const url = route.request().url();
     requests.push(url);
     const found = await data.sourceFile(url);
@@ -270,6 +271,15 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
         ]);
         return { type: 'application/zip', body: Buffer.from(await blob.arrayBuffer()) };
       }
+      // Study data: OpenBible.info's zip of one text file, CCEL's ThML.
+      const study = (name) => readFileSync(join(ROOT, 'test', 'fixtures', 'studydata', name), 'utf8');
+      if (url === 'https://a.openbible.info/data/cross-references.zip') {
+        const { makeZip } = await import('../../app/services/zip.js');
+        const blob = makeZip([{ name: 'cross_references.txt', text: study('openbible-gen1-1-5.txt') }]);
+        return { type: 'application/zip', body: Buffer.from(await blob.arrayBuffer()) };
+      }
+      if (url === 'https://ccel.org/ccel/e/easton/ebd2.xml') return { type: 'text/xml', body: study('easton-a-extract.xml') };
+      if (url === 'https://ccel.org/ccel/n/nave/bible.xml') return { type: 'text/xml', body: study('topics-thml.xml') };
       return null;
     },
     forUrl(url) {

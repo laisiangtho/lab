@@ -30,6 +30,7 @@ import report from '../../app/features/report/index.js';
 import compare from '../../app/features/compare/index.js';
 import guide from '../../app/features/guide/index.js';
 import wordstudy from '../../app/features/wordstudy/index.js';
+import reference from '../../app/features/reference/index.js';
 import memory from '../../app/features/memory/index.js';
 import welcome from '../../app/features/welcome/index.js';
 import { createPlatform } from './platform.js';
@@ -38,6 +39,6 @@ import './theme.css'; // after boot.js so target tokens override the defaults
 start({
   root: document.getElementById('app'),
   createPlatform,
-  features: [library, settings, search, notes, bookmarks, composer, notesManager, tags, backlinks, outline, plans, graph, board, ink, speech, verseCard, help, updates, exportPassage, projects, report, compare, memory, wordstudy, guide, welcome],
+  features: [library, settings, search, notes, bookmarks, composer, notesManager, tags, backlinks, outline, plans, graph, board, ink, speech, verseCard, help, updates, exportPassage, projects, report, compare, memory, wordstudy, reference, guide, welcome],
   config: {},
 });
