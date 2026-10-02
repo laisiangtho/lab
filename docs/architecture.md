@@ -829,6 +829,35 @@ indexes are held in memory by term for "who was", "what is", "verses about"
 where a set has the subject); a passage is answered with its words from the
 translation being read and the imported cross-references from it.
 
+## 3d-x-c-vii. The phone shell
+
+At 600 px and under (`PHONE_WIDTH`), `shell/phone.js` presents the same
+workspace, registry and features the way a phone is used, after Apple's
+Human Interface Guidelines; `body[data-phone]` is what `styles/phone.css`
+goes by, so nothing in it reaches the desktop or a tablet. It is a
+presentation, not a second app:
+
+- The workspace keeps its tabs; the phone shows one at a time and hides the
+  tab band. Read brings the chapter tab forward, Search the search pane as a
+  tab, Library its document. Study and More are lists built from the
+  registry's panes and documents; a row opens the pane (as "panes as tabs"
+  does — on a phone a pane is always a tab) or the document, and remembers
+  which list it came from for the way back.
+- A verse's actions are the registry's `verseActions`, drawn as a sheet with
+  their names instead of the desktop's popover (`shell.openVerseBar` goes to
+  whichever is in front). Highlight colours are `annotations.toggleMark`.
+- The text settings are the reading panel, placed as a sheet by the
+  stylesheet. The book picker, the translations and the chapter's menu are
+  sheets of the phone's own, made from the canon, the store and the commands
+  the build has.
+- The tab bar's offset follows the primary pane's scroll one to one
+  (`--ph-off`), ignores the rubber band past either end, and settles only
+  when no finger is down. History (`records.history`) stands in for the tabs
+  a desktop reader would leave open.
+
+Steps still to come: Library, Search and Settings as native lists; study
+panes as half-height sheets, parallel reading verse under verse.
+
 ## 3d-x-d. One knowledge, three views
 
 Help and the Guide answer from one knowledge (`features/guide/knowledge.js`):

@@ -144,7 +144,7 @@ test('the guide on a phone keeps its field above the bar', options, async (t) =>
   await page.keyboard.press('Enter');
   await page.waitForSelector('.gd-card', { timeout: 10000 });
   await page.waitForTimeout(400);
-  const [field, bar] = await Promise.all([page.locator('.gd-foot').boundingBox(), page.locator('.mobile-bar').boundingBox()]);
+  const [field, bar] = await Promise.all([page.locator('.gd-foot').boundingBox(), page.locator('.ph-tabs').boundingBox()]);
   assert.ok(field.y + field.height <= bar.y, `the field ends (${Math.round(field.y + field.height)}) above the bar (${Math.round(bar.y)})`);
   assert.deepEqual(app.problems, []);
 });

@@ -55,7 +55,7 @@ test('the Library on a phone', options, async (t) => {
     await page.locator('[data-identify="kjv1611"] .library-actions .btn').click();
     const toast = page.locator('.toast').first();
     await toast.waitFor({ timeout: 60000 });
-    const [a, b] = await Promise.all([toast.boundingBox(), page.locator('.mobile-bar').boundingBox()]);
+    const [a, b] = await Promise.all([toast.boundingBox(), page.locator('.ph-tabs').boundingBox()]);
     assert.ok(a.y + a.height <= b.y, `the notice ends (${Math.round(a.y + a.height)}) above the bar (${Math.round(b.y)})`);
   });
 
@@ -73,9 +73,9 @@ test('the Library on a phone', options, async (t) => {
     assert.equal(current, 'kjv1611');
   });
 
-  await t.test('asking for a pane by name shows it, drawer and all', async () => {
-    // On a phone the sidebars are drawers; selecting a pane picked it inside a
-    // shut drawer, so Bookmarks, Plan, a verse's note and "find" showed nothing.
+  await t.test('asking for a pane by name shows it, full screen', async () => {
+    // A phone has no sidebars: a pane asked for by name takes the screen, with
+    // the way back over it.
     await page.keyboard.press('Control+p');
     await page.locator('.modal-input').fill('Bookmarks');
     await page.waitForTimeout(250);
@@ -85,13 +85,15 @@ test('the Library on a phone', options, async (t) => {
       const view = document.querySelector('.pane-view[data-view="marks"]');
       const r = view?.getBoundingClientRect();
       return {
-        drawer: document.body.classList.contains('drawer-l'),
+        drawer: document.body.classList.contains('has-drawer'),
         active: view?.classList.contains('is-active') ?? false,
         onScreen: Boolean(r && r.width > 0 && r.right > 0 && r.left < innerWidth),
       };
     });
-    assert.ok(shown.drawer, 'the left drawer opens');
-    assert.ok(shown.active && shown.onScreen, 'with the Bookmarks pane in front, on screen');
+    assert.equal(shown.drawer, false, 'no drawer');
+    assert.ok(shown.onScreen, 'the Bookmarks pane is on screen');
+    assert.equal(await page.locator('.ph-nav .ph-title').innerText(), 'Bookmarks');
+    assert.ok(await page.locator('.ph-nav .ph-btn').first().isVisible(), 'with a way back');
   });
 
   await t.test('nothing went wrong on the way', () => assert.deepEqual(app.problems, []));

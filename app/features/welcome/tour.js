@@ -54,7 +54,9 @@ export function runTour(steps, { onEnd = () => {} } = {}) {
     if (rect.bottom < 0 || rect.right < 0 || rect.top > innerHeight || rect.left > innerWidth) return false;
     return getComputedStyle(el).visibility !== 'hidden';
   };
-  const targetOf = (step) => (step.target ? document.querySelector(step.target) : null);
+  // A step may name the same thing in more than one shell (the desktop's
+  // breadcrumb, the phone's passage button): the one on screen is meant.
+  const targetOf = (step) => (step.target ? [...document.querySelectorAll(step.target)].find(visible) ?? null : null);
 
   async function go(by) {
     let i = at + by;

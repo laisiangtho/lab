@@ -1,0 +1,181 @@
+/* ---- the phone shell (shell/phone.js) ---------------------------------------
+   Everything here is under body[data-phone]: the desktop and the tablet are
+   untouched. The reading runs edge to edge; the controls float over it as
+   glass, set in from the edges, and what is chosen or done arrives as a
+   sheet from the bottom, set in the same way. */
+
+.ph-nav, .ph-tabs, .ph-screen, .ph-scrim, .ph-sheet { display: none; }
+
+body[data-phone] {
+  --ph-edge: 12px;
+  --ph-top: calc(8px + env(safe-area-inset-top, 0px));
+  --ph-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  --ph-glass: color-mix(in srgb, var(--bg-elevated) 84%, transparent);
+  --ph-glass-thin: color-mix(in srgb, var(--bg-elevated) 46%, transparent);
+  --ph-ground: var(--bg-secondary);
+}
+
+/* The desktop's frame steps aside: no tab band, ribbon, sidebars, status bar,
+   pane heads, or the old floating pill. */
+body[data-phone] .tabbar,
+body[data-phone] .ribbon,
+body[data-phone] .sidebar,
+body[data-phone] .statusbar,
+body[data-phone] .mobile-bar,
+body[data-phone] .scrim-mobile,
+body[data-phone] .resizer,
+body[data-phone] .leaf-head { display: none !important; }
+body[data-phone] #app { padding-top: 0; }
+body[data-phone] .body-row { padding-bottom: 0; }
+body[data-phone] .panes { margin: 0; border-radius: 0; }
+/* The reading runs under the tab bar, which moves out of its way; a page or
+   a pane ends above it, since the bar stays put there. */
+body[data-phone][data-phone-view="read"] .leaf-scroll { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+body[data-phone]:not([data-phone-view="read"]) .panes { padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+body[data-phone][data-phone-view="read"] .leaf-scroll { padding-top: calc(52px + env(safe-area-inset-top, 0px)); }
+body[data-phone][data-phone-view="page"] .panes { padding-top: calc(60px + env(safe-area-inset-top, 0px)); }
+body[data-phone][data-phone-view="root"] .panes { padding-top: env(safe-area-inset-top, 0px); }
+body[data-phone] .note { padding: 18px 22px 30vh; }
+body[data-phone][data-phone-view="list"] .workspace { visibility: hidden; }
+
+/* Glass */
+body[data-phone] .ph-glass {
+  background: var(--ph-glass);
+  -webkit-backdrop-filter: saturate(1.7) blur(20px); backdrop-filter: saturate(1.7) blur(20px);
+  border: .5px solid var(--border); border-radius: 99px;
+  box-shadow: 0 6px 20px rgba(20, 16, 34, .12);
+}
+
+/* Controls over the reading */
+body[data-phone] .ph-nav {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+  position: fixed; z-index: 45; top: var(--ph-top); left: var(--ph-edge); right: var(--ph-edge);
+  pointer-events: none; font-family: var(--font-ui);
+}
+body[data-phone] .ph-nav:empty { display: none; }
+body[data-phone] .ph-nav > * { pointer-events: auto; }
+body[data-phone] .ph-nav .ph-glass { height: 44px; transition: background-color .25s ease, box-shadow .25s ease; }
+body[data-phone].ph-scrolled[data-phone-view="read"] .ph-nav .ph-glass { background: var(--ph-glass-thin); box-shadow: none; }
+.ph-group { display: inline-flex; align-items: center; padding: 0 2px; justify-self: start; }
+.ph-group:last-child { justify-self: end; }
+.ph-btn { min-width: 44px; height: 40px; display: grid; place-items: center; border-radius: 99px; color: var(--accent-2); font-size: 16px; font-weight: 600; }
+.ph-btn svg { width: 22px; height: 22px; }
+.ph-btn:active { background: var(--bg-hover); }
+.ph-pill { padding: 0 8px; color: var(--text-normal); font-size: 15px; font-weight: 700; max-width: 26vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-where, .ph-title { display: inline-flex; align-items: center; gap: 4px; padding: 0 16px; max-width: 46vw; color: var(--text-normal); font-size: 17px; font-weight: 600; }
+.ph-where span, .ph-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-where svg { width: 15px; height: 15px; color: var(--text-muted); transform: rotate(90deg); flex: 0 0 auto; }
+
+/* The tab bar: a capsule that follows the reading's scroll */
+body[data-phone] .ph-tabs {
+  display: flex; position: fixed; z-index: 45; left: 16px; right: 16px; bottom: var(--ph-bottom); padding: 5px;
+  transform: translateY(calc(var(--ph-off, 0) * 1px)); opacity: calc(1 - var(--ph-off, 0) / 96);
+  transition: transform .3s cubic-bezier(.2, .8, .2, 1), opacity .2s ease;
+}
+body[data-phone].ph-tracking .ph-tabs { transition: none; }
+.ph-tab { flex: 1; height: 50px; display: grid; place-items: center; border-radius: 99px; color: var(--text-faint); -webkit-tap-highlight-color: transparent; }
+.ph-tab svg { width: 27px; height: 27px; stroke-width: 1.6; }
+.ph-tab[aria-selected="true"] { color: var(--accent-2); background: var(--bg-hover); }
+
+/* The text fades out under the floating controls rather than meeting a bar. */
+body[data-phone][data-phone-view="read"] .workspace::before,
+body[data-phone][data-phone-view="read"] .workspace::after {
+  content: ""; position: fixed; left: 0; right: 0; z-index: 44; pointer-events: none; transition: opacity .2s ease;
+}
+body[data-phone][data-phone-view="read"] .workspace::before { top: 0; height: calc(64px + env(safe-area-inset-top, 0px)); background: linear-gradient(var(--bg-primary), transparent); }
+body[data-phone][data-phone-view="read"] .workspace::after { bottom: 0; height: calc(90px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(transparent, var(--bg-primary)); opacity: calc(1 - var(--ph-off, 0) / 96); }
+body[data-phone].ph-scrolled[data-phone-view="read"] .workspace::before { opacity: .55; }
+body[data-phone].ph-tracking .workspace::after { transition: none; }
+
+/* Study and More: a large title and grouped rows */
+body[data-phone] .ph-screen {
+  display: block; position: fixed; inset: 0; z-index: 43; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 16px calc(100px + env(safe-area-inset-bottom, 0px));
+  background: var(--ph-ground); color: var(--text-normal); font-family: var(--font-ui);
+}
+body[data-phone] .ph-screen[hidden] { display: none; }
+.ph-big { margin: 14px 4px 14px; font-size: 32px; font-weight: 800; letter-spacing: -.02em; }
+.ph-group-h { margin: 20px 6px 6px; font-size: 12.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+.ph-list { background: var(--bg-primary); border-radius: 14px; overflow: hidden; }
+.ph-list + .ph-list { margin-top: 14px; }
+.ph-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; padding: 13px 16px;
+  text-align: start; font-size: 16px; color: var(--text-normal); border-bottom: .5px solid var(--border);
+  -webkit-tap-highlight-color: transparent;
+}
+.ph-list > .ph-row:last-child, .ph-list > .ph-book:last-child > .ph-row { border-bottom: 0; }
+.ph-row:active { background: var(--bg-hover); }
+.ph-row-ic { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--accent-fade); color: var(--accent-2); }
+.ph-row-ic svg { width: 18px; height: 18px; }
+.ph-row-t { flex: 1; min-width: 0; line-height: 1.35; overflow-wrap: anywhere; }
+.ph-row-t small { display: block; margin-top: 3px; font-size: 13px; line-height: 1.45; color: var(--text-muted); }
+.ph-row-v { color: var(--text-muted); font-size: 15px; font-variant-numeric: tabular-nums; }
+.ph-row-chev svg { width: 15px; height: 15px; color: var(--text-faint); }
+.ph-row-check svg { width: 18px; height: 18px; color: var(--accent-2); }
+/* Burmese stacks marks above and below the line: it needs the taller line
+   wherever it appears, in a row as much as in the reading. */
+body[data-phone] .ph-row-t:lang(my), body[data-phone] .ph-row-t:lang(mya),
+body[data-phone] .ph-where:lang(my), body[data-phone] .ph-where:lang(mya),
+html:lang(my) body[data-phone] .ph-row-t, html:lang(my) body[data-phone] .ph-act span { line-height: 1.95; }
+
+/* Sheets */
+body[data-phone] .ph-scrim { display: block; position: fixed; inset: 0; z-index: 60; background: rgba(10, 8, 20, .42); opacity: 0; pointer-events: none; transition: opacity .25s ease; }
+body[data-phone] .ph-scrim.is-on { opacity: 1; pointer-events: auto; }
+body[data-phone] .ph-sheet {
+  display: flex; flex-direction: column; position: fixed; z-index: 61; left: 8px; right: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px)); max-height: 94%;
+  background: var(--ph-ground); color: var(--text-normal); font-family: var(--font-ui);
+  border: .5px solid var(--border); border-radius: 34px; box-shadow: 0 -8px 30px rgba(10, 8, 20, .22);
+  transform: translateY(calc(100% + 24px));
+  transition: transform .3s cubic-bezier(.2, .8, .2, 1), height .3s cubic-bezier(.2, .8, .2, 1), border-radius .3s;
+}
+body[data-phone] .ph-sheet.is-on { transform: translateY(0); }
+body[data-phone] .ph-sheet.is-drag { transition: none; }
+/* At full height a sheet takes the screen's edges, as a page of its own. */
+body[data-phone] .ph-sheet.is-full { left: 0; right: 0; bottom: 0; border-radius: 34px 34px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.ph-grab { flex: 0 0 auto; padding: 8px 0 4px; touch-action: none; }
+.ph-grab::before { content: ""; display: block; width: 36px; height: 5px; margin: 0 auto; border-radius: 3px; background: var(--border-strong); }
+.ph-sheet-h { flex: 0 0 auto; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 2px 10px 10px; touch-action: none; }
+.ph-sheet-h h2 { margin: 0; font-size: 17px; font-weight: 700; text-align: center; overflow-wrap: anywhere; }
+.ph-done { justify-self: end; min-height: 40px; padding: 0 10px; border-radius: 99px; color: var(--accent-2); font-size: 16px; font-weight: 600; }
+.ph-sheet-b { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 2px 14px 22px; }
+.ph-sheet-b > .ph-group-h:first-child { margin-top: 4px; }
+
+.ph-colours { display: flex; justify-content: space-between; gap: 8px; padding: 4px 6px 16px; }
+.ph-dot { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; border: .5px solid var(--border); color: var(--text-muted); }
+.ph-dot svg { width: 18px; height: 18px; }
+.ph-dot[disabled] { opacity: .35; }
+.ph-dot[data-colour="yellow"] { background: #f3d64e; }
+.ph-dot[data-colour="green"] { background: #6fcf8a; }
+.ph-dot[data-colour="blue"] { background: #7aa9f7; }
+.ph-dot[data-colour="purple"] { background: #b08cf5; }
+.ph-dot[data-colour="red"] { background: #f0807c; }
+.ph-dot[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ph-ground), 0 0 0 4px var(--accent); }
+.ph-acts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.ph-act {
+  min-height: 74px; padding: 8px 4px; border-radius: 14px; background: var(--bg-primary);
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px;
+  font-size: 11.5px; font-weight: 600; line-height: 1.25; text-align: center; color: var(--text-normal);
+}
+.ph-act svg { width: 22px; height: 22px; color: var(--accent-2); flex: 0 0 auto; margin-top: 4px; }
+.ph-act span { overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.ph-act[aria-pressed="true"] { background: var(--accent-fade); }
+.ph-act:active { filter: brightness(.94); }
+
+.ph-book.is-absent > .ph-row .ph-row-t { color: var(--text-faint); }
+.ph-book.is-open > .ph-row { border-bottom: 0; font-weight: 600; }
+.ph-chapters { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; padding: 2px 14px 16px; border-bottom: .5px solid var(--border); }
+.ph-chapters button { aspect-ratio: 1; border-radius: 12px; background: var(--bg-hover); color: var(--text-normal); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ph-chapters button.is-here { background: var(--accent); color: var(--text-on-accent); }
+
+/* The text settings and messages take the phone's shapes. */
+body[data-phone] .popover.rpanel {
+  left: 8px !important; right: 8px; top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  width: auto; max-width: none; border-radius: 30px; padding: 18px 16px; z-index: 62;
+}
+body[data-phone] .rpanel::before { display: none; }
+body[data-phone] .toasts { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 70; }
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-phone] .ph-tabs, body[data-phone] .ph-sheet, body[data-phone] .ph-scrim, body[data-phone] .ph-nav .ph-glass { transition: none; }
+}

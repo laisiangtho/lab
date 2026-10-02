@@ -17,6 +17,7 @@ import { createTranslationInfo } from './trinfo.js';
 import { createTree } from './tree.js';
 import { createReadingPanel, applyReading } from './readingpanel.js';
 import { createVerseBar } from './versebar.js';
+import { createPhone } from './phone.js';
 import { createWorkspace } from './workspace.js';
 import { fill, h } from './dom.js';
 import { icon } from './icons.js';
@@ -37,6 +38,7 @@ export function createShell(root, ctx) {
   let tree = null;
   let verseBar = null;
   let readingPanel = null;
+  let phone = null;
   let navPop = null;
   let trInfo = null;
   let peek = null;
@@ -155,7 +157,9 @@ export function createShell(root, ctx) {
     openCrumb: (anchor, mode, at) => navPop.open(anchor, mode, at, (book, chapter) => workspace.openChapter(book, chapter)),
     /** The primary translation finished loading: names may have changed. */
     refreshNames: () => { tree?.paint(); renderStatus(); },
-    openVerseBar: (anchor, passage, options) => verseBar.show(anchor, passage, options),
+    openVerseBar: (anchor, passage, options) => phone.verseBar.show(anchor, passage, options),
+    /** The phone shell (shell/phone.js): whether it is in front, and its sheets. */
+    get phone() { return phone; },
     get workspace() { return workspace; },
     /** The ribbon's own arrangement, for the settings page. */
     get ribbon() { return chrome.ribbon; },
@@ -193,6 +197,7 @@ export function createShell(root, ctx) {
         : workspace.openChapter(ref.book, ref.chapter, options)),
     });
     colours = createColorPicker();
+    phone = createPhone(ctx, { chrome, workspace, readingPanel, verseBar });
     document.body.append(modal.element, confirm.element, form.element, verseBar.element, readingPanel.element,
       navPop.element, trInfo.element, peek.element, colours.element, strongsPopover);
     applyReading(ctx.state.get());
@@ -236,6 +241,7 @@ export function createShell(root, ctx) {
     measureChapter().catch(() => { counts = null; });
     syncHash();
     workspace.render();
+    phone?.paint();
   }
 
   // --- commands -----------------------------------------------------------

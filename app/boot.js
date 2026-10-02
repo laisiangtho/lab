@@ -33,6 +33,7 @@ import { L, resolveLocale, setLocale } from './shell/i18n.js';
 
 import './styles/shell.css';
 import './styles/views.css';
+import './styles/phone.css';
 
 export async function start({ root, createPlatform, features, config }) {
   // The device's language from the first moment, so even the screen of last

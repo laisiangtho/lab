@@ -10,7 +10,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { available, installFromLibrary, launch } from './harness.mjs';
+import { available, installFromLibrary, launch, toReading } from './harness.mjs';
 
 const ready = await available();
 const options = ready.ok ? {} : { skip: `end-to-end: ${ready.why}` };
@@ -29,7 +29,7 @@ for (const size of SIZES) {
     await page.waitForSelector('.wl', { timeout: 20000 });
     await page.locator('.wl .btn.primary').click();
     await installFromLibrary(page, 'ddb1931');
-    await page.locator('.tabstrip .tab[data-kind="chapter"]').first().click();
+    await toReading(page);
     await page.waitForSelector('.verse');
     await page.evaluate(() => window.__lai?.openDoc?.('cards'));
     if (!(await page.locator('.cd-canvas').count())) {
@@ -74,7 +74,7 @@ for (const size of SIZES) {
           }
           const box = document.querySelector('.cd-panel').getBoundingClientRect();
           if (box.left < 0 || box.right > innerWidth || box.bottom > innerHeight) out.push('the panel runs off the screen');
-          const pill = document.querySelector('.mobile-bar');
+          const pill = document.querySelector('.ph-tabs');
           if (pill?.offsetParent && box.bottom > pill.getBoundingClientRect().top) out.push('the panel runs under the floating bar');
           return out;
         });

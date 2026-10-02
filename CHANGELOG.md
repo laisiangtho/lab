@@ -228,6 +228,18 @@ newest first.
 - About is a quiet column: the version, what is on the device (with a bar
   for storage), and the sources of the texts, the lexicon, the verse map, the
   grammar and the study data with their licences.
+- A phone gets its own shell, after iPhone conventions (step 1 of 3). Five
+  places in a floating tab bar — Read, Search, Library, Study, More — which
+  follows the reading's scroll and settles when the finger lifts. Over the
+  text, as separate pieces of glass: the translation, the passage, the text
+  settings and the chapter's menu; they thin out while text passes under
+  them. Books and chapters, translations, a verse's actions (with highlight
+  colours and every action named) and the chapter's menu arrive as sheets
+  from the bottom, pulled down to put away. A swipe turns the chapter. Study
+  and More list what the build has; a pane or page opens full screen with a
+  way back. History stands in for open tabs. The desktop's tab band, ribbon,
+  sidebars and status bar are not on a phone; a window up to 600 px wide is
+  one.
 
 
 ### 26.10.01.3 — 1 October 2026

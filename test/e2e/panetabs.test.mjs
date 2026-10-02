@@ -73,6 +73,10 @@ test('sidebar panes as workspace tabs', options, async (t) => {
 
   await t.test('a feature asking for its pane gets the tab', async () => {
     await page.locator('.tabstrip .tab[data-kind="chapter"]').first().click();
+    // The chapter is on screen before the key is pressed: the press is the
+    // reader's next act, not something racing the tab's own repaint.
+    await page.waitForSelector('.tabstrip .tab[data-kind="chapter"].is-active');
+    await page.waitForSelector('.leaf[data-pane="0"] .verse');
     await page.keyboard.press('Control+f');
     await page.waitForSelector('.tabstrip .tab[data-kind="pane:search"].is-active');
   });
@@ -134,7 +138,8 @@ test('sidebar panes as workspace tabs', options, async (t) => {
     const row = page.locator('.set-row', { hasText: 'Panes as tabs on narrow screens' });
     await row.scrollIntoViewIfNeeded();
     await row.locator('input[type="checkbox"], [role="switch"]').first().click();
-    await page.setViewportSize({ width: 390, height: 844 });
+    // A narrow window, not a phone: a phone has no sidebars to choose from.
+    await page.setViewportSize({ width: 700, height: 844 });
     await page.waitForTimeout(500);
     await page.locator('.mobile-bar [data-mb="side.left"]').click();
     await page.locator('.menu .mi, .menu button', { hasText: 'Bookmarks' }).first().click();
@@ -142,7 +147,7 @@ test('sidebar panes as workspace tabs', options, async (t) => {
     assert.equal(await page.locator('body.has-drawer').count(), 0, 'no drawer');
     const overflow = await page.evaluate(() => [...document.querySelectorAll('.leaf-pane *')]
       .filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1).length);
-    assert.equal(overflow, 0, 'nothing runs off a phone');
+    assert.equal(overflow, 0, 'nothing runs off the screen');
     await page.setViewportSize({ width: 1280, height: 860 });
   });
 

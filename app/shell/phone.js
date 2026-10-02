@@ -1,0 +1,486 @@
+/**
+ * The phone shell: the same workspace, features and registry as the desktop,
+ * presented the way a phone is used.
+ *
+ *   tab bar    five places, as a floating capsule: Read, Search, Library,
+ *              Study, More. It follows the reading's scroll one to one and
+ *              settles when the finger lifts.
+ *   controls   over the reading, as separate pieces of glass: the
+ *              translation, the passage, the text settings and the
+ *              chapter's menu. They thin out while text passes under them.
+ *   sheets     everything that is chosen or done arrives from the bottom:
+ *              the book and chapter picker, the translations, a verse's
+ *              actions, the chapter's menu. Set in from the edges; pulled
+ *              down to put away.
+ *   lists      Study and More are lists of what the build has — panes and
+ *              documents from the registry — each opening full screen with
+ *              a way back.
+ *
+ * Nothing here is a second implementation of a feature. A pane is opened in
+ * a workspace tab (as "panes as tabs" does), a document the way it always
+ * is, a verse's actions are the registry's. The workspace keeps its tabs;
+ * the phone shows one at a time and has no tab strip, so History stands in
+ * for the tabs a desktop reader would leave open.
+ *
+ * Active at phone width only (PHONE_WIDTH); `body[data-phone]` is what the
+ * stylesheet goes by. A window made wider gets the desktop shell back.
+ */
+
+import { COLOURS } from '../core/annotations.js';
+import { fill, h } from './dom.js';
+import { icon } from './icons.js';
+import { L } from './i18n.js';
+
+export const PHONE_WIDTH = 600;
+const HISTORY_KEY = 'history';
+const HISTORY_CAP = 30;
+/** How far the tab bar travels to be out of sight. */
+const TRAVEL = 96;
+
+/** What the Study tab lists, in this order, of what the build has. */
+// The Notes pane is the chapter's notes; the list of all of them is the
+// document of the same name, which is the one a list should lead to.
+const STUDY_PANES = ['marks', 'tags', 'plan', 'links', 'outline', 'project', 'study', 'reference'];
+const STUDY_DOCS = ['notes-manager', 'memory', 'projects'];
+const STUDY_FIRST = ['marks', 'notes-manager'];
+/** What More leaves out: its own tabs, and pages that are about a keyboard. */
+const NOT_IN_MORE = new Set(['library', 'shortcuts', ...STUDY_DOCS]);
+
+export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) {
+  const { registry, state, records } = ctx;
+  const body = document.body;
+  const query = window.matchMedia(`(max-width: ${PHONE_WIDTH}px)`);
+  const on = () => query.matches;
+
+  /** 'study' | 'more' while one of the two lists is in front. */
+  let list = null;
+  /** Workspace tab id → the list it was opened from, for the way back. */
+  const origin = new Map();
+
+  // --- elements ---------------------------------------------------------------
+
+  const nav = h('header', { class: 'ph-nav' });
+  const tabs = h('nav', { class: 'ph-tabs ph-glass', role: 'tablist' });
+  const screen = h('section', { class: 'ph-screen', hidden: true });
+  const scrim = h('div', { class: 'ph-scrim', onclick: () => closeSheet() });
+  const sheetTitle = h('h2', { id: 'ph-sheet-title' });
+  const sheetBody = h('div', { class: 'ph-sheet-b' });
+  const grab = h('div', { class: 'ph-grab' });
+  const sheetHead = h('div', { class: 'ph-sheet-h' },
+    h('span'), sheetTitle,
+    h('button', { class: 'ph-done', onclick: () => closeSheet() }, L('mob.done')));
+  const sheet = h('section', { class: 'ph-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ph-sheet-title' },
+    grab, sheetHead, sheetBody);
+  body.append(nav, tabs, screen, scrim, sheet);
+
+  const glass = (...children) => h('div', { class: 'ph-glass ph-group' }, ...children);
+  const navButton = (label, content, onclick, extra = '') => h('button', {
+    class: `ph-btn ${extra}`.trim(), 'aria-label': label, title: label, onclick,
+  }, content);
+  const row = ({ glyph, title, sub = '', value = '', lang = null, onclick, chevron = true, check = false }) => h('button', { class: 'ph-row', onclick },
+    glyph ? h('span', { class: 'ph-row-ic' }, icon(glyph)) : null,
+    h('span', { class: 'ph-row-t', lang }, title, sub ? h('small', {}, sub) : null),
+    value ? h('span', { class: 'ph-row-v' }, value) : null,
+    check ? h('span', { class: 'ph-row-check' }, icon('check')) : chevron ? h('span', { class: 'ph-row-chev' }, icon('chev')) : null);
+  const group = (title, rows) => (rows.length ? [title ? h('div', { class: 'ph-group-h' }, title) : null, h('div', { class: 'ph-list' }, rows)] : []);
+
+  // --- where the reader is ------------------------------------------------------
+
+  const TABS = [
+    { id: 'read', glyph: 'book-open', name: () => L('mob.read') },
+    { id: 'search', glyph: 'search', name: () => L('mob.search') },
+    { id: 'library', glyph: 'library', name: () => L('doc.library') },
+    { id: 'study', glyph: 'note', name: () => L('mob.study') },
+    { id: 'more', glyph: 'more', name: () => L('mob.more') },
+  ];
+  const hasPane = (id) => registry.panes().some((pane) => pane.id === id);
+
+  /** Which tab is in front, from what the workspace is showing. */
+  function view() {
+    if (list) return list;
+    const tab = workspace.activeTab;
+    if (!tab || tab.kind === 'chapter') return 'read';
+    if (tab.kind === 'pane:search') return 'search';
+    if (tab.kind === 'library') return 'library';
+    return origin.get(tab.id) ?? 'more';
+  }
+
+  async function go(id) {
+    closeSheet();
+    if (id === 'study' || id === 'more') { list = id; paint(); return; }
+    list = null;
+    if (id === 'read') {
+      const chapter = [...workspace.tabs].reverse().find((tab) => tab.kind === 'chapter');
+      if (chapter) workspace.activate(chapter.id);
+      else await workspace.openChapter(state.get().book, state.get().chapter);
+    } else if (id === 'search' && hasPane('search')) await workspace.openPaneTab('search');
+    else if (id === 'library') await workspace.openDoc('library');
+    paint();
+  }
+
+  /** Open something from a list, remembering the list for the way back. */
+  async function openFrom(from, open) {
+    list = null;
+    await open();
+    const tab = workspace.activeTab;
+    if (tab && tab.kind !== 'chapter') origin.set(tab.id, from);
+    paint();
+  }
+
+  function back() {
+    const tab = workspace.activeTab;
+    const from = tab ? origin.get(tab.id) : null;
+    if (tab && from) { origin.delete(tab.id); workspace.closeTab(tab.id); }
+    list = from ?? 'more';
+    paint();
+  }
+
+  // --- painting -------------------------------------------------------------------
+
+  function paint() {
+    const phone = on();
+    if (phone) body.dataset.phone = 'on'; else delete body.dataset.phone;
+    if (!phone) { closeSheet(); return; }
+    const now = view();
+    const tab = workspace.activeTab;
+    const reading = now === 'read';
+    const paged = !list && !reading && now !== 'search' && now !== 'library';
+    body.dataset.phoneView = list ? 'list' : reading ? 'read' : paged ? 'page' : 'root';
+
+    fill(tabs, ...TABS.filter((t) => t.id !== 'search' || hasPane('search')).map((t) => h('button', {
+      class: 'ph-tab', role: 'tab', dataset: { tab: t.id }, 'aria-label': t.name(), title: t.name(),
+      'aria-selected': String(now === t.id), onclick: () => go(t.id),
+    }, icon(t.glyph))));
+
+    if (reading && tab) paintReadNav();
+    else if (paged && tab) {
+      const doc = tab.kind.startsWith('pane:')
+        ? registry.panes().find((pane) => pane.id === tab.kind.slice(5))
+        : registry.getDoc(tab.kind);
+      fill(nav,
+        glass(navButton(L('mob.back'), icon('arrow-left'), back)),
+        h('div', { class: 'ph-glass ph-title' }, doc?.title ?? ''),
+        h('span'));
+    } else fill(nav);
+
+    screen.hidden = !list;
+    if (list) paintList();
+    if (!reading) setOff(0);
+  }
+
+  function paintReadNav() {
+    const { book, chapter } = state.get();
+    fill(nav,
+      glass(navButton(L('cmd.translation'), h('span', { class: 'ph-pill' }, workspace.primaryName()), openTranslations, 'ph-tr')),
+      h('button', {
+        class: 'ph-glass ph-where', 'aria-haspopup': 'dialog', lang: workspace.lang(), onclick: openPicker,
+        'aria-label': `${workspace.englishRef(book, chapter)} — ${L('mob.books')}`,
+      }, h('span', {}, `${workspace.bookName(book)} ${workspace.number(chapter)}`), icon('chev')),
+      glass(
+        navButton(L('cmd.reading'), 'Aa', (event) => readingPanel.toggle(event.currentTarget), 'ph-aa'),
+        navButton(L('mob.chapterMenu'), icon('more'), openChapterMenu, 'ph-menu')));
+  }
+
+  function paintList() {
+    const from = list;
+    const paneRow = (pane) => row({ glyph: pane.icon, title: pane.title, onclick: () => openFrom(from, () => workspace.openPaneTab(pane.id)) });
+    const docRow = (doc) => row({ glyph: doc.icon ?? 'files', title: doc.title, onclick: () => openFrom(from, () => workspace.openDoc(doc.id)) });
+    if (from === 'study') {
+      const panes = STUDY_PANES.map((id) => registry.panes().find((pane) => pane.id === id)).filter(Boolean);
+      const docs = STUDY_DOCS.map((id) => registry.getDoc(id)).filter(Boolean);
+      fill(screen,
+        h('h1', { class: 'ph-big' }, L('mob.study')),
+        ...group('', [...panes.map((pane) => [pane.id, paneRow(pane)]), ...docs.map((doc) => [doc.id, docRow(doc)])]
+          .sort(([a], [b]) => (STUDY_FIRST.includes(b) ? 1 : 0) - (STUDY_FIRST.includes(a) ? 1 : 0)).map(([, el]) => el)),
+        ...group(L('mob.history'), historyRows(8)));
+      return;
+    }
+    const guide = registry.panes().find((pane) => pane.id === 'guide');
+    const docs = registry.docs().filter((doc) => !NOT_IN_MORE.has(doc.id));
+    const first = ['settings', 'help', 'welcome', 'about'];
+    const tools = docs.filter((doc) => !first.includes(doc.id));
+    fill(screen,
+      h('h1', { class: 'ph-big' }, L('mob.more')),
+      ...group('', [guide ? paneRow(guide) : null, ...tools.map(docRow)].filter(Boolean)),
+      ...group(L('app.name'), first.map((id) => registry.getDoc(id)).filter(Boolean).map(docRow)));
+  }
+
+  // --- history ----------------------------------------------------------------------
+
+  const history = () => (Array.isArray(records.get(HISTORY_KEY, null)?.list) ? records.get(HISTORY_KEY, null).list : []);
+  let lastSeen = '';
+  function remember() {
+    const { book, chapter } = state.get();
+    const key = `${book}.${chapter}`;
+    if (key === lastSeen || workspace.activeTab?.kind !== 'chapter') return;
+    lastSeen = key;
+    const next = [{ book, chapter, at: Date.now() }, ...history().filter((item) => item.book !== book || item.chapter !== chapter)].slice(0, HISTORY_CAP);
+    records.save(HISTORY_KEY, { list: next }).catch(() => {});
+  }
+  function historyRows(limit) {
+    const { book, chapter } = state.get();
+    return history().filter((item) => item.book !== book || item.chapter !== chapter).slice(0, limit).map((item) => row({
+      glyph: 'clock', title: `${workspace.bookName(item.book)} ${workspace.number(item.chapter)}`, lang: workspace.lang(),
+      onclick: async () => { list = null; closeSheet(); await go('read'); await workspace.openChapter(item.book, item.chapter); paint(); },
+    }));
+  }
+
+  // --- sheets -------------------------------------------------------------------------
+
+  let detent = 'auto';
+  let onClose = null;
+  const sheetOpen = () => sheet.classList.contains('is-on');
+
+  /**
+   * @param {string} title
+   * @param {(Node|null)[]} content
+   * @param {{ tall?: boolean, closed?: () => void }} [options] `tall` opens at
+   *        half height and can be pulled to the full screen
+   */
+  function openSheet(title, content, { tall = false, closed = null } = {}) {
+    if (sheetOpen()) onClose?.();
+    onClose = closed;
+    sheetTitle.textContent = title;
+    fill(sheetBody, ...content);
+    sheetBody.scrollTop = 0;
+    detent = tall ? 'half' : 'auto';
+    sheet.classList.remove('is-full');
+    sheet.style.height = tall ? '56%' : '';
+    sheet.style.transform = '';
+    sheet.classList.add('is-on');
+    scrim.classList.add('is-on');
+    setOff(0);
+  }
+  function closeSheet() {
+    if (!sheetOpen()) return;
+    sheet.classList.remove('is-on');
+    scrim.classList.remove('is-on');
+    sheet.style.transform = '';
+    const done = onClose;
+    onClose = null;
+    done?.();
+  }
+  window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && sheetOpen()) { event.stopPropagation(); closeSheet(); } }, true);
+
+  // Pulled down, a sheet is put away; a tall one pulls up to the full screen.
+  let drag = null;
+  for (const handle of [grab, sheetHead]) {
+    handle.addEventListener('pointerdown', (event) => {
+      if (event.target.closest('button')) return;
+      drag = { y: event.clientY, height: sheet.offsetHeight };
+      sheet.classList.add('is-drag');
+      handle.setPointerCapture(event.pointerId);
+    });
+    handle.addEventListener('pointermove', (event) => {
+      if (!drag) return;
+      const dy = event.clientY - drag.y;
+      if (dy > 0) sheet.style.transform = `translateY(${dy}px)`;
+      else if (detent !== 'auto') sheet.style.height = `${Math.min(drag.height - dy, window.innerHeight * 0.94)}px`;
+    });
+    const end = (event) => {
+      if (!drag) return;
+      const dy = event.clientY - drag.y;
+      drag = null;
+      sheet.classList.remove('is-drag');
+      sheet.style.transform = '';
+      if (dy > 90) {
+        if (detent === 'full') { detent = 'half'; sheet.style.height = '56%'; sheet.classList.remove('is-full'); } else closeSheet();
+      } else if (dy < -50 && detent !== 'auto') {
+        detent = 'full'; sheet.style.height = '94%'; sheet.classList.add('is-full');
+      } else if (detent !== 'auto') sheet.style.height = detent === 'full' ? '94%' : '56%';
+    };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  }
+
+  /** Every book, the one being read open on its chapters. */
+  function openPicker() {
+    const here = state.get();
+    let opened = here.book;
+    const paintBooks = () => {
+      const content = [];
+      for (const testament of ctx.category.testaments) {
+        content.push(h('div', { class: 'ph-group-h' }, workspace.testamentName(testament.id)));
+        content.push(h('div', { class: 'ph-list' }, ctx.category.books.filter((b) => b.testament === testament.id).map((b) => {
+          const has = workspace.hasBook(b.id);
+          const open = opened === b.id;
+          return h('div', { class: `ph-book${open ? ' is-open' : ''}${has ? '' : ' is-absent'}`, dataset: { book: b.id } },
+            h('button', {
+              class: 'ph-row', 'aria-expanded': String(open),
+              onclick: () => { opened = open ? null : b.id; paintBooks(); sheetBody.querySelector('.ph-book.is-open')?.scrollIntoView({ block: 'nearest' }); },
+            },
+            h('span', { class: 'ph-row-t', lang: workspace.lang() }, workspace.bookName(b.id)),
+            h('span', { class: 'ph-row-v' }, workspace.number(b.chapters))),
+            open ? h('div', { class: 'ph-chapters' }, Array.from({ length: b.chapters }, (_, i) => h('button', {
+              class: b.id === here.book && i + 1 === here.chapter ? 'is-here' : null,
+              'aria-label': workspace.englishRef(b.id, i + 1),
+              onclick: () => { closeSheet(); workspace.openChapter(b.id, i + 1); },
+            }, workspace.number(i + 1)))) : null);
+        })));
+      }
+      fill(sheetBody, ...content);
+    };
+    openSheet(L('mob.books'), [], { tall: true });
+    paintBooks();
+    sheetBody.querySelector('.ph-book.is-open')?.scrollIntoView({ block: 'start' });
+  }
+
+  async function openTranslations() {
+    const installed = await ctx.store.list();
+    const current = state.get().translation;
+    const command = (id) => registry.commands().find((c) => c.id === id);
+    const alongside = command('reading.add-pane');
+    openSheet(L('cmd.translation'), [
+      h('div', { class: 'ph-list' }, installed.map((t) => row({
+        title: t.info.name, sub: [t.info.shortname, t.info.language?.text, t.info.year].filter(Boolean).join(' · '),
+        lang: t.info.language?.name ?? null, check: t.identify === current, chevron: false,
+        onclick: () => { closeSheet(); workspace.setPaneTranslation(0, t.identify); },
+      }))),
+      h('div', { class: 'ph-list' },
+        alongside && installed.length > 1 ? row({ glyph: 'add-pane', title: alongside.title, onclick: () => { closeSheet(); alongside.run(); } }) : null,
+        row({ glyph: 'library', title: L('lib.getMore'), onclick: () => go('library') })),
+    ]);
+  }
+
+  /** What can be done with the chapter: the commands this build has for it. */
+  function openChapterMenu() {
+    const { book, chapter } = state.get();
+    const wanted = ['speech.toggle', 'reading.copy', 'composer.open', 'reading.add-pane', 'reading.translationInfo', 'reading.mode'];
+    const commands = wanted.map((id) => registry.commands().find((c) => c.id === id)).filter(Boolean);
+    openSheet(`${workspace.bookName(book)} ${workspace.number(chapter)}`, [
+      h('div', { class: 'ph-list' }, commands.map((c) => row({
+        glyph: c.icon ?? 'cmd', title: c.title, chevron: false, onclick: () => { closeSheet(); c.run(); },
+      }))),
+      ...group(L('mob.history'), historyRows(6)),
+    ]);
+  }
+
+  /**
+   * A verse's actions, as a sheet: the colours a verse can be marked in, and
+   * every action a feature registered, each with its name.
+   */
+  function openVerse(passage) {
+    const here = { ...passage, to: passage.to ?? null };
+    const { annotations } = ctx;
+    const span = here.to ? `${workspace.number(here.verse)}–${workspace.number(here.to)}` : workspace.number(here.verse);
+    const tint = (shown) => {
+      for (const el of chrome.panes.querySelectorAll('.leaf[data-pane="0"] .verse')) {
+        const verse = Number(el.closest('.vblock')?.dataset.verse);
+        el.classList.toggle('is-selected', shown && verse >= here.verse && verse <= (here.to ?? here.verse));
+      }
+    };
+    const marked = annotations.isMarked(here.book, here.chapter, here.verse);
+    const colourNow = annotations.chapterIndex(here.book, here.chapter).marks.get(here.verse)?.colour ?? null;
+    const mark = async (colour) => {
+      closeSheet();
+      if (annotations.isMarked(here.book, here.chapter, here.verse)) await annotations.toggleMark(here.book, here.chapter, here.verse, null, here.to);
+      if (colour) await annotations.toggleMark(here.book, here.chapter, here.verse, colour, here.to);
+    };
+    openSheet(`${workspace.bookName(here.book)} ${workspace.number(here.chapter)}:${span}`, [
+      h('div', { class: 'ph-colours', role: 'group', 'aria-label': L('mob.highlight') },
+        h('button', { class: 'ph-dot', 'aria-label': L('mob.noHighlight'), title: L('mob.noHighlight'), disabled: marked ? null : '', onclick: () => mark(null) }, icon('x')),
+        ...COLOURS.map((colour) => h('button', {
+          class: 'ph-dot', dataset: { colour }, 'aria-label': L(`mob.colour.${colour}`), title: L(`mob.colour.${colour}`),
+          'aria-pressed': String(marked && colourNow === colour), onclick: () => mark(colour),
+        }))),
+      h('div', { class: 'ph-acts' }, registry.verseActions().map((action) => {
+        const title = typeof action.title === 'function' ? action.title(here) : action.title;
+        return h('button', {
+          class: 'ph-act', dataset: { action: action.id },
+          'aria-pressed': action.isOn ? String(Boolean(action.isOn(here))) : null,
+          onclick: async () => { closeSheet(); await action.run(here); },
+        }, icon(typeof action.icon === 'function' ? action.icon(here) : action.icon), h('span', {}, title));
+      })),
+    ], { closed: () => tint(false) });
+    tint(true);
+  }
+
+  // --- the reading: the tab bar follows the scroll, a swipe turns the chapter -----------
+
+  let off = 0;
+  let lastY = 0;
+  let touching = false;
+  let idle = null;
+  function setOff(value, tracking = false) {
+    off = Math.max(0, Math.min(TRAVEL, value));
+    body.classList.toggle('ph-tracking', tracking);
+    body.style.setProperty('--ph-off', String(off));
+  }
+  /** The finger has lifted and the page is still: all the way in, or all the way out. */
+  const settle = () => { if (!touching) setOff(off > TRAVEL / 2 ? TRAVEL : 0); };
+  const reader = (target) => (target instanceof Element && target.matches('.leaf[data-pane="0"] .leaf-scroll') ? target : null);
+
+  chrome.panes.addEventListener('scroll', (event) => {
+    if (!on() || view() !== 'read') return;
+    const scroller = reader(event.target);
+    if (!scroller) return;
+    const y = scroller.scrollTop;
+    const max = scroller.scrollHeight - scroller.clientHeight;
+    body.classList.toggle('ph-scrolled', y > 8);
+    // Past either end (the rubber band) is not reading on: the bar stays put.
+    if (y >= 0 && y <= max) setOff(y < 12 ? 0 : off + (y - lastY), true);
+    lastY = Math.max(0, Math.min(max, y));
+    clearTimeout(idle);
+    idle = setTimeout(settle, 140);
+  }, { capture: true, passive: true });
+
+  let swipe = null;
+  chrome.panes.addEventListener('touchstart', (event) => {
+    touching = true;
+    const touch = event.touches[0];
+    swipe = event.touches.length === 1 ? { x: touch.clientX, y: touch.clientY } : null;
+  }, { passive: true });
+  for (const type of ['touchend', 'touchcancel']) {
+    chrome.panes.addEventListener(type, (event) => {
+      touching = false;
+      clearTimeout(idle);
+      idle = setTimeout(settle, 140);
+      const start = swipe;
+      swipe = null;
+      if (!start || type === 'touchcancel' || !on() || view() !== 'read' || window.getSelection()?.toString()) return;
+      const touch = event.changedTouches[0];
+      const dx = touch.clientX - start.x;
+      const dy = touch.clientY - start.y;
+      if (Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 2.2) return;
+      // Forward is the way the text runs: a swipe to the left in English,
+      // to the right in Hebrew.
+      const forward = (workspace.primaryDirection?.() ?? 'ltr') === 'rtl' ? dx > 0 : dx < 0;
+      workspace.step(forward ? 1 : -1);
+    }, { passive: true });
+  }
+  // A press on the text itself, not on anything in it, shows or hides the bar.
+  chrome.panes.addEventListener('click', (event) => {
+    if (!on() || view() !== 'read' || window.getSelection()?.toString()) return;
+    if (event.target.closest('button, a, .strongs, .ilw, input, textarea, [contenteditable]')) return;
+    if (!event.target.closest('.leaf[data-pane="0"] .note')) return;
+    setOff(off > TRAVEL / 2 ? 0 : TRAVEL);
+  });
+
+  // --- keeping up ---------------------------------------------------------------------------
+
+  // The workspace repaints its panes whenever what is in front changes; the
+  // controls over it follow.
+  let queued = false;
+  const later = () => {
+    if (queued) return;
+    queued = true;
+    queueMicrotask(() => { queued = false; remember(); paint(); });
+  };
+  new MutationObserver(later).observe(chrome.panes, { childList: true });
+  state.subscribe(later);
+  query.addEventListener('change', () => { list = null; paint(); workspace.render(); });
+  paint();
+
+  return {
+    /** Whether the phone shell is the one in front. */
+    get on() { return on(); },
+    paint,
+    openVerse,
+    openSheet,
+    closeSheet,
+    /** Bring a tab to the front by name, for the tour and the tests. */
+    go,
+    /** The verse bar is the desktop's; on a phone its job is a sheet's. */
+    verseBar: { show: (anchor, passage, options) => (on() ? openVerse(passage) : verseBar.show(anchor, passage, options)) },
+  };
+}

@@ -397,3 +397,13 @@ export async function installFromLibrary(page, identify, { timeout = 60000 } = {
   if (await button.count()) await button.click();
   await page.locator(`[data-identify="${identify}"] .badge-ok`).first().waitFor({ timeout });
 }
+
+/**
+ * Bring the reading to the front: the chapter's tab on a desktop, the Read
+ * tab on a phone, which has no tab strip.
+ */
+export async function toReading(page) {
+  const phone = page.locator('.ph-tab[data-tab="read"]');
+  if (await phone.isVisible()) await phone.click();
+  else await page.locator('.tabstrip .tab[data-kind="chapter"]').first().click();
+}

@@ -582,7 +582,8 @@ export function createChrome(root, ctx) {
   }
 
   /** Whether panes open as tabs now: asked for, and the sidebars are drawers. */
-  const panesAsTabs = () => Boolean(ctx.state.get().paneTabs) && isDrawerLayout() && Boolean(paneTabs);
+  // A phone has no sidebars at all (shell/phone.js): there a pane is always a tab.
+  const panesAsTabs = () => (document.body.dataset.phone === 'on' || Boolean(ctx.state.get().paneTabs)) && isDrawerLayout() && Boolean(paneTabs);
 
   /** A sidebar's panes, as a menu that opens each in a tab. */
   function openSideAsTabs(side, anchor) {
