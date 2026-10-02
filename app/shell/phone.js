@@ -45,6 +45,8 @@ const STUDY_DOCS = ['notes-manager', 'memory', 'projects'];
 const STUDY_FIRST = ['marks', 'notes-manager'];
 /** What More leaves out: its own tabs, and pages that are about a keyboard. */
 const NOT_IN_MORE = new Set(['library', 'shortcuts', ...STUDY_DOCS]);
+/** Panes that come up over the reading as a sheet, when asked for by name. */
+const SHEET_PANES = new Set(['study', 'reference', 'guide', 'notes', 'links', 'outline']);
 
 export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) {
   const { registry, state, records } = ctx;
@@ -60,6 +62,7 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
   // --- elements ---------------------------------------------------------------
 
   const nav = h('header', { class: 'ph-nav' });
+  const rootTitle = h('h1', { class: 'ph-root-title' });
   const tabs = h('nav', { class: 'ph-tabs ph-glass', role: 'tablist' });
   const screen = h('section', { class: 'ph-screen', hidden: true });
   const scrim = h('div', { class: 'ph-scrim', onclick: () => closeSheet() });
@@ -71,7 +74,7 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
     h('button', { class: 'ph-done', onclick: () => closeSheet() }, L('mob.done')));
   const sheet = h('section', { class: 'ph-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ph-sheet-title' },
     grab, sheetHead, sheetBody);
-  body.append(nav, tabs, screen, scrim, sheet);
+  body.append(nav, rootTitle, tabs, screen, scrim, sheet);
 
   const glass = (...children) => h('div', { class: 'ph-glass ph-group' }, ...children);
   const navButton = (label, content, onclick, extra = '') => h('button', {
@@ -162,6 +165,8 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
         h('div', { class: 'ph-glass ph-title' }, doc?.title ?? ''),
         h('span'));
     } else fill(nav);
+    // Search and Library have no controls over them: a large title instead.
+    rootTitle.textContent = !list && !reading && !paged ? TABS.find((t) => t.id === now)?.name() ?? '' : '';
 
     screen.hidden = !list;
     if (list) paintList();
@@ -328,6 +333,8 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
   async function openTranslations() {
     const installed = await ctx.store.list();
     const current = state.get().translation;
+    const beside = workspace.panes().slice(1);
+    const named = (id) => installed.find((t) => t.identify === id);
     const command = (id) => registry.commands().find((c) => c.id === id);
     const alongside = command('reading.add-pane');
     openSheet(L('cmd.translation'), [
@@ -336,11 +343,42 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
         lang: t.info.language?.name ?? null, check: t.identify === current, chevron: false,
         onclick: () => { closeSheet(); workspace.setPaneTranslation(0, t.identify); },
       }))),
+      // Translations read alongside: under each verse of the first. A press takes one away.
+      ...group(L('mob.alongside'), beside.map((id, i) => h('button', {
+        class: 'ph-row', dataset: { beside: id }, 'aria-label': `${L('cmd.closeParallel')}: ${named(id)?.info.name ?? id}`,
+        onclick: () => { closeSheet(); workspace.closePane(i + 1); },
+      },
+      h('span', { class: 'ph-row-t', lang: named(id)?.info.language?.name ?? null }, named(id)?.info.name ?? id),
+      h('span', { class: 'ph-row-x' }, icon('x'))))),
       h('div', { class: 'ph-list' },
-        alongside && installed.length > 1 ? row({ glyph: 'add-pane', title: alongside.title, onclick: () => { closeSheet(); alongside.run(); } }) : null,
+        alongside && installed.length > 1 ? row({ glyph: 'add-pane', title: L('mob.addAlongside'), onclick: () => { closeSheet(); alongside.run(); } }) : null,
         row({ glyph: 'library', title: L('lib.getMore'), onclick: () => go('library') })),
     ]);
   }
+
+  /**
+   * A study pane over the reading, as a sheet at half height: the word
+   * study from a pressed word, the Reference pane, the Guide. The pane is the
+   * one the desktop has, lent to the sheet for as long as it is up.
+   */
+  let sheetPane = null;
+  function paneSheet(id) {
+    if (!on() || view() !== 'read' || !SHEET_PANES.has(id)) return false;
+    if (workspace.tabs.some((tab) => tab.kind === `pane:${id}`)) return false;
+    if (sheetPane === id && sheetOpen()) return true;
+    const pane = registry.panes().find((p) => p.id === id);
+    if (!pane) return false;
+    const host = h('div', { class: 'ph-pane-host' });
+    openSheet(pane.title, [host], {
+      tall: true,
+      closed: () => { sheetPane = null; sheet.classList.remove('has-pane'); unhost(); chrome.paneTabs.release(id); },
+    });
+    sheet.classList.add('has-pane');
+    const unhost = chrome.paneTabs.host(id, host);
+    sheetPane = id;
+    return true;
+  }
+  chrome.paneTabs.sheet(paneSheet);
 
   /** What can be done with the chapter: the commands this build has for it. */
   function openChapterMenu() {

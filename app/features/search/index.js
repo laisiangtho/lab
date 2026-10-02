@@ -168,7 +168,11 @@ export default {
 
         // --- the query -------------------------------------------------------
 
-        const input = h('input', { type: 'search', spellcheck: 'false', placeholder: L('ph.search') });
+        // The device's own helpers stay out of a search for scripture's words.
+        const input = h('input', {
+          type: 'search', spellcheck: 'false', placeholder: L('ph.search'), 'aria-label': L('ph.search'),
+          autocomplete: 'off', autocorrect: 'off', autocapitalize: 'off', enterkeyhint: 'search',
+        });
         const status = h('p', { class: 'empty-hint' }, L('empty.search'));
         const tree = h('div', { class: 'search-results' });
         const filters = h('div', { class: 'search-filters', hidden: true });
@@ -622,9 +626,23 @@ export default {
             ' ', row.before, h('mark', {}, row.hit), row.after);
         }
 
+        // With a keyboard the results follow the typing. On a phone nothing
+        // moves until the keyboard's Search key is pressed, which also puts
+        // the keyboard away: a list that jumps under a thumb at every letter
+        // is in the way. Emptying the field clears the results either way.
+        const quiet = () => shell.phone?.on === true;
+        const go = () => run().catch((err) => shell.notify(err.message, 'error'));
         input.addEventListener('input', () => {
           clearTimeout(timer);
-          timer = setTimeout(() => run().catch((err) => shell.notify(err.message, 'error')), DEBOUNCE_MS);
+          if (quiet() && input.value.trim()) return;
+          timer = setTimeout(go, DEBOUNCE_MS);
+        });
+        input.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' || !quiet()) return;
+          event.preventDefault();
+          clearTimeout(timer);
+          go();
+          input.blur();
         });
 
         paintModes();

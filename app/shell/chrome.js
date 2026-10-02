@@ -544,6 +544,8 @@ export function createChrome(root, ctx) {
   const parking = h('div', { class: 'pane-parking', hidden: true });
   /** Set by the workspace: how to open, close and ask about a pane's tab. */
   let paneTabs = null;
+  /** Set by the phone shell: (id) => true when it showed the pane as a sheet. */
+  let paneSheet = null;
 
   function liftPane(id) {
     if (tabbed.has(id)) return tabbed.get(id);
@@ -1255,6 +1257,8 @@ export function createChrome(root, ctx) {
     selectPane: (side, id) => {
       // A pane in a tab is shown in its tab; on a phone that asked for panes
       // as tabs, every pane is.
+      // On a phone, over the reading, a study pane comes up as a sheet.
+      if (!tabbed.has(id) && paneSheet?.(id)) return;
       if (tabbed.has(id) || panesAsTabs()) { paneTabs.open(id); return; }
       // A pane that is switched off is switched on again: a feature asking for
       // its own pane by name is a reader asking for it, and answering with
@@ -1272,6 +1276,8 @@ export function createChrome(root, ctx) {
     /** What the workspace needs to show panes in tabs, and to be told of them. */
     paneTabs: {
       connect(api) { paneTabs = api; },
+      /** The phone shell's say in where a pane asked for by name is shown. */
+      sheet(fn) { paneSheet = fn; },
       host: hostPane,
       release: returnPane,
       has: (id) => tabbed.has(id),

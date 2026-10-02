@@ -1130,6 +1130,8 @@ export default {
   'dl.status': '{name}: {host} svarte med feil {status}.',
   'dl.openPage': 'Åpne siden',
   'dl.addFile': 'Legg til filen',
+  'mob.alongside': 'Ved siden av',
+  'mob.addAlongside': 'Les en til ved siden av',
   'mob.read': 'Les',
   'mob.search': 'Søk',
   'mob.study': 'Studier',

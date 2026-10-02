@@ -147,6 +147,73 @@ test('the phone shell', options, async (t) => {
     assert.equal(await tab('read').getAttribute('aria-selected'), 'true');
   });
 
+  await t.test('Search and Library carry a large title; search waits for the Search key', async () => {
+    await tab('library').tap();
+    assert.equal(await page.locator('.ph-root-title').innerText(), 'Library');
+    await tab('search').tap();
+    assert.equal(await page.locator('.ph-root-title').innerText(), 'Search');
+    const field = page.locator('.search-pane input[type="search"]').first();
+    for (const [name, value] of [['autocorrect', 'off'], ['autocapitalize', 'off'], ['autocomplete', 'off'], ['enterkeyhint', 'search']]) {
+      assert.equal(await field.getAttribute(name), value, name);
+    }
+    assert.ok(parseFloat(await field.evaluate((el) => getComputedStyle(el).fontSize)) >= 16, 'big enough that the browser does not zoom');
+    const run = () => page.locator('.search-pane').getAttribute('data-run');
+    const before = await run();
+    await field.fill('ordet');
+    await page.waitForTimeout(700);
+    assert.equal(await run(), before, 'typing moves nothing');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction((was) => document.querySelector('.search-pane')?.dataset.run !== was, before);
+    await page.locator('.sr-head').first().waitFor();
+    assert.notEqual(await page.evaluate(() => document.activeElement?.tagName), 'INPUT', 'and the keyboard is put away');
+  });
+
+  await t.test('Settings: a list of sections, one at a time, without the desktop\'s frame', async () => {
+    await tab('more').tap();
+    await page.locator('.ph-screen .ph-row', { hasText: 'Settings' }).tap();
+    await page.waitForSelector('.set-nav-item');
+    assert.equal(await page.locator('.set-main').isVisible(), false, 'only the list at first');
+    assert.match(await page.locator('.set-nav-item').first().innerText(), /Appearance/);
+    await page.locator('.set-nav-item').first().tap();
+    await page.waitForSelector('.set-section.is-open');
+    assert.equal(await page.locator('.set-section:not(.is-open)').first().isVisible(), false);
+    const text = await page.locator('.set-section.is-open').innerText();
+    assert.match(text, /Theme/);
+    assert.doesNotMatch(text, /Ribbon|Status bar/, 'nothing about a ribbon or a status bar');
+    await page.locator('.set-section.is-open .set-back').tap();
+    assert.ok(await page.locator('.set-nav').isVisible(), 'back to the list');
+    await page.locator('.ph-nav .ph-btn').first().tap();
+  });
+
+  await t.test('a translation read alongside goes under each verse, and is taken away from the sheet', async () => {
+    await tab('read').tap();
+    await page.waitForSelector('.leaf[data-pane="0"] .vblock');
+    await page.locator('.ph-tr').tap();
+    await sheet.locator('.ph-row', { hasText: 'Read another alongside' }).tap();
+    await page.waitForSelector('.verse-under');
+    assert.equal(await page.locator('.leaf').count(), 1, 'one column');
+    const under = page.locator('.vblock[data-verse="1"] .verse-under');
+    assert.equal(await under.getAttribute('data-translation'), 'kjv1611');
+    assert.match(await under.innerText(), /^KJV\s*\S/);
+    await page.locator('.ph-tr').tap();
+    await sheet.locator('[data-beside="kjv1611"]').tap();
+    await page.waitForFunction(() => !document.querySelector('.verse-under'));
+  });
+
+  await t.test('a word studied comes up as a sheet over the reading', async () => {
+    assert.match(await where(), / 1$/, 'Genesis 1, where History left the reading');
+    await page.waitForSelector('.leaf[data-pane="0"] .strongs');
+    await page.locator('.leaf[data-pane="0"] .strongs').first().tap();
+    await page.locator('.popover button', { hasText: 'Study this word' }).tap();
+    await sheet.waitFor();
+    assert.equal(await page.locator('#ph-sheet-title').innerText(), 'Word study');
+    await page.locator('.ph-sheet .ws').waitFor();
+    assert.equal(await tab('read').getAttribute('aria-selected'), 'true', 'still reading');
+    assert.ok(await page.locator('.leaf[data-pane="0"] .vblock').first().isVisible(), 'the text is still there above it');
+    await closeSheet();
+    assert.equal(await page.locator('.ph-sheet .ws').count(), 0, 'and the pane goes back');
+  });
+
   await t.test('a sheet is pulled down to put it away', async () => {
     await page.locator('.ph-menu').tap();
     await sheet.waitFor();

@@ -1127,6 +1127,8 @@ export default {
   'dl.status': '{name}: {host} က အမှား {status} ဖြင့် တုံ့ပြန်သည်။',
   'dl.openPage': 'စာမျက်နှာ ဖွင့်ရန်',
   'dl.addFile': 'ဖိုင် ထည့်ရန်',
+  'mob.alongside': 'ယှဉ်ဖတ်ရန်',
+  'mob.addAlongside': 'နောက်တစ်ခု ယှဉ်ဖတ်ရန်',
   'mob.read': 'ဖတ်ရန်',
   'mob.search': 'ရှာရန်',
   'mob.study': 'လေ့လာရေး',

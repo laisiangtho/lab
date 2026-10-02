@@ -306,6 +306,16 @@ export default {
           });
         }
 
+        /** The section a phone has open, kept across repaints; null is the list. */
+        let opened = null;
+        function showSection() {
+          const page = el.querySelector('.settings');
+          if (!page) return;
+          if (opened) page.dataset.open = opened; else delete page.dataset.open;
+          for (const section of page.querySelectorAll('.set-section')) section.classList.toggle('is-open', section.id === `set-${opened}`);
+        }
+        const deskOnly = (row) => { row?.classList?.add('desk-only'); return row; };
+
         async function render() {
           const current = settings.get();
           const installed = await store.list();
@@ -317,6 +327,8 @@ export default {
             class: 'set-nav-item', href: `#set-${id}`,
             onclick: (e) => {
               e.preventDefault();
+              // A phone shows one section at a time, from a list of them.
+              if (shell.phone?.on) { opened = id; showSection(); el.scrollTop = 0; return; }
               el.querySelector(`#set-${id}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
             },
           }, icon(glyph), h('span', {}, L(key)))));
@@ -340,6 +352,7 @@ export default {
             if (extra.length) body.push(h('div', { class: 'set-group' }, ...extra));
             if (!body.length) body.push(h('p', { class: 'muted' }, L('set.nothing')));
             return h('section', { class: 'set-section', id: `set-${id}` },
+              h('button', { class: 'set-back', onclick: () => { opened = null; showSection(); } }, icon('arrow-left'), L('doc.settings')),
               h('h2', { class: 'settings-h' }, L(key)), ...body);
           };
 
@@ -361,9 +374,11 @@ export default {
                       onChange: (value) => { state.set({ theme: value }); applyTheme(value); refresh(); },
                     }),
                     accentRow(current),
+                    flag('motion', L('set.motion'), L('set.motionHint'))),
+                  // The desktop's frame: none of it is on a phone.
+                  h('div', { class: 'set-group desk-only' },
                     flag('ribbon', L('cmd.ribbon'), L('set.ribbonHint')),
                     flag('statusBar', L('cmd.statusBar'), L('set.statusHint')),
-                    flag('motion', L('set.motion'), L('set.motionHint')),
                     ui.action({
                       name: L('set.ribbonItems'),
                       hint: L('set.ribbonItemsHint', { n: shell.ribbon.items().length }),
@@ -412,8 +427,8 @@ export default {
                     flag('strongs', L('cmd.strongs'), L('set.strongsHint')),
                     flag('tintStrongs', L('cmd.tintStrongs'), L('set.tintStrongsHint')),
                     flag('interlinear', L('cmd.interlinear'), L('set.interlinearHint')),
-                    flag('paneTabs', L('set.paneTabs'), L('set.paneTabsHint')),
-                    flag('restoreTabs', L('set.restore'), L('set.restoreHint'))),
+                    deskOnly(flag('paneTabs', L('set.paneTabs'), L('set.paneTabsHint'))),
+                    deskOnly(flag('restoreTabs', L('set.restore'), L('set.restoreHint')))),
                   directionRows(installed)),
 
                 section('typography', 'set.typography',
@@ -507,6 +522,7 @@ export default {
                   `${L('app.name')} v${VERSION} · ${L('lbl.built', { date: when.date(BUILT_AT) })}`,
                   ' · ',
                   h('button', { class: 'link-btn', onclick: () => shell.openDoc('about') }, L('doc.about'))))))));
+          showSection();
         }
 
         /** What the browser has room for, in one line. */

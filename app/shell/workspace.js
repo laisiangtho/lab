@@ -733,7 +733,12 @@ export function createWorkspace(ctx, chrome) {
       loadPack();
     }
 
-    const leaves = loaded.map((pane) => buildLeaf(pane, loaded, { book, chapter }));
+    // A phone has one column: translations read alongside go under each
+    // verse of the first, in the one pane, not in panes of their own.
+    const stacked = document.body.dataset.phone === 'on' && loaded.length > 1 && state.get().mode !== 'source';
+    if (stacked) loaded[0].under = loaded.slice(1);
+    const drawn = stacked ? [loaded[0]] : loaded;
+    const leaves = drawn.map((pane) => buildLeaf(pane, loaded, { book, chapter }));
     const children = [];
     leaves.forEach((leaf, i) => {
       if (i > 0) children.push(h('div', { class: 'leaf-divider' }));
@@ -741,7 +746,7 @@ export function createWorkspace(ctx, chrome) {
     });
     chrome.panes.replaceChildren(...children);
 
-    alignRows(loaded, leaves);
+    alignRows(drawn, leaves);
     wireSync(leaves);
     wireFades(chrome.panes);
     shownFor = key;
@@ -874,6 +879,7 @@ export function createWorkspace(ctx, chrome) {
         interlinear: compare ? null : (pane.interlinear ?? null),
         studyRefs: compare ? null : (pane.studyRefs ?? null),
         primaryVerses: compare ? all[0].verses : null,
+        under: compare ? null : (pane.under ?? null),
         // A cross-reference names a verse, and used to arrive at the top of
         // the chapter with nothing marked — the one link in the app that did
         // not show the reader what it had brought them to.

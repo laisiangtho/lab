@@ -1118,6 +1118,8 @@ export default {
   'dl.status': '{name}: {host} answered with error {status}.',
   'dl.openPage': 'Open the page',
   'dl.addFile': 'Add the file',
+  'mob.alongside': 'Alongside',
+  'mob.addAlongside': 'Read another alongside',
   'mob.read': 'Read',
   'mob.search': 'Search',
   'mob.study': 'Study',

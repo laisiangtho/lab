@@ -240,6 +240,16 @@ newest first.
   way back. History stands in for open tabs. The desktop's tab band, ribbon,
   sidebars and status bar are not on a phone; a window up to 600 px wide is
   one.
+- On a phone (steps 2 and 3): Search and Library carry a large title. Search
+  waits for the keyboard's Search key — nothing moves while typing — then puts
+  the keyboard away; the device's autocorrect, capitals and saved entries are
+  off for the field, and it is sized so the browser does not zoom. Settings is
+  a list of sections, one open at a time, without the ribbon, status bar and
+  tab settings a phone has no use for. The word study, Reference, the Guide,
+  notes, links and outline come up over the reading as a half-height sheet,
+  pulled up to the full screen. A translation read alongside goes under each
+  verse of the first, in one column, and is taken away from the translation
+  sheet. The tour counts only the steps a screen will show.
 
 
 ### 26.10.01.3 — 1 October 2026

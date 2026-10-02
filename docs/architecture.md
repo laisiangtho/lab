@@ -855,8 +855,16 @@ presentation, not a second app:
   when no finger is down. History (`records.history`) stands in for the tabs
   a desktop reader would leave open.
 
-Steps still to come: Library, Search and Settings as native lists; study
-panes as half-height sheets, parallel reading verse under verse.
+- A pane asked for by name over the reading (`chrome.selectPane`) is offered
+  to the phone first (`chrome.paneTabs.sheet`): the study panes are lent to
+  a sheet with `paneTabs.host`, and returned when it is put away. Elsewhere
+  they open as tabs.
+- Translations read alongside are not panes on a phone: the workspace draws
+  the first one's leaf only and hands the others to `chapterNote` as `under`,
+  which puts each one's verse beneath the first's.
+- Search runs on the Search key, not on input, where `shell.phone.on`;
+  Settings shows one section at a time from its own navigation, and rows
+  marked `desk-only` are left out.
 
 ## 3d-x-d. One knowledge, three views
 

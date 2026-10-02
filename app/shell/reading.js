@@ -116,6 +116,7 @@ export function chapterNote(p) {
             class: 'verse-note-dot', title: L('lbl.notes', { n: noteCount }), 'aria-label': L('lbl.notes', { n: noteCount }),
             onclick: (e) => p.onVerse?.(key, e.currentTarget, { extend: e.shiftKey }),
           }, icon('note')) : null)),
+      ...(p.under ?? []).map((other) => underLine(other, key, p)),
       verse.ref && !compare && p.xrefs !== false ? refsLine(verse.ref, meta, p.resolver, p.onRef, p.onPeek) : null,
       p.studyRefs?.[key] && !compare && p.xrefs !== false ? studyRefsLine(p.studyRefs[key], meta, p, ctx) : null));
   }
@@ -179,6 +180,20 @@ function refsLine(text, meta, resolver, onRef, onPeek) {
       )
       : h('span', { class: 'xref-plain', title: `Unresolved reference: ${part.unresolved}` }, part.text),
   ]));
+}
+
+/**
+ * The same verse in a translation read alongside, under the first one's: its
+ * short name, then its words in its own language and direction. A verse the
+ * other translation does not have at this number is passed over.
+ */
+function underLine(other, key, p) {
+  const verse = other.verses?.[key];
+  if (!verse) return null;
+  const language = other.meta.info.language;
+  return h('p', { class: 'verse-under', lang: language.code, dir: language.textdirection, dataset: { translation: other.identify } },
+    h('span', { class: 'vu-tr', dir: 'ltr' }, other.meta.info.shortname),
+    h('span', { class: 'vtext' }, verseText(verse.text, { ...p, strongs: false, onStrongs: null }, Number(key))));
 }
 
 /** Imported cross-references a line shows before "N more". */

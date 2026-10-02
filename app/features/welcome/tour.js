@@ -80,7 +80,11 @@ export function runTour(steps, { onEnd = () => {} } = {}) {
     const step = steps[at];
     const last = !steps.slice(at + 1).some((s) => !s.target || visible(targetOf(s)));
     layer.dataset.step = step.id;
-    count.textContent = L('tour.count', { n: at + 1, of: steps.length });
+    // Counted as the reader meets them: a step for what is not on this
+    // screen is neither behind nor ahead.
+    const ahead = steps.slice(at + 1).filter((s) => !s.target || visible(targetOf(s))).length;
+    const behind = shown.filter((i) => i < at).length;
+    count.textContent = L('tour.count', { n: behind + 1, of: behind + 1 + ahead });
     title.textContent = step.title;
     body.textContent = step.body;
     back.disabled = at === 0;

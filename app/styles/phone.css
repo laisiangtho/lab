@@ -179,3 +179,71 @@ body[data-phone] .toasts { bottom: calc(92px + env(safe-area-inset-bottom, 0px))
 @media (prefers-reduced-motion: reduce) {
   body[data-phone] .ph-tabs, body[data-phone] .ph-sheet, body[data-phone] .ph-scrim, body[data-phone] .ph-nav .ph-glass { transition: none; }
 }
+
+/* ---- steps 2 and 3 ------------------------------------------------------- */
+
+/* Search and Library: a large title where the reading has its controls. */
+.ph-root-title { display: none; }
+body[data-phone] .ph-root-title:not(:empty) {
+  display: block; position: fixed; z-index: 44; left: 20px; right: 20px; margin: 0;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  font-family: var(--font-ui); font-size: 32px; font-weight: 800; letter-spacing: -.02em; color: var(--text-normal);
+}
+body[data-phone][data-phone-view="root"] .panes { padding-top: calc(64px + env(safe-area-inset-top, 0px)); background: var(--ph-ground); }
+body[data-phone][data-phone-view="root"] .leaf, body[data-phone][data-phone-view="root"] .leaf-scroll { background: var(--ph-ground); }
+
+/* What only a desktop has is not offered on a phone. */
+body[data-phone] .desk-only { display: none !important; }
+
+/* A study pane, lent to a sheet. */
+.ph-sheet-b { flex: 1 1 auto; min-height: 0; }
+body[data-phone] .ph-sheet.has-pane .ph-sheet-b { padding: 0 4px 8px; display: flex; flex-direction: column; overflow: hidden; }
+.ph-pane-host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ph-pane-host > * { flex: 1; min-height: 0; display: flex !important; flex-direction: column; margin: 0 !important; background: transparent; border-radius: 0; }
+.ph-row-x svg { width: 16px; height: 16px; color: var(--text-faint); }
+
+/* A translation read alongside: its verse under the first one's. */
+.verse-under {
+  margin: 2px 0 10px; padding-inline-start: 12px; border-inline-start: 2px solid var(--accent-line);
+  font-size: .94em; line-height: inherit; color: var(--text-muted);
+}
+.vu-tr { display: inline-block; margin-inline-end: 6px; padding: 0 6px; border-radius: 99px; background: var(--accent-fade); color: var(--accent-2); font-family: var(--font-ui); font-size: .62em; font-weight: 700; vertical-align: .15em; unicode-bidi: isolate; }
+
+/* Search: a field a thumb can hit, rows with room, text that does not make
+   the browser zoom (16px is the size below which iOS zooms on focus). */
+body[data-phone] .search-pane { padding: 0 16px; background: transparent; }
+body[data-phone] .search-pane input[type="search"] { font-size: 16px; min-height: 44px; }
+body[data-phone] .search-pane .field { border-radius: 12px; min-height: 44px; }
+body[data-phone] .result-line { padding: 12px 6px; font-size: 15px; line-height: 1.5; text-align: start; }
+body[data-phone] .leaf-pane input, body[data-phone] .leaf-pane textarea, body[data-phone] .doc input, body[data-phone] .doc textarea, body[data-phone] .ph-sheet input, body[data-phone] .ph-sheet textarea { font-size: 16px; }
+
+/* Library: rows with room. */
+body[data-phone] .library-item { padding: 14px 14px; }
+body[data-phone] .library-meta strong { font-size: 16px; line-height: 1.35; }
+body[data-phone] .library-meta .muted { font-size: 13px; line-height: 1.5; }
+body[data-phone] .lib-has { margin-top: 7px; gap: 5px; }
+
+/* Settings: a list of sections, then one section at a time. */
+body[data-phone] .settings { padding: 4px 16px 24px; }
+body[data-phone] .settings .doc-head { display: none; }
+body[data-phone] .set-layout { display: block; }
+body[data-phone] .set-nav { position: static; display: flex; flex-direction: column; flex-wrap: nowrap; gap: 0; background: var(--bg-primary); border-radius: 14px; overflow: hidden; }
+body[data-phone] .set-nav-item { min-height: 58px; padding: 13px 16px; gap: 12px; border-radius: 0; box-shadow: none; background: none; font-size: 16px; color: var(--text-normal); border-bottom: .5px solid var(--border); }
+body[data-phone] .set-nav-item:last-child { border-bottom: 0; }
+body[data-phone] .set-nav-item span { display: inline; }
+body[data-phone] .set-nav-item svg { width: 20px; height: 20px; color: var(--accent-2); }
+body[data-phone] .set-nav-item::after { content: "›"; margin-inline-start: auto; color: var(--text-faint); font-size: 20px; }
+body[data-phone] .settings:not([data-open]) .set-main { display: none; }
+body[data-phone] .settings[data-open] .set-nav { display: none; }
+body[data-phone] .settings[data-open] .set-section { display: none; }
+body[data-phone] .settings[data-open] .set-section.is-open { display: block; }
+.set-back { display: none; }
+body[data-phone] .set-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin: 0 0 4px -4px; padding: 0 8px; color: var(--accent-2); font-size: 16px; font-weight: 600; }
+body[data-phone] .set-back svg { width: 18px; height: 18px; }
+body[data-phone] .settings-h { font-size: 28px; font-weight: 800; letter-spacing: -.02em; margin: 0 0 14px; }
+body[data-phone] .settings .set-row { padding-block: 14px; }
+body[data-phone] .settings .set-name { font-size: 16px; }
+body[data-phone] .settings .set-hint { font-size: 13px; line-height: 1.5; }
+html:lang(my) body[data-phone] .settings .set-name, html:lang(my) body[data-phone] .settings .set-hint, html:lang(my) body[data-phone] .set-nav-item { line-height: 1.95; }
+body[data-phone] .sr-head { min-height: 52px; padding: 12px 8px; font-size: 16px; }
+body[data-phone] .sr-n { font-size: 14px; }
