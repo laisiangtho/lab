@@ -7,7 +7,6 @@
  * internal id.
  */
 
-import { verseLabelOf } from '../../core/annotations.js';
 import { noteTitle, wordCount } from '../../core/markdown.js';
 import { h } from '../../shell/dom.js';
 import { wantsNewTab } from '../../shell/reflink.js';
@@ -25,9 +24,7 @@ export default {
 
     registry.command({ id: 'notes.manager', title: L('doc.notes'), icon: 'notes', opens: 'notes-manager', run: () => shell.openDoc('notes-manager') });
 
-    const passage = (note) => (note.verse === null
-      ? `${shell.workspace.bookName(note.book)} ${note.chapter}`
-      : `${shell.workspace.bookName(note.book)} ${note.chapter}:${verseLabelOf(note, (n) => shell.workspace.number(n))}`);
+    const passage = (note) => shell.workspace.refLabel(note.book, note.chapter, note.verse, note.to ?? null);
 
     function download(name, text) {
       const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown' }));

@@ -951,6 +951,7 @@ export default {
               h('strong', {}, row.entry ? `${row.entry.shortname} · ${row.entry.name}` : ownTitle(row)),
               h('span', { class: 'muted' }, [info.language?.text, row.held ? held(row.held) : null].filter(Boolean).join(' · ')),
               hasLine(row.held?.stats ? contentOfStats(row.held.stats, row.entry?.content) : row.entry?.content),
+              faultsBadge(row.held ? row.held.diagnostics?.faults : row.entry?.content?.faults),
               row.state === 'local' ? h('span', { class: 'badge' }, L('lib.yours')) : null,
               origin && row.held?.source !== 'native' ? h('span', { class: 'badge badge-src' }, origin) : null,
               row.state === 'unlisted' ? h('span', { class: 'badge' }, L('lib.unlisted')) : null,
@@ -987,6 +988,20 @@ export default {
             found.map(({ id, n: count }) => h('span', {
               class: `lib-has-i is-${id}`, dataset: { has: id }, title: L(`lib.has.${id}Hint`, { n: n(count) }),
             }, L(`lib.has.${id}`))));
+        }
+
+        /**
+         * Faults in a translation's file that the app reads past, said before
+         * it is downloaded and after: a press says which, in words.
+         */
+        function faultsBadge(faults) {
+          const kinds = Object.entries(faults ?? {});
+          if (!kinds.length) return null;
+          const said = `${L('lib.faults.what')} ${kinds.map(([kind, n]) => L(`lib.faults.${kind}`, { n })).join('; ')}.`;
+          return h('button', {
+            class: 'badge badge-warn', title: said, dataset: { faults: kinds.map(([kind]) => kind).join(' ') },
+            onclick: (event) => { event.stopPropagation(); shell.notify(said); },
+          }, icon('alert'), L('lib.faults'));
         }
 
         /** A translation's short name, as a small square: the eye finds a row by it. */
@@ -1219,6 +1234,7 @@ export default {
               h('strong', {}, `${e.shortname} · ${e.name}`),
               h('span', { class: 'muted' }, [e.year, e.publisher].filter(Boolean).join(' · ')),
               hasLine(e.content),
+              faultsBadge(row.held ? row.held.diagnostics?.faults : e.content?.faults),
               here && row.state !== 'update' ? h('span', { class: 'badge badge-ok' }, icon('check'), L('lib.onDevice')) : null,
               row.state === 'update' ? h('span', { class: 'badge badge-hint' }, `v${row.installedVersion} → v${e.version}`) : null,
               !here && suggested(row) ? h('span', { class: 'badge badge-hint' }, L('lib.suggested')) : null),
@@ -1340,7 +1356,7 @@ export default {
             diag.missing && !record.stats ? L('lbl.booksMissing', { n: diag.missing }) : null,
             diag.short ? L('lbl.chaptersShort', { n: diag.short }) : null,
             diag.extra ? L('lbl.chaptersExtra', { n: diag.extra }) : null,
-            !diag.missing && !diag.short && !diag.extra && diag.total
+            !diag.missing && !diag.short && !diag.extra && diag.total && !Object.keys(diag.faults ?? {}).length
               ? L('lbl.differs', { n: diag.total }) : null,
           ].filter(Boolean).join(' · ');
         }

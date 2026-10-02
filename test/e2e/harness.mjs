@@ -154,9 +154,23 @@ export async function launch(options = {}) {
     problems,
     missing,
     origin: server.origin,
+    /**
+     * The app, started. A device whose language is one the app fetches
+     * (Burmese) is offered it once the app is up; the offer is taken, the
+     * way a reader takes it, so the page that comes back is in that language.
+     */
     async open() {
       await page.goto(server.origin);
       await page.waitForSelector('#app .body-row');
+      const wanted = String(options.locale ?? '').toLowerCase().split('-')[0];
+      if (wanted && existsSync(join(ROOT, 'locale', `${wanted}.json`))
+        && await page.evaluate(() => document.documentElement.lang) !== wanted) {
+        const reload = page.waitForEvent('load');
+        await page.locator('.toast .toast-act').first().click();
+        await reload;
+        await page.waitForSelector('#app .body-row');
+        await page.waitForFunction((code) => document.documentElement.lang === code, wanted);
+      }
       return page;
     },
     async close() {
@@ -295,6 +309,12 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
       const guideFile = url.match(/\/master\/(guide\/.+)$/);
       if (guideFile) return guide[decodeURIComponent(guideFile[1])] ?? null;
       if (url.endsWith('/book.json')) return catalog;
+      // The interface languages the app fetches: this repository's own files.
+      const locale = url.match(/\/master\/locale\/([\w-]+)\.json$/);
+      if (locale) {
+        const file = join(ROOT, 'locale', `${locale[1]}.json`);
+        return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
+      }
       const pack = url.match(/lang\/iso-([a-z]{3})\.json$/);
       if (pack) return packs[pack[1]] ?? null;
       const file = url.match(/json\/([^/]+)\.json$/);

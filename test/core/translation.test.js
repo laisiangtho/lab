@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { parseTranslation, localizeNumber } from '../../app/core/translation.js';
+import { faultsOf, parseTranslation, localizeNumber } from '../../app/core/translation.js';
 import { category, clone, readJson } from '../helpers.js';
 
 const sample = readJson('test/fixtures/tedim1932.sample.json');
@@ -35,14 +35,53 @@ test('unknown verse key is a structural error', () => {
   assert.throws(() => parse(raw), /\$\.book\.1\.chapter\.1\.verse\.2\.note: unknown verse key/);
 });
 
-test('merge must point forward, and covered verses must be absent', () => {
+test('merge must point forward', () => {
   const back = clone(sample);
   back.book['1'].chapter['1'].verse['3'].merge = '2';
   assert.throws(() => parse(back), /verse number greater than 3/);
+});
 
+test('faults a file can be read past are recorded, and what can be read is kept', () => {
+  const clean = parse(clone(sample));
+  assert.deepEqual(faultsOf(clean.diagnostics), {}, 'the sample has none');
+
+  // A verse joined to others that are also given on their own: kept apart.
   const overlap = clone(sample);
   overlap.book['1'].chapter['1'].verse['18'] = { text: 'dup' };
-  assert.throws(() => parse(overlap), /verse 18 is also covered by the merge on verse 17/);
+  const joined = parse(overlap);
+  const verses = joined.chapters.find((c) => c.book === 1 && c.chapter === 1).verses;
+  assert.equal(verses[17].merge, undefined);
+  assert.equal(verses[18].text, 'dup');
+  assert.equal(joined.stats.merges, clean.stats.merges - 1);
+  assert.deepEqual(joined.diagnostics.filter((d) => d.type === 'merge-overlap'), [{ type: 'merge-overlap', book: 1, chapter: 1, verse: 17 }]);
+
+  // A verse with nothing to read.
+  const bare = clone(sample);
+  bare.book['1'].chapter['1'].verse['2'] = { ref: 'Mat 6:14' };
+  const emptied = parse(bare);
+  assert.equal(emptied.chapters.find((c) => c.book === 1 && c.chapter === 1).verses[2], undefined);
+  assert.equal(emptied.stats.verses, clean.stats.verses - 1);
+  assert.deepEqual(faultsOf(emptied.diagnostics), { 'empty-verse': 1 });
+
+  // A book the canon does not have, named and without chapters: left out,
+  // and the names, now in an order of their own, are not taken.
+  const extra = clone(sample);
+  extra.book['67'] = { info: { name: 'Tobit', shortname: 'Tob' }, chapter: {} };
+  extra.story = { ...(extra.story ?? {}), 67: { 1: { 1: { text: 'x', ref: '' } } } };
+  const outside = parse(extra);
+  assert.deepEqual(faultsOf(outside.diagnostics), { 'names-unaligned': 1, 'outside-canon': 1 });
+  assert.equal(outside.meta.books[67], undefined);
+  assert.equal(outside.meta.books[1].name, category.book(1).name, 'the canon\'s name, not the file\'s');
+  assert.notEqual(clean.meta.books[1].name, category.book(1).name, 'which the sample does have of its own');
+
+  // A book whose opening is another's word for word: a converter's filler.
+  const filler = clone(sample);
+  filler.book['2'] = { chapter: { 1: clone(sample.book['1'].chapter['1']) } };
+  const copied = parse(filler);
+  assert.equal(copied.meta.books[2], undefined);
+  assert.equal(copied.chapters.some((c) => c.book === 2), false);
+  assert.deepEqual(copied.diagnostics.find((d) => d.type === 'copied-book'), { type: 'copied-book', book: 2, expected: 1 });
+  assert.ok(copied.diagnostics.some((d) => d.type === 'names-unaligned'), 'a book with no info of its own');
 });
 
 test('string info.version accepted (bbe1949 publishes "1")', () => {

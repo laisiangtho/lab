@@ -13,7 +13,8 @@ import { createRows } from '../../shell/settingrows.js';
 import { requestPersistence, resetStore, storageStatus } from '../../services/store.js';
 import { applyAccent, applyTheme, THEME_CYCLE } from '../../shell/theme.js';
 import { icon } from '../../shell/icons.js';
-import { L, LOCALES, currentLocale, when } from '../../shell/i18n.js';
+import { coverage } from '../../core/locale.js';
+import { L, currentLocale, englishStrings, hasLocale, locales, when } from '../../shell/i18n.js';
 
 /** A short palette; the colour input covers everything else. */
 const ACCENTS = Object.freeze(['#7c3aed', '#2563eb', '#0ea5e9', '#14b8a6', '#e9973f', '#e11d48']);
@@ -98,7 +99,8 @@ export default {
         : L('msg.installedAll'), missing.length ? 'error' : 'ok');
     }
 
-    const guard = (fn) => () => fn().catch((err) => shell.notify(err.message, 'error'));
+    // Settings' actions take no arguments; a click's event is not one of them.
+    const guard = (fn) => shell.guard(() => fn());
     registry.command({ id: 'settings.export', title: L('cmd.exportSettings'), icon: 'download', run: guard(exportSettings) });
     registry.command({ id: 'settings.import', title: L('cmd.importSettings'), icon: 'enter', run: guard(importSettings) });
 
@@ -168,18 +170,44 @@ export default {
          * the interface again — after the choice is safely written, or the
          * restart would come back in the old one. Each language is named in
          * itself; one not yet checked by a native speaker says so.
+         *
+         * English and Norwegian are part of the app. The others are in the
+         * catalog repository and fetched when chosen: one not yet on this
+         * device is marked, and choosing it downloads it first. A language
+         * the app is newer than says how much of it is still in English.
+         *
+         * @param {object} current  the settings
+         * @param {{ list: object[], why: string|null }} more  what the repository offers
          */
-        function languageRow(current) {
-          const shown = LOCALES[currentLocale()];
-          const hint = shown.review ? `${L('set.languageHint')} ${L('set.languageReview')}` : L('set.languageHint');
+        function languageRow(current, more) {
+          const here = locales();
+          const shown = here.find((one) => one.code === currentLocale());
+          const lacking = coverage(L.strings(), Object.keys(englishStrings())).missing;
+          const hint = [
+            L('set.languageHint'),
+            shown?.review ? L('set.languageReview') : '',
+            lacking ? L('set.languagePartial', { n: lacking }) : '',
+            more.why ? L('set.languageNoList', { why: more.why }) : '',
+          ].filter(Boolean).join(' ');
+          const toFetch = more.list.filter((one) => !hasLocale(one.code));
           return ui.choice({
             name: L('set.language'), hint,
-            options: [['device', L('set.languageDevice')], ...Object.entries(LOCALES).map(([id, { name }]) => [id, name, null, id])],
+            options: [
+              ['device', L('set.languageDevice')],
+              ...here.map(({ code, name }) => [code, name, null, code]),
+              ...toFetch.map(({ code, name }) => [code, L('set.languageFetch', { name }), null, code]),
+            ],
             value: current.locale ?? 'device',
             onChange: async (value) => {
-              state.set({ locale: value === 'device' ? null : value });
-              await settings.save();
-              window.location.reload();
+              const code = value === 'device' ? null : value;
+              const name = [...here, ...toFetch].find((one) => one.code === code)?.name ?? L('set.languageDevice');
+              if (code && !hasLocale(code)) shell.notify(L('msg.localeGetting', { name }));
+              try {
+                await ctx.locales.use(code);
+              } catch (err) {
+                shell.notify(L('msg.localeFailed', { name, why: err.message }), 'error');
+                run();
+              }
             },
           });
         }
@@ -336,7 +364,22 @@ export default {
         });
         const deskOnly = (row) => { row?.classList?.add('desk-only'); return row; };
 
+        // What the catalog repository offers besides the built-in languages,
+        // asked for once the page is open and drawn in when it answers; why
+        // not, when it does not.
+        let moreLanguages = { list: [], why: null };
+        let asked = false;
+        function askLanguages() {
+          if (asked) return;
+          asked = true;
+          ctx.locales.offered().then(
+            (list) => { moreLanguages = { list, why: null }; run(); },
+            (err) => { moreLanguages = { list: [], why: err.message }; run(); },
+          );
+        }
+
         async function render() {
+          askLanguages();
           const current = settings.get();
           const installed = await store.list();
           const held = installed.reduce((n, t) => n + (t.bytes ?? 0), 0);
@@ -386,7 +429,7 @@ export default {
 
                 section('appearance', 'set.appearance',
                   h('div', { class: 'set-group' },
-                    languageRow(current),
+                    languageRow(current, moreLanguages),
                     ui.choice({
                       name: L('cmd.theme'), hint: L('set.themeHint'),
                       options: THEME_CYCLE.map((id) => [id, L(`val.${id}`)]), value: current.theme,

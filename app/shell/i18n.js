@@ -5,15 +5,21 @@
  * with a "|" holds singular|plural for the {n} value, and a language with one
  * plural form (Burmese) writes one form and no "|".
  *
- * Each locale is a file in ./locales. English is the source; every other
- * locale is checked against it by test/locales.test.js — same keys, same
- * placeholders, plural forms that fit the language — so a string missing from
- * a translation fails the build rather than turning up in English on screen.
+ * English and Norwegian are files in ./locales and part of the app. English
+ * is the source; Norwegian is checked against it by test/locales.test.js —
+ * same keys, same placeholders, plural forms that fit the language — so a
+ * string missing from it fails the build.
+ *
+ * Every other language is fetched from the catalog repository when a reader
+ * chooses it (services/locales.js, core/locale.js) and added here with
+ * `addLocale` before the interface is built. Their sources are the JSON
+ * files in this repository's `locale/` folder, held to the same test. The
+ * app may still be newer than a device's copy: a string that copy lacks is
+ * shown in English, and Settings says how many there are.
  */
 
 import { relativeTime } from '../core/time.js';
 import en from './locales/en.js';
-import my from './locales/my.js';
 import nb from './locales/nb.js';
 
 /**
@@ -21,14 +27,32 @@ import nb from './locales/nb.js';
  * looking for their own language, not for its English name. `review` marks a
  * translation not yet checked by a native speaker, which Settings says.
  */
-export const LOCALES = Object.freeze({
-  en: Object.freeze({ name: 'English', strings: en }),
-  nb: Object.freeze({ name: 'Norsk bokmål', strings: nb }),
-  my: Object.freeze({ name: 'မြန်မာ', strings: my, review: true }),
-});
+export const BUILT_IN = Object.freeze(['en', 'nb']);
+
+const LOCALES = {
+  en: Object.freeze({ name: 'English', strings: en, forms: 2 }),
+  nb: Object.freeze({ name: 'Norsk bokmål', strings: nb, forms: 2 }),
+};
+
+/** The languages the interface can be in right now: built in, or added. */
+export const locales = () => Object.entries(LOCALES).map(([code, { name, review }]) => ({ code, name, review: review === true }));
+export const hasLocale = (code) => Object.hasOwn(LOCALES, code);
+
+/**
+ * A fetched language (core/locale.js) made available. Built-in ones are not
+ * replaced: what the app ships is what the app was tested with.
+ */
+export function addLocale({ code, name, strings, forms, review = false }) {
+  if (BUILT_IN.includes(code)) throw new Error(`i18n: "${code}" is built in and is not replaced`);
+  LOCALES[code] = Object.freeze({ name, strings, forms, review });
+}
+
+/** English, for what is checked against it. */
+export const englishStrings = () => en;
 
 let locale = 'en';
-let pluralRules = new Intl.PluralRules('en');
+/** 'one' or 'other' for a number, in the locale in force. */
+let pluralOf = (n) => new Intl.PluralRules('en').select(n);
 
 export function L(key, vars = {}) {
   // English stands in only for a key the tests would already have refused.
@@ -36,10 +60,13 @@ export function L(key, vars = {}) {
   if (text === undefined) return key;
   if (text.includes('|') && vars.n !== undefined) {
     const [one, other] = text.split('|');
-    text = pluralRules.select(vars.n) === 'one' ? one : other;
+    text = pluralOf(vars.n) === 'one' ? one : other;
   }
   return text.replace(/\{(\w+)\}/g, (_, name) => (vars[name] === undefined ? `{${name}}` : String(vars[name])));
 }
+
+/** The strings of the locale in force, for what counts them. */
+L.strings = () => LOCALES[locale].strings;
 
 /**
  * Whether a string exists, for a feature that finds its text by pattern (the
@@ -58,8 +85,10 @@ export function currentLocale() {
 
 /**
  * The interface language: the reader's choice when there is one, otherwise the
- * first of the device's languages this app has, otherwise English. Norwegian in
- * any written form (no, nb, nn) reads Bokmål, the one Norwegian there is.
+ * first of the device's languages this app has on the device, otherwise
+ * English. Norwegian in any written form (no, nb, nn) reads Bokmål, the one
+ * Norwegian there is. A language that would have to be fetched is never the
+ * answer here: it is offered, and chosen, before it is used.
  *
  * @param {string|null} chosen  settings.locale
  * @param {readonly string[]} languages  navigator.languages
@@ -77,7 +106,10 @@ export function resolveLocale(chosen, languages = []) {
 export function setLocale(next) {
   if (!LOCALES[next]) throw new Error(`i18n: no strings for locale "${next}"`);
   locale = next;
-  pluralRules = new Intl.PluralRules(next);
+  // A language written in one form has one form, whatever the platform's
+  // rules know or do not know of it (Intl has none for Zolai).
+  const rules = LOCALES[next].forms === 1 ? null : new Intl.PluralRules(next);
+  pluralOf = rules ? (n) => rules.select(n) : () => 'other';
   // What screen readers, hyphenation and font fallback go by.
   if (typeof document !== 'undefined') document.documentElement.lang = next;
 }

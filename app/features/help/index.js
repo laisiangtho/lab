@@ -8,7 +8,7 @@
 
 import { requestPersistence, storageStatus } from '../../services/store.js';
 import { formatSections } from './formats.js';
-import { fill, h } from '../../shell/dom.js';
+import { fill, formatBytes, h } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { keyLabel } from '../../shell/keys.js';
 import { L, when, currentLocale } from '../../shell/i18n.js';
@@ -317,12 +317,12 @@ export default {
           fill(device,
             row(L('lbl.translationsHeld'), String(installed.length),
               installed.map((t) => t.info.shortname || t.info.name).join(', ')),
-            row(L('lbl.textStored'), bytes(size)),
+            row(L('lbl.textStored'), formatBytes(size)),
             ctx.study ? row(L('lib.tab.study'), String(sets.length), sets.map((set) => set.name).join(', ')) : null,
             row(L('pane.notes'), String(annotations.allNotes().length)),
             row(L('pane.marks'), String(annotations.allMarks().length)),
-            row(L('lbl.storage'), usage === null ? L('val.unknown') : bytes(usage),
-              [quota ? L('lbl.ofQuota', { size: bytes(quota), pct: Math.max(1, Math.round(share * 100)) }) : '',
+            row(L('lbl.storage'), usage === null ? L('val.unknown') : formatBytes(usage),
+              [quota ? L('lbl.ofQuota', { size: formatBytes(quota), pct: Math.max(1, Math.round(share * 100)) }) : '',
                 persisted === false ? L('lbl.notPersisted') : persisted ? L('about.kept') : ''].filter(Boolean).join(' · '),
               share === null ? null : h('span', { class: 'about-bar', 'aria-hidden': 'true' },
                 h('span', { style: { width: `${Math.max(2, Math.round(share * 100))}%` } }))),
@@ -359,12 +359,3 @@ export default {
   },
 };
 
-function bytes(n) {
-  if (!n) return '0 B';
-  if (n < 1024) return `${n} B`;
-  const units = ['KB', 'MB', 'GB'];
-  let value = n / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
-  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
-}

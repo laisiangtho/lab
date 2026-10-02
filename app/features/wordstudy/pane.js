@@ -39,7 +39,7 @@ export function mountStudy(el, ctx) {
   const section = (title, ...body) => h('section', { class: 'ws-sec' }, h('h3', { class: 'ws-h' }, title), ...body);
   const note = (text, ...more) => h('p', { class: 'ws-note' }, text, ...more);
   const pending = () => h('p', { class: 'ws-note ws-wait' }, L('ws.gathering'));
-  const refLabel = ({ book, chapter, verse }) => `${shell.workspace.bookName(book)} ${shell.workspace.number(chapter)}:${shell.workspace.number(verse)}`;
+  const refLabel = ({ book, chapter, verse }) => shell.workspace.refLabel(book, chapter, verse);
   const goTo = (ref) => {
     const { book, chapter, verse } = typeof ref === 'string' ? parseRef(ref) : ref;
     shell.openVerse(book, chapter, verse);

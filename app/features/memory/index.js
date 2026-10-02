@@ -47,8 +47,7 @@ export default {
 
     const refOf = (card) => {
       const where = shell.workspace;
-      const verses = card.to ? `${where.number(card.verse)}–${where.number(card.to)}` : where.number(card.verse);
-      return `${where.bookName(card.book)} ${where.number(card.chapter)}:${verses}`;
+      return where.refLabel(card.book, card.chapter, card.verse, card.to ?? null);
     };
 
     /** The words of a card, from its own translation when that is still here. */

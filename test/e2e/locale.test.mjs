@@ -80,6 +80,51 @@ test('the interface follows the device, and the reader can choose', options, asy
     assert.equal(await lang(), 'nb', 'the device language again');
   });
 
+  await t.test('a language that is not built in is fetched when chosen, then read from the device', async () => {
+    const settings = async (word) => {
+      await page.keyboard.press('Escape');
+      await page.keyboard.press('Control+p');
+      await page.locator('.modal-input').fill(word);
+      await page.waitForTimeout(250);
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('.settings');
+    };
+    await settings('Innstillinger');
+    const row = page.locator('.set-row', { hasText: 'Språk' });
+    await row.locator('button', { hasText: 'Zolai' }).waitFor();
+    const offered = await row.locator('button').allInnerTexts();
+    assert.ok(offered.includes('Zolai (last ned)'), `Zolai is offered for download: ${offered.join(' | ')}`);
+    assert.ok(offered.includes('မြန်မာ'), 'Burmese, fetched a moment ago, is on the device and says nothing of a download');
+    assert.equal(app.requests.filter((url) => /locale\/ctd\.json$/.test(url)).length, 0, 'nothing fetched before it is chosen');
+
+    const reload = page.waitForEvent('load');
+    await row.locator('button', { hasText: 'Zolai' }).click();
+    await reload;
+    await page.waitForSelector('#app .body-row');
+    assert.equal(await lang(), 'ctd');
+    assert.equal(app.requests.filter((url) => /locale\/ctd\.json$/.test(url)).length, 1);
+
+    // With the repository out of reach the next start is still in Zolai.
+    await page.context().route('**/locale/**', (route) => route.abort());
+    await page.reload();
+    await page.waitForSelector('#app .body-row');
+    assert.equal(await lang(), 'ctd', 'read from the device');
+    await page.waitForTimeout(600);
+    assert.equal(await page.locator('.toast.err').count(), 0, 'and no network is not news');
+    await page.context().unroute('**/locale/**');
+
+    // "Dan" is Settings in Zolai, and Daniel to the palette: the ribbon's button is asked instead.
+    await page.locator('.ribbon [aria-label="Dan"]').first().click();
+    await page.waitForSelector('.settings');
+    assert.match(await page.locator('.set-row').first().innerText(), /^Pau/, 'the language row, in Zolai');
+    assert.match(await page.locator('.set-row').first().innerText(), /sittel|sit/i, 'which says it is yet to be checked by a speaker');
+    const back = page.waitForEvent('load');
+    await page.locator('.set-row').first().locator('button').first().click();
+    await back;
+    await page.waitForSelector('#app .body-row');
+    assert.equal(await lang(), 'nb');
+  });
+
   await t.test('nothing went wrong on the way', () => assert.deepEqual(app.problems, []));
 });
 

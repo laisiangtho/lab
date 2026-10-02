@@ -11,6 +11,9 @@
  *   refs       verses with cross-references
  *   headings   section headings (the file's `story`)
  *   titles     verse titles (a psalm's superscription)
+ *   faults     optional: faults in the file the app reads past, by kind
+ *              (core/translation.js FAULTS), so a reader is told before
+ *              downloading what to expect
  *
  * The same figures come from two places: a parsed translation
  * (`contentOf`, at install, and in scripts/catalog-content.mjs, which
@@ -22,6 +25,7 @@
  */
 
 import { fail, isPlainObject } from './errors.js';
+import { FAULTS, faultsOf } from './translation.js';
 
 export const CONTENT_KEYS = Object.freeze(['ot', 'nt', 'verses', 'strongs', 'refs', 'headings', 'titles']);
 
@@ -31,7 +35,8 @@ export const CONTENT_KEYS = Object.freeze(['ot', 'nt', 'verses', 'strongs', 'ref
  *        its stats (`{ meta, stats }`)
  * @param {{ book(id: number): { testament: number } }} category
  */
-export function contentOf({ meta, stats }, category) {
+export function contentOf({ meta, stats, diagnostics }, category) {
+  const faults = faultsOf(diagnostics);
   const books = Object.keys(meta?.books ?? {}).map(Number);
   const testament = (id) => category.book(id).testament;
   let headings = 0;
@@ -46,6 +51,7 @@ export function contentOf({ meta, stats }, category) {
     refs: stats?.refs ?? 0,
     headings,
     titles: stats?.titles ?? 0,
+    ...(Object.keys(faults).length ? { faults: Object.freeze(faults) } : {}),
   });
 }
 
@@ -61,6 +67,16 @@ export function readContent(raw, source, path) {
     const value = raw[key];
     if (!Number.isInteger(value) || value < 0) fail(source, `${path}.${key}`, `expected a whole number, got ${JSON.stringify(value)}`);
     out[key] = value;
+  }
+  if (raw.faults !== undefined) {
+    if (!isPlainObject(raw.faults)) fail(source, `${path}.faults`, 'expected an object of counts by kind');
+    const faults = {};
+    for (const [kind, n] of Object.entries(raw.faults)) {
+      if (!FAULTS.includes(kind)) fail(source, `${path}.faults.${kind}`, `expected one of ${FAULTS.join(', ')}`);
+      if (!Number.isInteger(n) || n < 1) fail(source, `${path}.faults.${kind}`, `expected a whole number above zero, got ${JSON.stringify(n)}`);
+      faults[kind] = n;
+    }
+    if (Object.keys(faults).length) out.faults = Object.freeze(faults);
   }
   return Object.freeze(out);
 }

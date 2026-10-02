@@ -106,9 +106,7 @@ export default {
         el.append(body);
         let token = 0;
 
-        const ref = (book, chapter, verse) => (verse
-          ? `${shell.workspace.bookName(book)} ${chapter}:${verse}`
-          : `${shell.workspace.bookName(book)} ${chapter}`);
+        const ref = (book, chapter, verse) => shell.workspace.refLabel(book, chapter, verse || null);
 
         function chip(key, st) {
           const p = parseChapterKey(key);

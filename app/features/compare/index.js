@@ -127,7 +127,7 @@ export default {
       async function paint() {
         const { book, chapter, verse } = at;
         const where = shell.workspace;
-        title.textContent = `${where.bookName(book)} ${where.number(chapter)}:${where.number(verse)}`;
+        title.textContent = where.refLabel(book, chapter, verse);
         const held = await store.list();
         const current = state.get().translation;
         // The one being read first, then the rest by language and name.
@@ -168,8 +168,7 @@ export default {
 
       function refOf(row, found) {
         const where = shell.workspace;
-        const verses = found.end !== found.start ? `${found.start}–${found.end}` : String(found.start);
-        return `${where.bookName(at.book)} ${at.chapter}:${verses} (${row.info?.shortname || row.identify})`;
+        return `${where.refLabel(at.book, at.chapter, found.start, found.end)} (${row.info?.shortname || row.identify})`;
       }
 
       async function copy(row, found, text) {

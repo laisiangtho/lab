@@ -34,7 +34,7 @@
     "aliases": "node scripts/aliases.mjs",
     "version:stamp": "node scripts/version.mjs",
     "icons": "node scripts/icons.mjs",
-    "test:crawl": "npm run build && node test/e2e/crawl.mjs 1440 900 desktop-dark en dark && node test/e2e/crawl.mjs 1440 900 desktop-light en light && node test/e2e/crawl.mjs 1100 800 desktop-nb nb light && node test/e2e/crawl.mjs 390 844 phone-en en dark && node test/e2e/crawl.mjs 390 844 phone-my my dark"
+    "test:crawl": "npm run build && node test/e2e/crawl.mjs 1440 900 desktop-dark en dark && node test/e2e/crawl.mjs 1440 900 desktop-light en light && node test/e2e/crawl.mjs 1100 800 desktop-nb nb light && node test/e2e/crawl.mjs 390 844 phone-en en dark && node test/e2e/crawl.mjs 390 844 phone-my my dark && node test/e2e/crawl.mjs 390 844 phone-ctd ctd light"
   },
   "devDependencies": {
     "electron": "^44.4.3",

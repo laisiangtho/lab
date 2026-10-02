@@ -13,9 +13,9 @@ Translations are downloaded once and kept: after that everything works with no c
 - **Write and keep**: notes in Markdown with `[[wikilinks]]` and `#tags`, bookmarks over a verse or a run of verses, reading plans and a streak, memory verses on spaced repetition, a study board, freehand ink, and projects for a sermon or a lesson.
 - **Share**: a passage as Markdown, a citation or a printed sheet; a verse card drawn as an image in a studio of its own; a link that opens on the verse; any translation written out as USFM, USX, OSIS, Zefania, JSON or a spreadsheet.
 - **Bring a translation**: from the Lai Siangtho catalog, getBible, eBible.org, a web address or a file — this app's JSON, USFM, USX, USFX, OSIS, Zefania, browserBible, a spreadsheet, or a whole published zip — checked against the canon and reported on, never silently altered.
-- **Ask** in plain words — "how do I bookmark a verse" — and get the button that does it, from Help, the Guide pane or `?` in the palette, in English, Norwegian or Burmese.
+- **Ask** in plain words — "how do I bookmark a verse" — and get the button that does it, from Help, the Guide pane or `?` in the palette, in the interface's language.
 
-The interface is in English, Norsk bokmål and မြန်မာ (Burmese, awaiting review by a native reader). The scripture is in whatever language the translation is.
+The interface is in English and Norsk bokmål, and in မြန်မာ (Burmese) and Zolai (Tedim), which are downloaded when chosen and kept on the device; both await review by a native reader. The scripture is in whatever language the translation is.
 
 ## Getting it
 
@@ -46,17 +46,18 @@ This is Phase 2 of the project. The Phase 1 single-file `index.html` is preserve
 | `npm run desktop:build` | Compile main, preload and renderer → `out/` |
 | `npm run desktop:package` | Installers for the current system → `release/` (`.dmg`/`.zip`; setup and portable `.exe`; AppImage, `.deb`, `.rpm`, `.tar.gz`) |
 | `npm test` | Unit and boundary tests (`node:test`, no framework) — about a second |
-| `npm run test:e2e` | The built web app driven in a browser, one file at a time: the ordered checks, the app across restarts, phone and title-bar layout (every page on a phone, in Burmese), the interface languages and projects studio, the Library, Help and the Guide, Strong's numbers and the rest of a translation's markup, every card-studio panel on a desktop and on a phone, a word study from imported Hebrew, KJV and STEPBible files, sidebar panes moved into workspace tabs, the English–Hebrew verse map, study data got, shown and removed, and the phone shell's tabs, sheets and gestures |
+| `npm run test:e2e` | The built web app driven in a browser, one file at a time: the ordered checks, the app across restarts, phone and title-bar layout (every page on a phone, in Burmese), the interface languages (the built-in ones, and one fetched when chosen) and projects studio, the Library, Help and the Guide, Strong's numbers and the rest of a translation's markup, every card-studio panel on a desktop and on a phone, a word study from imported Hebrew, KJV and STEPBible files, sidebar panes moved into workspace tabs, the English–Hebrew verse map, study data got, shown and removed, and the phone shell's tabs, sheets and gestures |
 | `npm run test:desktop` | The packaged Electron application, started and inspected |
 | `npm run test:perf` | Timings at full size: three complete Bibles, the longest chapter, a whole-library search |
-| `npm run test:crawl` | Every palette command run on a desktop (dark, light, Norwegian) and a phone (English, Burmese), the screen inspected after each for errors, overflow, leaked strings, clipped labels, overlapping controls and unnamed buttons (a few minutes a run) |
+| `npm run test:crawl` | Every palette command run on a desktop (dark, light, Norwegian) and a phone (English, Burmese, Zolai), the screen inspected after each for errors, overflow, leaked strings, clipped labels, overlapping controls and unnamed buttons (a few minutes a run) |
 | `npm run test:all` | `npm test` then the browser suite |
 | `npm run aliases -- <identify> [--file PATH] [--apply]` | Alias overlay maintenance (dry run by default) |
 | `npm run icons -- [--apply \| --out DIR]` | Every PNG icon drawn again from `public/icons/icon.svg` — an open book with a red ribbon, one colour, no background — set in from the edge for desktops and on a tile for Android's adaptive icon (dry run by default; see `assets/icons/README.md`) |
 | `node scripts/lexicon.mjs <hebrew> <greek> [--source strongs\|step] [--out DIR --apply]` | Build `lexicon/strongs-{h,g}.json` for the catalog repository: by default from Strong's own dictionaries (public domain; Open Scriptures' JSON edition, CC BY-SA), checked with the app's own parser (dry run by default) |
 | `node scripts/versification.mjs <TVTMS.txt> [--apply]` | Regenerate `app/core/versification-data.js`, the English ↔ Hebrew verse map, from STEPBible's TVTMS (dry run by default) |
 | `node scripts/studydata.mjs <file> --id openbible\|easton\|nave [--out DIR --apply]` | Turn a publisher's study data file into the app's JSON for the catalog repository's `study/` folder, where the web build's *Get* finds it (dry run by default) |
-| `node scripts/catalog-content.mjs <catalog repository> [--apply]` | Count what each catalog translation carries (testaments, verses, Strong's numbers, cross-references, headings) and write it into book.json as `content`, for the Library; lists any translation file the app would refuse (dry run by default) |
+| `node scripts/catalog-content.mjs <catalog repository> [--apply]` | Count what each catalog translation carries (testaments, verses, Strong's numbers, cross-references, headings) and write it into book.json as `content`, for the Library, with the faults in a file that the app reads past (`content.faults`); lists any translation file the app would refuse (dry run by default) |
+| `node scripts/locale.mjs [--to <catalog repository>] [--apply]` | Check the fetched interface languages (`locale/*.json`) against English, write `locale/index.json`, and copy both into the catalog repository's `locale/` (dry run by default) |
 | `node scripts/morphology.mjs <TEHMC> <TEGMC> [--apply]` | Rebuild `app/core/morph-data.js` from STEPBible's morphology tables (dry run by default) |
 | `node scripts/guide-check.mjs <folder>` | Check guide data (a `guide/` folder) the way the app reads it; exits 1 on any problem |
 | `npm run version:stamp -- --apply` | Stamp today's date and the next build number |
@@ -91,8 +92,9 @@ app/                      shared UI — never imports from targets/
     sources.js settings.js time.js errors.js
     aliases/              app-owned alias overlays, one per translation
   services/               browser APIs
-    store.js              IndexedDB (v8): translations, chapters, catalog, settings,
-                          notes, marks, records, lexicons, guide, lemmas, study data
+    store.js              IndexedDB (v9): translations, chapters, catalog, settings,
+                          notes, marks, records, lexicons, guide, lemmas, study data,
+                          fetched interface languages
     library.js sources.js zip.js     install, update, import, the sources of more
     lexicon.js lemmas.js  lexicons on the device; the lemma index and the originals
     records.js settings.js annotations.js search.js transfer.js
@@ -102,7 +104,7 @@ app/                      shared UI — never imports from targets/
   shell/                  the app itself: chrome, workspace, reading surface, the
                           palette and pickers, the verse bar, detached windows,
                           dragging, the reading panel, settings rows, dialogs,
-                          i18n.js with locales/{en,nb,my}.js, icons, dom helpers
+                          i18n.js with locales/{en,nb}.js, icons, dom helpers
   features/               library, settings, search, notes, bookmarks, composer,
                           notes-manager, tags, backlinks, outline, plans, graph,
                           board, ink, speech, verse-card, compare, memory, report,
@@ -118,8 +120,10 @@ targets/
 public/                   category.json, book.json, icons — served at '/'
 assets/                   packaging icons, drawn from public/icons/icon.svg;
                           linux/ AppStream metadata
+locale/                   the interface languages the app fetches (my, ctd) and
+                          their index, as the catalog repository publishes them
 scripts/                  version, release-plan, release-notes, icons, aliases,
-                          morphology, guide-check — Node standard library only
+                          morphology, guide-check, locale — Node standard library only
 test/                     unit and boundary tests, fixtures, e2e/ (browser suites,
                           the crawl, the packaged desktop app)
 docs/                     architecture.md, releasing.md, roadmap.md
@@ -293,7 +297,7 @@ Numbers that name a chapter — in a tab, a breadcrumb, the books tree, the stat
 
 Interface text is set at a unitless `line-height: 1.5` so a label's box is a multiple of its font size rather than of the font's own metrics; without that, a Burmese label made its button taller than the Latin one beside it.
 
-Interface strings live in `app/shell/locales/{en,nb,my}.js`, read through `L()` in `app/shell/i18n.js`, and nowhere else — features included; `test/locales.test.js` holds the other languages to English key for key. Labels are named for what they do, not what they point at: "Close", not "Close this tab"; "Bookmark", not "Bookmark this verse". A label that carries a passage into the string ("Note on {ref}") reads badly once translated and is avoided.
+Interface strings are read through `L()` in `app/shell/i18n.js`, and nowhere else — features included. English and Norwegian are `app/shell/locales/{en,nb}.js` and part of the app; Burmese and Zolai are `locale/{my,ctd}.json`, published from the catalog repository's `locale/` folder and fetched when a reader chooses one (`node scripts/locale.mjs --to <catalog repository> --apply` checks them, writes `locale/index.json` and copies both there). `test/locales.test.js` holds every one of them to English key for key. Labels are named for what they do, not what they point at: "Close", not "Close this tab"; "Bookmark", not "Bookmark this verse". A label that carries a passage into the string ("Note on {ref}") reads badly once translated and is avoided.
 
 ### Narrow windows and touch
 

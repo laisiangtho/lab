@@ -56,6 +56,37 @@ Measured on tedim1932, niv2011, judson1835, ddb1931, bbe1949, jwmynwt, mizo1917;
 - `info.shortname` can be `""` (jwmynwt); localised book names are sometimes English (mizo1917, niv2011).
 - Parse time in Node: 50–170 ms per full translation.
 
+### 1.3-a Faults a file is read past
+
+Nine of the catalog's 64 files (measured 2 October 2026) were refused
+outright, for faults that leave most of the file perfectly readable. The
+validator now reads past these, keeps what can be read, and records each as
+a diagnostic (`FAULTS` in `core/translation.js`); wrong types and unknown
+keys are still errors.
+
+| fault | what the file has | what the app does |
+|---|---|---|
+| `outside-canon` | a book numbered past 66 (web2000, 37, 303, 42, 416, matu2009: names only, no chapters) | the book is left out |
+| `names-unaligned` | books outside the canon, or books with no `info` | the file's book names are not taken; the canon's are shown |
+| `copied-book` | a book whose first chapter is word for word an earlier book's (2530: 42 books filled with Genesis; matu2009: two) | the book is left out, and so counts as absent |
+| `empty-verse` | a verse with no `text` (2486, Mark 11:26) | the verse is left out |
+| `merge-overlap` | a verse joined to verses that are also given on their own (294, Mark 16:9) | the join is dropped, the verses kept |
+
+`names-unaligned` is the one that is not obvious. In those files the list of
+names is the edition's own — with Tobit, Judith and the rest in among the
+others — written down the slots in order, while the text sits in the canon's
+slots: web2000's slot 40 is named *Tobit* and holds Matthew. Taking the names
+would mislabel most of the New Testament, so none are taken. For 37 the
+names do line up (its extra names come after the 66) and are dropped all the
+same; telling the two cases apart would need knowing every language's book
+names.
+
+The faults are counted by kind on the installed record
+(`diagnostics.faults`) and, by `scripts/catalog-content.mjs`, in the catalog
+entry (`content.faults`), so the Library marks such a translation before it
+is downloaded and after; the mark says which, in words, when pressed. The
+real remedy is in the files, and the marks go when the files are mended.
+
 ### 1.4 Verse fields (measured on full `tedim1932.json`)
 
 | Field | Count | Meaning |
@@ -119,37 +150,63 @@ upstream app's, not this one's. The interface is translated here instead — see
 
 ### Interface languages
 
-Menus, buttons and messages come from `app/shell/locales/{en,nb,my}.js`, one
-file per language; scripture and book names are the translation's and the
-pack's, whatever the interface speaks. English is the source, and
-`test/locales.test.js` holds every other file to it: the same keys, the same
-placeholders (as a set — a language with one plural form writes `{n}` once),
-plural forms that fit the language (`singular|plural` for Norwegian, a single
-form for Burmese, whose `Intl.PluralRules` has only `other`), and fewer than 8%
-of strings identical to English. At run time a key missing from a translation
-would show in English and nobody would notice; the test is where it fails
-instead.
+Menus, buttons and messages come from two places; scripture and book names
+are the translation's and the pack's, whatever the interface speaks.
+
+- **Built in:** English and Norwegian, `app/shell/locales/{en,nb}.js`, part
+  of the app.
+- **Fetched when chosen:** every other language — Burmese (`my`) and Zolai
+  (`ctd`) at present — from the catalog repository's `locale/` folder
+  (`core/locale.js`, `services/locales.js`). Their sources are this
+  repository's `locale/<code>.json`; `scripts/locale.mjs` checks them, writes
+  `locale/index.json` (what is offered, with a fingerprint of each file) and
+  copies both into a checkout of the catalog repository.
+
+English is the source, and `test/locales.test.js` holds every other language
+to it, built in or not: the same keys, the same placeholders (as a set — a
+language with one plural form writes `{n}` once), plural forms as the
+language is written (`singular|plural` for Norwegian; one form for Burmese
+and Zolai, declared by the file as `forms: 1`, since `Intl.PluralRules` knows
+nothing of Zolai), and fewer than 8% of strings identical to English.
 
 - **Which language.** `settings.locale` is the reader's choice, or null to
-  follow the device: the first of `navigator.languages` this app has, with any
-  Norwegian (no, nb, nn) reading Bokmål, and English last. It is applied at the
-  start of `start()` from the device alone — so even the screen of last resort
-  speaks it — and again from settings before any feature registers, since
-  command titles and pane names are read once. Changing it saves, waits for the
-  write, and restarts the interface.
-- **Named in themselves.** Settings lists *English, Norsk bokmål, မြန်မာ*: the
-  list is read by somebody looking for their own language. A translation not
-  yet checked by a native speaker is marked `review` and Settings says so;
-  Burmese is.
+  follow the device: the first of `navigator.languages` the app has *on the
+  device*, with any Norwegian (no, nb, nn) reading Bokmål, and English last.
+  It is applied at the start of `start()` from the device alone — so even the
+  screen of last resort speaks it — and again once settings and the fetched
+  languages kept in the `locales` store are read, before any feature
+  registers, since command titles and pane names are read once. Changing it
+  saves, waits for the write, and restarts the interface (`ctx.locales.use`).
+- **Fetching.** Settings lists what is on the device and, once the index
+  answers, what can be had, marked *(download)*. Choosing one of those
+  fetches it, keeps it, then restarts; a failure is said and nothing changes.
+  From then on a start reads it from the device and needs no network.
+  `tendLocale` in `boot.js` looks after the rest once the app is up: a chosen
+  language that is not here (a backup restored on a new device, or a build
+  that used to carry Burmese) is fetched and the switch offered, or the
+  reason English is showing is said; a fetched language in use is refreshed
+  for the next start when the index has a different fingerprint; and a
+  device whose first language the repository has and the app does not is
+  offered it, once.
+- **Behind the app.** A device's copy may be older than the app. A key it
+  lacks is shown in English, and Settings says how many there are; the
+  repository's test is what keeps the published files complete.
+- **Named in themselves.** Settings lists *English, Norsk bokmål, မြန်မာ,
+  Zolai*: the list is read by somebody looking for their own language. A
+  translation not yet checked by a native speaker is marked `review` and
+  Settings says so; Burmese and Zolai are.
 - **Dates too.** Every date the interface writes goes through `when` in
   `i18n.js` (`date`, `time`, `dateTime`, `ago`) in the interface language; the
-  browser's own locale put Norwegian dates inside a Burmese interface.
+  browser's own locale put Norwegian dates inside a Burmese interface. A
+  language the platform has no date formats for (Zolai) gets the platform's
+  default.
 - **Not translated:** the *Data and formats* document, whose prose documents
   JSON keys that stay English (its header says why), and the palette's verbs
   (`go`, `find`, …), which are what the parser reads.
-- **Size.** The three files are about 45 KB compressed together; Burmese is the
-  largest (three bytes a character). They load with the app rather than on
-  demand, since `L()` is synchronous and everything reads it at build time.
+- **Size.** English and Norwegian load with the app, since `L()` is
+  synchronous and everything reads it at build time. Burmese was a fifth of
+  the main chunk (three bytes a character); fetched, it costs only those who
+  read it.
 
 ## 2. Cross-reference resolution
 

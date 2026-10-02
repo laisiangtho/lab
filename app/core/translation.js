@@ -5,6 +5,21 @@
  * DataError. Content differences from category.json (versification) are not
  * errors; they are returned in `diagnostics` so the UI can surface them.
  *
+ * So are the faults a file can be read past (FAULTS): what can be read is
+ * kept, what cannot is left out, and each is recorded so a reader is told
+ * what to expect before and after installing.
+ *
+ *   outside-canon     a book whose number is not in category.json: left out
+ *   names-unaligned   the file has books outside the canon, or books with no
+ *                     `info`: its names are then in an order of its own and
+ *                     belong to other books, so the canon's names are used
+ *   copied-book       a book whose first chapter is word for word an earlier
+ *                     book's (a converter's filler for a book the edition
+ *                     does not have): left out
+ *   empty-verse       a verse with no text: left out
+ *   merge-overlap     a verse joined to others that are also given on their
+ *                     own: the join is dropped, the verses kept
+ *
  * Output is split for storage: one `meta` record plus one record per chapter.
  * Empty-string optional fields ("title": "", "merge": "") are published by some
  * translations and are normalised to absent.
@@ -19,11 +34,33 @@ import { hasStrongs, tallyStrongs } from './strongs.js';
 
 const VERSE_KEYS = new Set(['text', 'title', 'ref', 'merge']);
 
+/** The kinds of diagnostic that are faults in the file, not departures of the edition. */
+export const FAULTS = Object.freeze(['outside-canon', 'names-unaligned', 'copied-book', 'empty-verse', 'merge-overlap']);
+
+/** How many of each fault a list of diagnostics holds: { kind: n }, only what is there. */
+export function faultsOf(diagnostics) {
+  const out = {};
+  for (const d of diagnostics ?? []) if (FAULTS.includes(d.type)) out[d.type] = (out[d.type] ?? 0) + 1;
+  return out;
+}
+
+/**
+ * A book's opening, as one string to compare: the texts of its first
+ * chapter. Null where there are too few verses for a match to mean anything.
+ */
+function opening(bookRaw) {
+  const first = isPlainObject(bookRaw?.chapter) ? Object.values(bookRaw.chapter)[0] : null;
+  const verses = isPlainObject(first?.verse) ? Object.values(first.verse) : [];
+  if (verses.length < 3) return null;
+  return verses.map((v) => (typeof v?.text === 'string' ? v.text : '')).join('\n');
+}
+
 /**
  * @typedef {{ text: string, title?: string, ref?: string, merge?: number }} Verse
  * @typedef {{ book: number, chapter: number, verses: Record<string, Verse> }} ChapterRecord
- * @typedef {{ type: 'versification'|'extra-chapter'|'missing-book', book: number,
- *             chapter?: number, expected?: number, actual?: number }} Diagnostic
+ * @typedef {{ type: 'versification'|'extra-chapter'|'missing-book'|'outside-canon'|'names-unaligned'
+ *                   |'copied-book'|'empty-verse'|'merge-overlap', book: number,
+ *             chapter?: number, verse?: number, expected?: number, actual?: number }} Diagnostic
  */
 
 /**
@@ -56,6 +93,13 @@ export function parseTranslation(raw, { identify, category }) {
   const books = {};
   const chapters = [];
   const diagnostics = [];
+  // Names are taken from the file only when every book in it is one of the
+  // canon's and says what it is called. Otherwise the list of names is the
+  // edition's own (with books the canon lacks in among them) written down
+  // the slots in order, and a name sits on a book it does not belong to.
+  const aligned = Object.entries(booksRaw).every(([key, book]) => /^\d+$/.test(key) && category.hasBook(Number(key)) && book?.info !== undefined);
+  if (!aligned) diagnostics.push({ type: 'names-unaligned', book: 0 });
+  const openings = new Map();
   // `strongs`: how many words carry a Strong's number, and the edition's own
   // numbers past the end of the lexicon, by number (core/strongs.js).
   const stats = { books: 0, chapters: 0, verses: 0, merges: 0, titles: 0, refs: 0, strongs: { words: 0, edition: {} } };
@@ -63,11 +107,17 @@ export function parseTranslation(raw, { identify, category }) {
   for (const [bookKey, bookRaw] of Object.entries(booksRaw)) {
     const bp = `$.book.${bookKey}`;
     const bookId = numericKey(bookKey, S, bp);
-    if (!category.hasBook(bookId)) fail(S, bp, `book ${bookId} is not in category.json`);
+    if (!category.hasBook(bookId)) { diagnostics.push({ type: 'outside-canon', book: bookId }); continue; }
     const canon = category.book(bookId);
     expectObject(bookRaw, S, bp);
 
-    const bi = expectObject(bookRaw.info, S, `${bp}.info`);
+    const start = opening(bookRaw);
+    if (start !== null) {
+      if (openings.has(start)) { diagnostics.push({ type: 'copied-book', book: bookId, expected: openings.get(start) }); continue; }
+      openings.set(start, bookId);
+    }
+
+    const bi = aligned ? expectObject(bookRaw.info, S, `${bp}.info`) : {};
     books[bookId] = Object.freeze({
       name: optionalString(bi.name, S, `${bp}.info.name`) ?? canon.name,
       shortname: optionalString(bi.shortname, S, `${bp}.info.shortname`) ?? canon.shortname,
@@ -84,7 +134,8 @@ export function parseTranslation(raw, { identify, category }) {
       expectObject(chRaw, S, cp);
       for (const k of Object.keys(chRaw)) if (k !== 'verse') fail(S, `${cp}.${k}`, 'unknown chapter key');
 
-      const verses = parseVerses(expectObject(chRaw.verse, S, `${cp}.verse`), S, `${cp}.verse`, stats);
+      const verses = parseVerses(expectObject(chRaw.verse, S, `${cp}.verse`), S, `${cp}.verse`, stats,
+        (type, verse) => diagnostics.push({ type, book: bookId, chapter, verse }));
       chapters.push(Object.freeze({ book: bookId, chapter, verses }));
       stats.chapters += 1;
 
@@ -161,7 +212,7 @@ function languageCode(language) {
   return toTag(long);
 }
 
-function parseVerses(raw, S, path, stats) {
+function parseVerses(raw, S, path, stats, fault) {
   const out = {};
   for (const [vKey, vRaw] of Object.entries(raw)) {
     const vp = `${path}.${vKey}`;
@@ -169,6 +220,9 @@ function parseVerses(raw, S, path, stats) {
     expectObject(vRaw, S, vp);
     for (const k of Object.keys(vRaw)) if (!VERSE_KEYS.has(k)) fail(S, `${vp}.${k}`, 'unknown verse key');
 
+    // A verse some editions leave out, written as a number with nothing
+    // under it (a cross-reference at most): there is nothing to read.
+    if (vRaw.text === undefined) { fault('empty-verse', n); continue; }
     const verse = { text: expectString(vRaw.text, S, `${vp}.text`) };
     const title = optionalString(vRaw.title, S, `${vp}.title`);
     const ref = optionalString(vRaw.ref, S, `${vp}.ref`);
@@ -181,16 +235,23 @@ function parseVerses(raw, S, path, stats) {
       stats.merges += 1;
     }
     if (hasStrongs(verse.text)) tallyStrongs(verse.text, stats.strongs);
-    out[n] = Object.freeze(verse);
+    out[n] = verse;
     stats.verses += 1;
   }
-  // Covered verses must be absent: "merge": "18" on verse 17 means no verse 18 key.
+  // Covered verses are absent: "merge": "18" on verse 17 means no verse 18
+  // key. Where they are there all the same, the verses are what was written
+  // and the join is what was claimed: the verses are kept.
   for (const [key, verse] of Object.entries(out)) {
     if (verse.merge === undefined) continue;
     for (let m = Number(key) + 1; m <= verse.merge; m += 1) {
-      if (out[m]) fail(S, `${path}.${m}`, `verse ${m} is also covered by the merge on verse ${key}`);
+      if (!out[m]) continue;
+      delete verse.merge;
+      stats.merges -= 1;
+      fault('merge-overlap', Number(key));
+      break;
     }
   }
+  for (const verse of Object.values(out)) Object.freeze(verse);
   return Object.freeze(out);
 }
 
@@ -201,7 +262,8 @@ function parseStory(raw, S, category) {
   const out = {};
   for (const [b, chapters] of Object.entries(raw)) {
     const bookId = numericKey(b, S, `$.story.${b}`);
-    if (!category.hasBook(bookId)) fail(S, `$.story.${b}`, `book ${bookId} is not in category.json`);
+    // Headings for a book outside the canon go the way of the book.
+    if (!category.hasBook(bookId)) continue;
     expectObject(chapters, S, `$.story.${b}`);
     out[bookId] = {};
     for (const [c, verses] of Object.entries(chapters)) {

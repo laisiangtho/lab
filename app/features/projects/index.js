@@ -163,9 +163,7 @@ export default {
     }
 
     const slug = (name) => String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project';
-    const guard = (fn) => (...args) => Promise.resolve()
-      .then(() => fn(...args))
-      .catch((err) => shell.notify(err.message, 'error'));
+    const { guard } = shell;
 
     registry.command({ id: 'projects.import', title: L('proj.import'), icon: 'enter', run: guard(importProject) });
 

@@ -42,12 +42,6 @@
   .library-item { flex-wrap: wrap; align-items: flex-start; gap: 8px 12px; padding: 12px; }
   .library-meta { flex: 1 1 220px; }
 }
-
-/* Settings */
-.settings-list { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 18px 0; }
-.settings-list dt { color: var(--text-faint); }
-.settings-list dd { margin: 0; color: var(--text-muted); }
-.settings-actions { display: flex; gap: 8px; margin: 14px 0 6px; }
 .settings-import { margin-top: 28px; border-top: 1px solid var(--border); padding-top: 16px; }
 .settings-import ul { margin: 0 0 12px; padding-inline-start: 20px; color: var(--text-muted); }
 
@@ -232,9 +226,6 @@
 
 /* Strong's numbers, where a translation carries them */
 .strongs-code { font-family: var(--font-ui); font-size: .62em; color: var(--c-orange); margin-inline-start: .12em; }
-
-/* Reading panel value readout */
-.rp-val { min-width: 3.4em; text-align: end; font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: var(--fs-ui-s); }
 
 /* Dragging */
 .leaf.is-dragging { opacity: .6; }
@@ -536,6 +527,10 @@ body.is-dragging-tab .sidebar[data-empty="true"] .side-body::after {
 /* A translation in a language this device asks for */
 .badge-hint { background: var(--accent-fade); color: var(--accent-2); box-shadow: inset 0 0 0 1px var(--accent-line); }
 
+/* A file with faults the app reads past: said, and pressed for which. */
+.badge-warn { background: color-mix(in srgb, #d97706 16%, transparent); color: var(--text-normal); box-shadow: inset 0 0 0 1px color-mix(in srgb, #d97706 45%, transparent); cursor: pointer; }
+.badge-warn svg { width: 12px; height: 12px; color: #d97706; }
+
 /* ---- what the install found ----------------------------------------------*/
 .tri-more { margin-top: 12px; font-size: var(--fs-ui-m); }
 .tri-more > summary { cursor: pointer; color: var(--text-muted); padding: 2px 0; }
@@ -544,7 +539,6 @@ body.is-dragging-tab .sidebar[data-empty="true"] .side-body::after {
 .tri-diag li { margin: 2px 0; }
 .tri-diag .is-more { color: var(--text-faint); list-style: none; margin-left: -18px; }
 .tri-more > .btn { width: 100%; justify-content: center; }
-.lib-held { font-size: var(--fs-ui-s); }
 
 /* ---- a pane or document that could not build itself ----------------------*/
 .pane-broken { padding: 16px; color: var(--text-muted); }
@@ -1771,7 +1765,7 @@ label.set-row:hover { background: var(--bg-hover); }
 .lib-empty .btn svg { width: 14px; height: 14px; }
 .lib-banner { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 9px 12px; border-radius: 10px; background: var(--accent-fade); color: var(--accent-2); font-size: var(--fs-ui-s); }
 .lib-banner svg { width: 14px; height: 14px; }
-.lib-listed, .lib-more-hint, .lib-loading { margin: 2px 0 10px; font-size: var(--fs-ui-s); color: var(--text-faint); }
+.lib-more-hint, .lib-loading { margin: 2px 0 10px; font-size: var(--fs-ui-s); color: var(--text-faint); }
 .lib-more-hint { text-align: center; margin-top: 12px; }
 .lib-web-note { display: flex; gap: 6px; align-items: flex-start; margin-top: 10px; font-size: var(--fs-ui-s); color: var(--c-orange); line-height: 1.5; }
 .lib-web-note svg, .lib-banner svg { width: 14px; height: 14px; flex: 0 0 auto; margin-top: 1px; }

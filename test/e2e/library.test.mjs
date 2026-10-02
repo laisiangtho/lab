@@ -93,7 +93,10 @@ test('the Library', options, async (t) => {
           }
         }
         const r = parts[i].r; const box = bar.getBoundingClientRect();
-        if (r.right > box.right + 1 || r.left < box.left - 1) out.push(`${parts[i].el.className} outside the band`);
+        // On a phone the sources are a row that scrolls sideways: one past
+        // the edge there is a chip to scroll to, not one that fell out.
+        const scrolls = /auto|scroll/.test(getComputedStyle(parts[i].el.parentElement).overflowX);
+        if (!scrolls && (r.right > box.right + 1 || r.left < box.left - 1)) out.push(`${parts[i].el.className} outside the band`);
       }
       return out;
     });

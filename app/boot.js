@@ -29,7 +29,8 @@ import { createSettings } from './services/settings.js';
 import { openStore, resetStore } from './services/store.js';
 import { createShell } from './shell/shell.js';
 import { h } from './shell/dom.js';
-import { L, resolveLocale, setLocale } from './shell/i18n.js';
+import { addLocale, BUILT_IN, currentLocale, hasLocale, L, resolveLocale, setLocale } from './shell/i18n.js';
+import { createLocales } from './services/locales.js';
 
 import './styles/shell.css';
 import './styles/views.css';
@@ -67,6 +68,11 @@ async function boot({ root, platform, features, config: overrides }) {
   await library.load();
 
   const settings = await createSettings({ store, category });
+  // The interface languages fetched on an earlier day are read from the
+  // device, so a start needs no network to be in the reader's language.
+  const fetched = createLocales({ store, config });
+  const heldLocales = await fetched.held();
+  for (const held of heldLocales) addLocale(held);
   // Before any feature registers: command titles and pane names are read once.
   setLocale(resolveLocale(settings.get().locale, globalThis.navigator?.languages ?? []));
   const annotations = await createAnnotations({ store, category });
@@ -92,6 +98,26 @@ async function boot({ root, platform, features, config: overrides }) {
     lexicons,
     lemmas: createLemmas({ store }),
     study: createStudyData({ store, library }),
+    /**
+     * Interface languages beyond the built-in ones: what the catalog
+     * repository offers, and `use`, which fetches one if it is not here,
+     * writes the choice and starts the interface again in it. The interface
+     * reads every label once, so a language takes effect by starting again,
+     * and only after the choice is safely written.
+     */
+    locales: Object.freeze({
+      offered: () => fetched.offered(),
+      async use(code) {
+        if (code !== null && !hasLocale(code)) {
+          const entry = (await fetched.offered()).find((one) => one.code === code);
+          if (!entry) throw new Error(L('msg.localeNotOffered', { name: code }));
+          await fetched.get(code, entry.version);
+        }
+        state.set({ locale: code });
+        await settings.save();
+        window.location.reload();
+      },
+    }),
     /**
      * What one feature lends another, by name — the guide's knowledge, which
      * the Help page asks too. The context is frozen; this one object is not,
@@ -139,6 +165,8 @@ async function boot({ root, platform, features, config: overrides }) {
   if (lost) ctx.shell.notify(lost, 'error');
   reportLost = (reason) => ctx.shell.notify(L('msg.storageLost', { why: reason }), 'error');
 
+  tendLocale({ ctx, fetched, heldLocales, records }).catch((err) => ctx.shell.notify(err.message, 'error'));
+
   // Whatever lexicon this device already holds, read once so a Strong's number
   // pressed in the first minute answers without a round trip.
   lexicons.load().catch(() => { /* a lexicon is an extra, never a start-up failure */ });
@@ -149,6 +177,80 @@ async function boot({ root, platform, features, config: overrides }) {
     ({ changed }) => { if (changed) ctx.shell.notify(L('lib.catalogChanged')); },
     (err) => ctx.shell.notify(L('lib.catalogFailed', { why: err.message }), 'error'),
   );
+}
+
+const OFFER_KEY = 'locale-offer';
+
+/**
+ * The interface language, looked after once the app is up:
+ *
+ *   chosen, not on this device   (a backup restored here, or a build that
+ *                                used to carry the language) fetched now;
+ *                                the reader is offered the switch, or told
+ *                                why English is what they have
+ *   in use, and fetched          a newer copy is fetched if the repository
+ *                                has one, for the next start. No network is
+ *                                not news here: the copy on the device is
+ *                                complete and in use
+ *   none chosen                  the device's first language, if the
+ *                                repository has it and the app does not, is
+ *                                offered once
+ */
+async function tendLocale({ ctx, fetched, heldLocales, records }) {
+  const { shell, settings } = ctx;
+  const chosen = settings.get().locale;
+  const switchTo = (code, name) => ({
+    label: L('msg.localeUse', { name }),
+    run: () => ctx.locales.use(code).catch((err) => shell.notify(L('msg.localeFailed', { name, why: err.message }), 'error')),
+  });
+
+  if (chosen && !hasLocale(chosen)) {
+    try {
+      const entry = (await fetched.offered()).find((one) => one.code === chosen);
+      if (!entry) throw new Error(L('msg.localeNotOffered', { name: chosen }));
+      const record = await fetched.get(chosen, entry.version);
+      shell.notify(L('msg.localeReady', { name: record.name }), 'ok', { action: { label: L('msg.localeUse', { name: record.name }), run: () => window.location.reload() } });
+    } catch (err) {
+      shell.notify(L('msg.localeMissing', { name: chosen, why: err.message }), 'error');
+    }
+    return;
+  }
+
+  const current = currentLocale();
+  if (!BUILT_IN.includes(current)) {
+    const mine = heldLocales.find((one) => one.code === current);
+    let entry = null;
+    try {
+      entry = (await fetched.offered()).find((one) => one.code === current) ?? null;
+    } catch {
+      return;
+    }
+    if (entry && entry.version !== mine?.version) await fetched.get(current, entry.version);
+    return;
+  }
+
+  if (chosen) return;
+  // The device's languages in its own order: the first one the app speaks
+  // settles it, and only a language ahead of that one is worth offering.
+  const ahead = [];
+  for (const tag of globalThis.navigator?.languages ?? []) {
+    const base = String(tag).toLowerCase().split(/[-_]/)[0];
+    if (hasLocale(base) || base === 'no' || base === 'nn') break;
+    ahead.push(base);
+  }
+  if (!ahead.length || records.get(OFFER_KEY, null)?.code === ahead[0]) return;
+  let offered;
+  try {
+    offered = await fetched.offered();
+  } catch {
+    // Nothing was promised and nothing is lost: the offer is made at a start
+    // that has a network.
+    return;
+  }
+  const entry = offered.find((one) => ahead.includes(one.code));
+  if (!entry) return;
+  await records.save(OFFER_KEY, { code: ahead[0] });
+  shell.notify(L('msg.localeOffer', { name: entry.name }), 'info', { action: switchTo(entry.code, entry.name) });
 }
 
 /**

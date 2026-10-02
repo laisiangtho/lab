@@ -286,6 +286,28 @@ newest first.
 - Failures that were kept quiet are said: interlinear and cross-reference
   lines that could not be read, the Reference pane, the history and the
   walkthrough's record.
+- Interface languages are fetched when chosen. English and Norwegian stay
+  part of the app; Burmese and the new Zolai (Tedim) are downloaded from the
+  catalog repository's `locale/` folder the first time one is chosen in
+  Settings, kept on the device, and read from there at every start. A device
+  set to a language the repository has is offered it once. The main bundle is
+  about a fifth smaller. `scripts/locale.mjs` checks the files and writes
+  their index.
+- Zolai (Tedim) interface, a first draft awaiting review by a native reader.
+- The nine catalog translations the app refused now install. What can be
+  read is kept and what is wrong is said, in the Library before and after
+  downloading and in the translation's information: books outside the 66
+  left out, book names that do not line up with the books replaced by the
+  standard names, books that are a copy of another left out, verses without
+  text, and joined verses also given on their own.
+- Phone: the Library and Study data are lists in the phone's own style — a
+  segmented control for the three pages, the sources as a row of chips, and
+  each row with one thing to press at its end.
+- A reference is written the same way everywhere (bookmarks, notes, cards,
+  plans, memory verses, compare): the translation's book name and its own
+  digits. Sizes are written one way too ("837 KB", "8.4 MB").
+- Removed: 31 interface strings and 44 style classes that nothing used,
+  among them the styles of the old verse sheet and window buttons.
 
 ### 26.10.01.3 — 1 October 2026
 

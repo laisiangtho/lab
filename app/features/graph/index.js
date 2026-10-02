@@ -14,7 +14,7 @@
 import { extractLinks } from '../../core/markdown.js';
 import { chapterKey, parseChapterKey } from '../../core/plans.js';
 import { parseReferences } from '../../core/reference.js';
-import { h } from '../../shell/dom.js';
+import { h, themeValue as tone } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
 
@@ -68,7 +68,6 @@ export default {
         const camera = { x: 0, y: 0 };
         const token = { run: 0 };
 
-        const tone = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         const radius = (n) => 6 + Math.min(9, n.degree * 1.6);
         const label = (key) => {
           const p = parseChapterKey(key);

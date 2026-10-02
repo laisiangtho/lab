@@ -13,7 +13,7 @@
  * is invented: a field the data does not carry is simply not a row.
  */
 
-import { h } from './dom.js';
+import { formatBytes, h } from './dom.js';
 import { wireFades } from './fade.js';
 import { icon } from './icons.js';
 import { L, when } from './i18n.js';
@@ -100,6 +100,8 @@ export function createTranslationInfo(ctx) {
         found.short ? L('lbl.chaptersShort', { n: found.short }) : '',
         found.extra ? L('lbl.chaptersExtra', { n: found.extra }) : '',
       ].filter(Boolean).join(' · ') || L('lbl.differs', { n: found.total }));
+      const faults = Object.entries(found.faults ?? {});
+      if (faults.length) row(L('lib.faults'), faults.map(([kind, n]) => L(`lib.faults.${kind}`, { n })).join('; '));
     }
     if (facts.children.length) out.push(facts);
     // A sentence, not a cell: in a narrow popover a grid cell this long is a
@@ -200,7 +202,7 @@ export function createTranslationInfo(ctx) {
 
   function describe(d) {
     const book = ctx.category.hasBook(d.book) ? ctx.category.book(d.book).name : String(d.book);
-    return L(`diag.${d.type}`, { book, chapter: d.chapter, expected: d.expected, actual: d.actual });
+    return L(`diag.${d.type}`, { book, chapter: d.chapter, verse: d.verse, expected: d.expected, actual: d.actual });
   }
 
   function saveReport(meta, found) {
@@ -227,14 +229,6 @@ export function createTranslationInfo(ctx) {
   return { element, open, close };
 }
 
-function formatBytes(n) {
-  if (n < 1024) return `${n} B`;
-  const units = ['KB', 'MB', 'GB'];
-  let value = n / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
-  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
-}
 
 /**
  * What a translation's Strong's numbers amount to, in a line: how many words

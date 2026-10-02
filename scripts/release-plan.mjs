@@ -19,6 +19,9 @@
  *
  * Under GitHub Actions the plan is also written to $GITHUB_OUTPUT as
  * `web`, `desktop`, `version` and `tag`.
+ * That is the one thing written, and there is no `--apply` for it: the file
+ * is the runner's, named by the runner, and nothing in the repository
+ * changes. Without that variable the script only prints.
  *
  * Node standard library only.
  */

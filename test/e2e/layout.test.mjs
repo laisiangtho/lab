@@ -10,6 +10,7 @@
  */
 
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { available, launch } from './harness.mjs';
 
@@ -147,7 +148,7 @@ test('every page fits a phone, in the longest language', options, async (t) => {
   // choice running under a panel's rounded edge, or a toolbar button half off
   // the band, looks like to a reader.
   const { default: en } = await import('../../app/shell/locales/en.js');
-  const { default: my } = await import('../../app/shell/locales/my.js');
+  const my = JSON.parse(readFileSync(new URL('../../locale/my.json', import.meta.url), 'utf8')).strings;
   const app = await launch({ viewport: { width: 390, height: 844 }, phone: true, locale: 'my' });
   const { page } = app;
   t.after(() => app.close());
@@ -180,6 +181,9 @@ test('every page fits a phone, in the longest language', options, async (t) => {
         if (!r.width || r.top > innerHeight || r.bottom < 0 || el.closest('[hidden]')) continue;
         for (let p = el.parentElement; p && p.id !== 'app'; p = p.parentElement) {
           const ps = getComputedStyle(p);
+          // Inside a row that scrolls sideways (the Library's sources) a
+          // control past the edge is one to scroll to, not one cut off.
+          if (/(auto|scroll)/.test(ps.overflowX) && p.scrollWidth > p.clientWidth + 1) break;
           if (!/(hidden|clip)/.test(ps.overflowX) || /(auto|scroll)/.test(ps.overflowX)) continue;
           const pr = p.getBoundingClientRect();
           if (r.right > pr.right + 1 || r.left < pr.left - 1) {

@@ -19,7 +19,7 @@ import { createReadingPanel, applyReading } from './readingpanel.js';
 import { createVerseBar } from './versebar.js';
 import { createPhone } from './phone.js';
 import { createWorkspace } from './workspace.js';
-import { fill, h } from './dom.js';
+import { fill, formatBytes, h } from './dom.js';
 import { icon } from './icons.js';
 import { L, when } from './i18n.js';
 import { createLookup, parsePassageQuery, passageOf } from '../core/lookup.js';
@@ -71,6 +71,13 @@ export function createShell(root, ctx) {
       if (chrome) chrome.notify(message, kind, options);
       else console.error(`[${kind}] ${message}`);
     },
+    /**
+     * A handler whose failure is said: what a button or a command runs,
+     * wrapped so that a throw or a rejection becomes a message instead of
+     * nothing happening.
+     */
+    guard: (fn) => (...args) => Promise.resolve().then(() => fn(...args))
+      .catch((err) => shell.notify(err.message, 'error')),
     openDoc: (id) => workspace.openDoc(id),
     /** A sidebar pane, shown in a workspace tab of its own. */
     openPaneTab: (id) => workspace.openPaneTab(id),
@@ -982,10 +989,10 @@ export function createShell(root, ctx) {
     const next = usage === null
       ? { text: L('val.unknown'), title: L('lbl.storageUnknown') }
       : {
-        text: bytes(usage),
+        text: formatBytes(usage),
         title: [
-          L('lbl.stored', { size: bytes(usage) }),
-          quota ? L('lbl.ofQuota', { size: bytes(quota), pct: Math.max(1, Math.round(usage / quota * 100)) }) : null,
+          L('lbl.stored', { size: formatBytes(usage) }),
+          quota ? L('lbl.ofQuota', { size: formatBytes(quota), pct: Math.max(1, Math.round(usage / quota * 100)) }) : null,
           persisted === true ? L('lbl.persisted') : persisted === false ? L('lbl.notPersisted') : null,
         ].filter(Boolean).join(' · '),
       };
@@ -994,14 +1001,6 @@ export function createShell(root, ctx) {
     renderStatus();
   }
 
-  function bytes(n) {
-    if (n < 1024) return `${n} B`;
-    const units = ['KB', 'MB', 'GB'];
-    let value = n / 1024;
-    let unit = 0;
-    while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
-    return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
-  }
 
   // --- address hash -------------------------------------------------------
 

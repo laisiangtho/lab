@@ -49,14 +49,23 @@ function append(el, children, label = false) {
   }
 }
 
+/**
+ * A size for reading: "512 B", "8.4 MB", "837 KB" — one decimal only where
+ * the number is small enough for it to say something. The one place sizes
+ * are written, so the same file is the same size on every page.
+ */
 export function formatBytes(n) {
   if (n === null || n === undefined) return '–';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let i = 0;
-  let v = n;
-  while (v >= 1024 && i < units.length - 1) { v /= 1024; i += 1; }
-  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+  if (n < 1024) return `${n} B`;
+  const units = ['KB', 'MB', 'GB'];
+  let value = n / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
 }
+
+/** A colour (or any custom property) of the theme in force, for what is drawn on a canvas. */
+export const themeValue = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 /**
  * Rebuild part of the page without throwing the reader back to the top.

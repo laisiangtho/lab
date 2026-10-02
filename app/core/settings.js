@@ -9,6 +9,7 @@
  */
 
 import { expectArray, expectObject, expectString, fail, isPlainObject } from './errors.js';
+import { isLocaleCode } from './locale.js';
 
 export const APP = 'lai-siangtho';
 export const SCHEMA = 1;
@@ -59,11 +60,6 @@ export const SETTING_SECTIONS = Object.freeze([
 /** How many rows a sidebar may be split into. Beyond this nothing is readable. */
 export const MAX_ROWS = 4;
 
-/**
- * The interface languages a stored setting may name. The strings live in the
- * shell (app/shell/locales); test/locales.test.js holds the two lists equal.
- */
-export const INTERFACE_LOCALES = Object.freeze(['en', 'nb', 'my']);
 
 export const defaultSettings = Object.freeze({
   /** Last translation read, or null before anything is installed. */
@@ -73,7 +69,7 @@ export const defaultSettings = Object.freeze({
   /** Translations open in the parallel panes, after the primary one. */
   parallel: Object.freeze([]),
   theme: 'system',
-  /** Interface language (INTERFACE_LOCALES), or null to follow the device. */
+  /** Interface language, as a language code (core/locale.js), or null to follow the device. */
   locale: null,
   /** Accent colour as #rrggbb, or null for the stylesheet's own. */
   accent: null,
@@ -216,9 +212,10 @@ export function parseSettings(raw, { source, category }) {
   const chapter = Number.isInteger(raw.chapter) ? Math.min(Math.max(raw.chapter, 1), chapters) : defaultSettings.chapter;
 
   const theme = THEMES.includes(raw.theme) ? raw.theme : defaultSettings.theme;
-  // A locale this build does not have follows the device rather than refusing
-  // the whole file: a newer build may add one, and the setting is only a choice.
-  const locale = INTERFACE_LOCALES.includes(raw.locale) ? raw.locale : null;
+  // Any language code is a choice that can be kept: the language may be one
+  // the catalog repository offers and this device has yet to fetch (a backup
+  // restored on a new device). What is not a code at all follows the device.
+  const locale = isLocaleCode(raw.locale) ? raw.locale : null;
   const layout = VERSE_LAYOUTS.includes(raw.layout) ? raw.layout : defaultSettings.layout;
   const accent = raw.accent === undefined || raw.accent === null ? null : expectString(raw.accent, source, '$.accent');
   if (accent !== null && !/^#[0-9a-f]{6}$/i.test(accent)) fail(source, '$.accent', `expected #rrggbb, got ${JSON.stringify(accent)}`);

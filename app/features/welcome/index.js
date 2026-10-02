@@ -118,7 +118,13 @@ export default {
     // Claimed here, while features are being set up, rather than when the app
     // has finished starting: the Library asks the same question a moment later,
     // and the answer must not depend on which of them finishes first.
-    const greeting = !seen() && shell.claimFirstRun();
+    //
+    // A reader with no translation yet is still a new reader, greeted again:
+    // the welcome's whole business is the first translation, and a start that
+    // comes before one (the interface restarted in a language just chosen)
+    // would otherwise open on an empty page.
+    const fresh = !seen() || ctx.settings.get().translation === null;
+    const greeting = fresh && shell.claimFirstRun();
     shell.whenReady(() => {
       if (greeting) {
         shell.openDoc('welcome');

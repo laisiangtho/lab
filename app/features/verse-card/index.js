@@ -23,7 +23,7 @@ import {
   parseTemplate, readTemplateFile, resizeFrame, snapLines, snapTo,
 } from '../../core/card.js';
 import { downloadJson, pickJson } from '../../services/transfer.js';
-import { fill, h, keepPlace } from '../../shell/dom.js';
+import { fill, h, keepPlace, themeValue as tone } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { openMenu } from '../../shell/menu.js';
 import { fitStrip, watchStrip } from '../../shell/overflow.js';
@@ -85,20 +85,19 @@ export default {
         .filter((n) => n >= from && n <= last)
         .sort((a, b) => a - b);
       if (!keys.length) {
-        throw new Error(L('ch.noVerse', { ref: `${shell.workspace.bookName(book)} ${chapter}:${from}` }));
+        throw new Error(L('ch.noVerse', { ref: shell.workspace.refLabel(book, chapter, from) }));
       }
       const span = keys.length > 1 ? `${keys[0]}–${keys.at(-1)}` : String(keys[0]);
       return {
         meta,
         at: { book, chapter, verse: keys[0], to: keys.length > 1 ? keys.at(-1) : null },
         lines: keys.map((n) => ({ verse: n, text: verses[n].text })),
-        reference: `${shell.workspace.bookName(book)} ${shell.workspace.number(chapter)}:${span}`,
+        reference: shell.workspace.refLabel(book, chapter, keys[0], keys.at(-1)),
         slug: `${shell.workspace.bookName(book).replace(/\s+/g, '-')}-${chapter}-${span.replace('–', '-')}-${meta.identify}`,
       };
     }
 
     const baseLang = (code) => String(code ?? '').toLowerCase().replace('_', '-').split('-')[0];
-    const tone = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
     function faceFor(template, lang) {
       if (template.font === 'script') return SCRIPT_FONTS[baseLang(lang)] ?? FAMILIES.serif;
@@ -272,8 +271,7 @@ export default {
       save(await toBlob(canvas), `${gathered.slug}.png`);
     }
 
-    const guard = (fn) => (...args) => Promise.resolve().then(() => fn(...args))
-      .catch((err) => shell.notify(err.message, 'error'));
+    const { guard } = shell;
 
     registry.verseAction({
       id: 'card.verse',

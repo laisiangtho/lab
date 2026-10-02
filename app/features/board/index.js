@@ -6,7 +6,7 @@
  * behaves the same everywhere.
  */
 
-import { h } from '../../shell/dom.js';
+import { h, themeValue as tone } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
 
@@ -63,7 +63,6 @@ export default {
         let selected = null;
         let editing = null;
 
-        const tone = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         const at = (x, y) => [...list].reverse().find((c) => x > c.x && x < c.x + c.w && y > c.y && y < c.y + c.h) ?? null;
         const pointer = (e) => {
           const rect = canvas.getBoundingClientRect();
@@ -218,7 +217,7 @@ export default {
           if (!verses) { shell.notify(L('ch.noText', { tr: shell.workspace.primaryName() }), 'error'); return; }
           const first = Object.keys(verses).map(Number).sort((a, b) => a - b)[0];
           addCard({
-            title: `${shell.workspace.bookName(book)} ${chapter}:${first}`,
+            title: shell.workspace.refLabel(book, chapter, Number(first)),
             text: verses[first].text,
             x: 40 + list.length * 24,
             y: 40 + list.length * 18,

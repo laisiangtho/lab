@@ -8,7 +8,12 @@
  * Bible from a plain one without fetching either.
  *
  * Each translation file is read the way the app reads it
- * (core/translation.js). A file the app would refuse is listed at the end
+ * (core/translation.js). A file with faults the app reads past (a book
+ * outside the canon, names out of line with the books, a book that is a copy
+ * of another, a verse without text, a join over verses given on their own)
+ * gets its figures and, as `content.faults`, a count of each fault, which the
+ * Library shows before the translation is downloaded. A file the app would
+ * refuse outright is listed at the end
  * with why, its entry left without figures, and the run exits with status 1:
  * the app cannot install that translation either, which is worth knowing
  * apart from this. Only `content` and, when any
@@ -62,10 +67,12 @@ function main() {
     }
     const content = { ...contentOf(parsed, category) };
     const before = entry.content ?? null;
-    const same = before && CONTENT_KEYS.every((key) => before[key] === content[key]);
+    const same = before && CONTENT_KEYS.every((key) => before[key] === content[key])
+      && JSON.stringify(before.faults ?? {}) === JSON.stringify(content.faults ?? {});
     const line = `${entry.identify.padEnd(14)} OT ${String(content.ot).padStart(2)} NT ${String(content.nt).padStart(2)}  ${String(content.verses).padStart(5)} verses`
       + `  strongs ${content.strongs}  refs ${content.refs}  headings ${content.headings}  titles ${content.titles}`;
     console.log(`${same ? ' ' : '*'} ${line}`);
+    for (const [kind, n] of Object.entries(content.faults ?? {})) console.log(`      fault: ${kind} × ${n}`);
     if (!same) {
       entry.content = content;
       changed += 1;

@@ -148,9 +148,7 @@ export default {
       element.dataset.max = element.dataset.max === '1' ? '0' : '1';
     }
 
-    const label = () => (target.verse === null
-      ? `${shell.workspace.bookName(target.book)} ${target.chapter}`
-      : `${shell.workspace.bookName(target.book)} ${target.chapter}:${target.verse}`);
+    const label = () => shell.workspace.refLabel(target.book, target.chapter, target.verse);
 
     function paint() {
       if (!target) return;

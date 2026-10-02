@@ -31,3 +31,11 @@ test('a catalog entry\'s content: optional, and whole when present', () => {
   assert.throws(() => parseCatalog(entry({ ...full, refs: -1 }), { source: 'book.json' }), /book\[0\]\.content\.refs/);
   assert.throws(() => readContent({ ot: 1 }, 'book.json', '$.c'), /\$\.c\.nt/);
 });
+
+test('faults in the file travel with the figures', () => {
+  const base = { ot: 39, nt: 27, verses: 1, strongs: 0, refs: 0, headings: 0, titles: 0 };
+  assert.equal(readContent(base, 'book.json', '$').faults, undefined);
+  assert.deepEqual({ ...readContent({ ...base, faults: { 'empty-verse': 2 } }, 'book.json', '$').faults }, { 'empty-verse': 2 });
+  assert.throws(() => readContent({ ...base, faults: { nonsense: 1 } }, 'book.json', '$'), /expected one of/);
+  assert.throws(() => readContent({ ...base, faults: { 'empty-verse': 0 } }, 'book.json', '$'), /above zero/);
+});

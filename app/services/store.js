@@ -13,6 +13,8 @@
  *   lexicon       key: 'H' | 'G'                 value: a Strong's lexicon
  *   guide         key: path                      value: a downloaded guide file
  *   lemmas        key: identify                  value: { stamp, index } — core/lemmas.js
+ *   locales       key: code                      value: an interface language fetched from
+ *                                                the catalog repository (core/locale.js)
  *   study         key: id                        value: what a study data set is (no data)
  *   studyrows     key: [id, part]                value: { id, part, data } — a set's data, by
  *                                                chapter ("b.c") for cross-references, or
@@ -23,9 +25,10 @@
  */
 
 import { plainVerses } from '../core/strongs.js';
+import { FAULTS, faultsOf } from '../core/translation.js';
 
 const DB_NAME = 'lai-siangtho';
-const DB_VERSION = 8;
+const DB_VERSION = 9;
 const DIAGNOSTIC_LIMIT = 400;
 
 /**
@@ -66,6 +69,10 @@ export async function openStore({ name = DB_NAME, onLost = null } = {}) {
       // reads one chapter's cross-references and not 340,000. Added in v8.
       if (!d.objectStoreNames.contains('study')) d.createObjectStore('study', { keyPath: 'id' });
       if (!d.objectStoreNames.contains('studyrows')) d.createObjectStore('studyrows', { keyPath: ['id', 'part'] });
+      // Interface languages that are not built in, fetched when chosen and
+      // read at every start. The catalog's, fetched again at will, so never
+      // exported. Added in v9.
+      if (!d.objectStoreNames.contains('locales')) d.createObjectStore('locales', { keyPath: 'code' });
     };
     req.onblocked = () => reject(new Error('Another window of this app is open with an older version of its storage. Close the other windows and reload.'));
     req.onsuccess = () => resolve(req.result);
@@ -177,7 +184,10 @@ class TranslationStore {
         missing: found.filter((d) => d.type === 'missing-book').length,
         short: found.filter((d) => d.type === 'versification').length,
         extra: found.filter((d) => d.type === 'extra-chapter').length,
-        items: found.slice(0, DIAGNOSTIC_LIMIT),
+        // Faults in the file itself, by kind, and first in the list: the cap
+        // must not be what hides them.
+        faults: faultsOf(found),
+        items: [...found.filter((d) => FAULTS.includes(d.type)), ...found.filter((d) => !FAULTS.includes(d.type))].slice(0, DIAGNOSTIC_LIMIT),
       },
     });
     await done(tx);
@@ -229,6 +239,17 @@ class TranslationStore {
     const files = tx.objectStore('guide');
     for (const row of put) files.put(row);
     for (const path of remove) files.delete(path);
+    await done(tx);
+  }
+
+  /** Every interface language kept here: { code, name, english, forms, review, version, strings, fetchedAt }. */
+  async locales() {
+    return request(this.#tx('locales').objectStore('locales').getAll());
+  }
+
+  async putLocale(record) {
+    const tx = this.#tx('locales', 'readwrite');
+    tx.objectStore('locales').put(record);
     await done(tx);
   }
 

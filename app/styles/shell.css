@@ -183,7 +183,7 @@ button,input,textarea,select{font:inherit;color:inherit}
    Only things that behave like hypertext in the document get the hand. */
 /* icon() emits a bare <svg>, which renders at 300x150 anywhere that forgets to
    size it. :where() adds no specificity, so every rule below still wins. */
-:where(#app,.toast,.popover,.drag-ghost,.win-buttons,.composer) svg{width:15px;height:15px}
+:where(#app,.toast,.popover,.drag-ghost,.composer) svg{width:15px;height:15px}
 button{background:none;border:0;padding:0;cursor:default}
 .wikilink,.tag-inline,.pill,.vnum,.tagcloud .pill{cursor:pointer}
 
@@ -193,7 +193,7 @@ button{background:none;border:0;padding:0;cursor:default}
    keeps the arrow throughout; everything a reader might actually want to copy
    — the scripture, their own notes, a copyright line, whatever they typed —
    opts back in below. */
-#app,.toast,.popover,.drag-ghost,.float-win,.composer,.mobile-bar,.win-buttons{
+#app,.toast,.popover,.drag-ghost,.float-win,.composer,.mobile-bar{
   user-select:none;-webkit-user-select:none;cursor:default;
 }
 .note,.doc,.about,.tri-body,.md-body,.cw-preview,.key-list,
@@ -250,25 +250,12 @@ body[data-platform="darwin"]::before{
 .win-ctl button[aria-pressed="true"]{color:var(--accent-2)}
 .win-ctl svg{width:15px;height:15px}
 
-/* Window buttons belong to the window's corner, not to any one column, so they
-   float above the band and the strip underneath reserves room for them. */
-.win-buttons{
-  display:none;position:fixed;top:var(--mac-inset);inset-inline-end:0;height:var(--bar-h);z-index:48;
-  -webkit-app-region:no-drag;app-region:no-drag;
-}
-body[data-shell="on"] .win-buttons{display:flex}
+/* The window's own buttons sit in its corner; the strip underneath reserves
+   room for them. */
 body[data-shell="on"],body[data-platform="darwin"]{--drag-reserve:72px}
-body[data-shell="on"][data-platform="darwin"] .win-buttons{display:none}
 body[data-shell="on"] .win-ctl button:nth-child(3){display:none}
 body[data-shell="on"][data-right="open"] .sidebar.right .pane-tabs{padding-inline-end:var(--wc-w)}
 body[data-shell="on"][data-right="shut"] .tabbar{padding-inline-end:var(--wc-w)}
-.win-buttons button{
-  width:46px;height:100%;display:grid;place-items:center;border-radius:0;
-  color:var(--text-muted);transition:background var(--speed),color var(--speed);
-}
-.win-buttons button:hover{background:var(--bg-hover);color:var(--text-normal)}
-.win-buttons button.close:hover{background:var(--win-close);color:#fff}
-.win-buttons svg{width:12px;height:12px}
 
 .body-row{flex:1;display:flex;min-height:0;padding-bottom:var(--gutter)}
 
@@ -356,20 +343,6 @@ body[data-shell="on"][data-right="shut"] .tabbar{padding-inline-end:var(--wc-w)}
 .ribbon [data-dragging] ~ .rib-foot .rib-add .rib-bin{display:grid}
 .rib-add.is-target{background:var(--c-red);color:#fff;box-shadow:none;transform:scale(1.12)}
 .rib.is-leaving{opacity:.5}
-.rib-speech{position:relative}
-.rib-speech .ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);pointer-events:none}
-.rib-speech .ring circle{fill:none;stroke-width:2.2}
-.rib-speech .ring-track{stroke:var(--border-strong);opacity:0;transition:opacity var(--speed)}
-.rib-speech .ring-fill{
-  stroke:currentColor;stroke-linecap:round;
-  stroke-dasharray:100.5;stroke-dashoffset:100.5;
-  transition:stroke-dashoffset .18s linear;
-}
-.rib-speech[data-mode="playing"],.rib-speech[data-mode="paused"]{color:var(--accent-2)}
-.rib-speech[data-mode="paused"]{color:var(--c-orange)}
-.rib-speech[data-mode="playing"] .ring-track,
-.rib-speech[data-mode="paused"] .ring-track{opacity:1}
-.rib-speech[data-mode="playing"] .glyph{animation:pulse 2.4s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.62}}
 .rib[data-tip]::after{
   content:attr(data-tip);position:absolute;inset-inline-start:calc(100% + 10px);top:50%;transform:translateY(-50%);
@@ -483,16 +456,6 @@ body[data-shell="on"][data-right="shut"] .tabbar{padding-inline-end:var(--wc-w)}
 .sidebar.left .pane-tabs{--sheet-inset:var(--gutter)}
 
 .pane-view{background:var(--bg-secondary)}
-.pane-head{
-  display:flex;align-items:center;gap:6px;padding:10px 12px 6px;flex:0 0 auto;
-  font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--text-faint);
-}
-.pane-head .ph-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pane-head button{
-  width:22px;height:22px;border-radius:var(--radius-s);display:grid;place-items:center;color:var(--text-faint);
-}
-.pane-head button:hover{background:var(--bg-hover);color:var(--text-normal)}
-.pane-head svg{width:14px;height:14px}
 .pane-body{flex:1;min-height:0;padding:10px 6px}
 
 /* ---- sidebar rows -------------------------------------------------------- */
@@ -797,14 +760,6 @@ html[dir="rtl"] .tree-item.is-open>.tree-row>.twisty svg{transform:none}
   border-radius:var(--radius-s);padding:2px 7px;font-size:11px;font-weight:600;
   letter-spacing:.02em;color:var(--text-muted);transition:background var(--speed),color var(--speed);
 }
-.dir-btn{
-  width:24px;height:22px;flex:0 0 auto;display:grid;place-items:center;border-radius:var(--radius-s);
-  color:var(--text-faint);transition:background var(--speed),color var(--speed);
-}
-.dir-btn:hover{background:var(--bg-hover);color:var(--text-normal)}
-.dir-btn[aria-pressed="true"]{color:var(--accent-2)}
-.dir-btn svg{width:14px;height:14px}
-.dir-btn[aria-pressed="true"] svg{transform:scaleX(-1)}
 /* A voice this device lacks: visibly quiet, still explains itself on hover. */
 .rib.is-unavailable{opacity:.38}
 .rib.is-unavailable:hover{opacity:.62}
@@ -815,7 +770,6 @@ html[dir="rtl"] .tree-item.is-open>.tree-row>.twisty svg{transform:none}
 }
 .leaf-close:hover{background:var(--bg-hover);color:var(--c-red)}
 .leaf-close svg{width:12px;height:12px}
-.swatch-dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 0 1px rgba(128,128,128,.35)}
 /* pan-y leaves horizontal gestures to the app; without it the browser claims
    the swipe and fires pointercancel instead of pointerup. */
 .leaf-scroll{
@@ -830,26 +784,6 @@ html[dir="rtl"] .tree-item.is-open>.tree-row>.twisty svg{transform:none}
   max-width:calc(var(--measure) + 88px);margin:0 auto;padding:34px 44px 48vh;position:relative;
 }
 body[data-measure="full"] .note{max-width:none}
-/* Chapter and study sections share a row: stacked by default, side by side
-   when the pane has room for a margin (fitLeaves decides). */
-.note.has-margin{max-width:calc(var(--measure) + 52px + 360px + 88px)}
-.note.has-margin .reading-row{
-  display:grid;grid-template-columns:minmax(0,var(--measure)) minmax(260px,360px);
-  column-gap:52px;align-items:start;
-}
-.note.has-margin .study-col{
-  position:sticky;top:18px;max-height:calc(var(--pane-h,100vh) - 36px);overflow:auto;
-  padding-inline-start:20px;border-inline-start:1px solid var(--border);
-  font-size:var(--fs-ui-m);scrollbar-width:none;
-}
-.note.has-margin .study-col::-webkit-scrollbar{display:none}
-.note.has-margin .study-col .md-h2{
-  font-family:var(--font-ui);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
-  color:var(--text-faint);margin:0 0 6px;
-}
-.note.has-margin .study-col .md-h2~.md-h2{margin-top:22px}
-.note.has-margin .study-col>p{font-size:var(--fs-ui-m)!important;line-height:1.6!important}
-.note.has-margin .study-col .study-empty{margin-top:0}
 .note.wide{max-width:none}
 .inline-title{
   font-family:var(--font-ui);font-size:30px;font-weight:700;letter-spacing:-.02em;
@@ -873,39 +807,6 @@ body[data-measure="full"] .note{max-width:none}
    eye goes to the text. */
 .note.is-compare .ch-caption{font-weight:500;color:var(--text-muted)}
 .tr-missing{margin:22px 0 0;font-size:var(--fs-ui-s);color:var(--text-faint)}
-/* A chapter nobody has written about yet: one quiet line and one way forward. */
-.study-empty{
-  display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:28px 0 0;padding:10px 12px;
-  border-radius:var(--radius-m,6px);background:var(--base-10);color:var(--text-faint);
-  font-family:var(--font-ui);font-size:var(--fs-ui-m);
-}
-.study-empty svg{width:15px;height:15px;flex:0 0 auto;opacity:.8}
-.study-empty span{flex:1;min-width:12em}
-.study-add{
-  color:var(--accent-2);font:inherit;font-weight:600;padding:3px 8px;border-radius:var(--radius-s);
-}
-.study-add:hover{background:var(--bg-hover)}
-
-.props{border-bottom:var(--divider);padding-bottom:10px;margin-bottom:22px}
-.props-head{
-  display:flex;align-items:center;gap:6px;color:var(--text-faint);font-size:var(--fs-ui-s);
-  padding:2px 0 6px;
-}
-.props-head svg{width:12px;height:12px;transition:transform var(--speed)}
-.props.is-collapsed .props-head svg{transform:rotate(-90deg)}
-.props.is-collapsed .props-list{display:none}
-.props-list{display:grid;grid-template-columns:minmax(88px,132px) 1fr;gap:1px 8px;align-items:start}
-.prop-k{
-  display:flex;align-items:center;gap:6px;color:var(--text-faint);font-size:var(--fs-ui-m);
-  padding:4px 6px;border-radius:var(--radius-s);
-}
-.prop-k svg{width:13px;height:13px;flex:0 0 auto}
-.prop-v{
-  padding:4px 6px;border-radius:var(--radius-s);color:var(--text-muted);font-size:var(--fs-ui-m);
-  min-height:26px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;
-}
-.prop-v[contenteditable="true"]:hover{background:var(--bg-hover)}
-.prop-v[contenteditable="true"]:focus{background:var(--bg-hover);outline:1px solid var(--accent-line)}
 
 .pill{
   display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;
@@ -975,7 +876,6 @@ body[data-measure="full"] .note{max-width:none}
 }
 .rpanel.no-arrow::before{display:none}
 .rpanel:focus{outline:none}
-body.study-in-margin .outline-study{display:none}
 .rp-row{display:flex;align-items:center;gap:10px}
 .rp-row>.rp-l{flex:0 0 88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* A control too wide to sit beside its label takes the line under it. */
@@ -988,8 +888,6 @@ body.study-in-margin .outline-study{display:none}
 .rp-step:hover{background:var(--bg-hover);color:var(--text-normal)}
 .rp-a{font-family:var(--font-text);font-size:17px;line-height:1}
 .rp-a.small{font-size:12px}
-.rp-glyph{width:30px;display:grid;place-items:center;color:var(--text-faint)}
-.rp-glyph svg{width:16px;height:16px}
 .rp-num{display:flex;align-items:center;gap:3px;background:var(--base-10);border:1px solid var(--border);border-radius:var(--radius-s);padding-block:0;padding-inline:2px 6px}
 .rp-num input{width:44px;background:none;border:0;color:var(--text-normal);font:inherit;font-size:var(--fs-ui-m);text-align:end;padding:4px 0;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
 .rp-num input::-webkit-inner-spin-button{display:none}
@@ -1047,8 +945,6 @@ body[data-tint="on"] .strongs.is-hidden-code:hover{color:var(--accent-2);backgro
   font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
   color:var(--text-faint);margin:30px 0 10px;
 }
-.doc-p{margin:0 0 12px}
-.doc-p:last-child{margin-bottom:0}
 .task-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:8px}
 .task{
   background:var(--surface-raised);border:var(--divider);border-radius:var(--radius-l);
@@ -1065,30 +961,6 @@ body[data-tint="on"] .strongs.is-hidden-code:hover{color:var(--accent-2);backgro
 .key-row .k{flex:0 0 130px;display:flex;gap:4px;flex-wrap:wrap}
 .key-row .a{flex:1;color:var(--text-muted);font-size:var(--fs-ui-m)}
 .key-empty{padding:14px 2px;color:var(--text-faint)}
-.test-row{
-  display:flex;align-items:flex-start;gap:12px;padding:8px 2px;
-  border-bottom:1px solid var(--border);font-size:var(--fs-ui-m);
-}
-.test-row:last-child{border-bottom:0}
-.test-row .mark{
-  flex:0 0 auto;width:18px;height:18px;border-radius:99px;display:grid;place-items:center;
-  font-size:11px;font-weight:700;
-}
-.test-row.pass .mark{background:rgba(68,207,110,.16);color:var(--c-green)}
-.test-row.fail .mark{background:rgba(251,70,76,.16);color:var(--c-red)}
-.test-row .what{flex:1;color:var(--text-normal)}
-.test-row .why{display:block;color:var(--text-faint);font-size:11px;margin-top:2px}
-.test-sum{
-  display:flex;gap:14px;align-items:center;padding:10px 12px;border-radius:var(--radius-m);
-  background:var(--surface-raised);border:var(--divider);margin:14px 0 6px;font-size:var(--fs-ui-m);
-}
-.test-sum b{font-size:18px}
-.test-sum.ok b{color:var(--c-green)}
-.test-sum.bad b{color:var(--c-red)}
-.fact-list{display:grid;grid-template-columns:minmax(120px,180px) 1fr;gap:1px 16px}
-.fact-list dt{color:var(--text-faint);padding:6px 0;font-size:var(--fs-ui-m)}
-.fact-list dd{margin:0;padding:6px 0;color:var(--text-normal);font-size:var(--fs-ui-m);border-bottom:1px solid var(--border)}
-.fact-list dd:last-of-type{border-bottom:0}
 .doc-filter{max-width:320px;margin:0 0 6px}
 
 /* source mode */
@@ -1288,7 +1160,6 @@ body[data-status="off"] .statusbar{display:none}
 .statusbar .sb-flag:not(.is-on) svg{opacity:.7}
 
 /* ---- overlays: graph / canvas / ink --------------------------------------*/
-.overlay-view{position:absolute;inset:0;background:var(--bg-primary);display:flex;flex-direction:column}
 /* icon() emits a bare <svg>; every strip has to size it or it renders at the
    SVG default of 300x150. */
 .ov-bar{
@@ -1296,7 +1167,6 @@ body[data-status="off"] .statusbar{display:none}
   color:var(--text-muted);font-size:var(--fs-ui-s);
 }
 .ov-bar svg{width:15px;height:15px;flex:0 0 auto}
-.ov-title{display:flex;align-items:center;gap:7px;font-weight:600;color:var(--text-normal);flex:0 0 auto}
 .ov-hint{color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ov-bar .spacer{flex:1;min-width:8px}
 .ov-sep{width:1px;height:14px;background:var(--border);flex:0 0 auto;margin:0 2px}
@@ -1400,10 +1270,6 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
   outline:none;color:var(--text-normal);
 }
 .note-editor:focus{border-color:var(--accent-line)}
-.chat{
-  display:flex;flex-direction:column;gap:9px;padding:10px;margin:0 6px 8px;
-  background:var(--surface-raised);border:var(--divider);border-radius:var(--radius-m);
-}
 .msg{border-radius:var(--radius-m);padding:9px 11px;font-size:var(--fs-ui-m);line-height:1.6}
 .msg.user{background:var(--accent-fade);color:var(--text-normal);border:1px solid var(--accent-line)}
 .msg.ai{background:transparent;box-shadow:inset 0 0 0 1px var(--border);color:var(--text-muted)}
@@ -1446,7 +1312,7 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
 .float-bar .tb-btn{width:28px;height:28px;border-radius:8px;transition:background var(--speed),color var(--speed)}
 .float-bar .tb-btn:hover{background:var(--bg-hover);color:var(--text-normal)}
 .float-bar .tb-btn:last-child:hover{background:rgba(232,72,85,.16);color:var(--c-red)}
-.float-body .crumbs,.float-body .crumb-bar{border-top:0}
+.float-body .crumbs{border-top:0}
 @keyframes win-in{from{opacity:0;transform:translateY(6px) scale(.985)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.float-win,.composer{animation:none}}
 .float-bar.is-dragging{cursor:grabbing}
@@ -1584,16 +1450,10 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
   padding:9px 11px;font-family:var(--font-mono);font-size:12.5px;overflow:auto;margin:0 0 11px;
   color:var(--base-80);
 }
-.md-inline-code{
-  font-family:var(--font-mono);font-size:.88em;background:var(--surface-raised);
-  border-radius:4px;padding:1px 5px;color:var(--c-orange);
-}
-.md-hr{border:0;border-top:1px solid var(--border);margin:16px 0}
 .cw-preview .md-quote{margin:0 0 11px}
 /* Notes mix languages freely, so each block takes the direction of its own
    first letter: a Hebrew line in an English note reads right to left. */
-.cw-preview :is(p,li,h1,h2,h3,h4,.md-quote),.result-line,.nm-sub,.chat .msg,.card,.md-quote,.doc-p{unicode-bidi:plaintext;text-align:start}
-.cw-empty{padding:24px 16px;color:var(--text-faint);font-size:var(--fs-ui-m);line-height:1.6}
+.cw-preview :is(p,li,h1,h2,h3,h4,.md-quote),.result-line,.nm-sub,.card,.md-quote{unicode-bidi:plaintext;text-align:start}
 
 /* ---- notes manager --------------------------------------------------------*/
 .nm{max-width:60rem;margin:0 auto;padding:26px 28px 40vh}
@@ -1687,9 +1547,6 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
     box-shadow:var(--shadow-l),inset 0 1px 0 rgba(255,255,255,.07);
     transition:transform .22s cubic-bezier(.2,.9,.3,1),opacity .18s ease;
   }
-  /* While the finger is moving the bar follows the scroll one to one; the
-     transition only exists for the snap at the end. */
-  body.nav-tracking .mobile-bar{transition:none}
   .mobile-bar.is-stowed{pointer-events:none}
   .mobile-bar button{
     width:50px;height:46px;border-radius:99px;display:grid;place-items:center;
@@ -1727,45 +1584,11 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
 @media (hover:none){
   .ch-chip{height:34px}
   .mi{padding:12px 14px}
-  .sheet-row,.mobile-bar button{-webkit-tap-highlight-color:transparent}
+  .mobile-bar button{-webkit-tap-highlight-color:transparent}
   .ink-bar{position:fixed;inset-inline-end:14px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:70}
   .ink-bar button{width:38px;height:38px}
   .ink-bar svg{width:18px;height:18px}
 }
-
-/* ---- verse action sheet ---------------------------------------------------*/
-.sheet-scrim{
-  position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:215;
-  opacity:0;pointer-events:none;transition:opacity .18s ease;
-}
-.sheet-scrim.is-open{opacity:1;pointer-events:auto}
-.sheet{
-  position:fixed;left:8px;right:8px;z-index:216;
-  bottom:calc(8px + env(safe-area-inset-bottom,0px));
-  background:var(--bg-elevated);border:1px solid var(--border-strong);
-  border-radius:var(--radius-xl);box-shadow:var(--shadow-l);overflow:hidden;
-  transform:translateY(calc(100% + 24px));transition:transform .22s cubic-bezier(.2,.9,.3,1);
-}
-.sheet.is-open{transform:none}
-.sheet-grip{width:36px;height:4px;border-radius:99px;background:var(--base-40);margin:9px auto 4px}
-.sheet-head{
-  padding:4px 18px 10px;font-size:var(--fs-ui-m);color:var(--text-faint);
-  border-bottom:1px solid var(--border);
-}
-.sheet-head b{display:block;color:var(--text-normal);font-size:var(--fs-ui-l);margin-bottom:2px}
-/* Two lines of the verse, ended by the layout rather than cut mid-word. */
-.sheet-head .sh-text{
-  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;
-  unicode-bidi:plaintext;text-align:start;
-}
-.sheet-rows{padding:6px;max-height:60vh;overflow:auto}
-.sheet-row{
-  display:flex;align-items:center;gap:14px;width:100%;height:48px;padding:0 12px;
-  border-radius:var(--radius-m);color:var(--text-normal);font-size:var(--fs-ui-l);text-align:start;
-}
-.sheet-row:active{background:var(--bg-active)}
-.sheet-row svg{width:18px;height:18px;color:var(--accent-2);flex:0 0 auto}
-.sheet-row .hint{margin-inline-start:auto;font-size:11px;color:var(--text-faint)}
 
 /* ---- mobile --------------------------------------------------------------*/
 #barApp{display:none}
@@ -1779,8 +1602,6 @@ canvas.graph,canvas.board{flex:1;display:block;width:100%;min-height:0;touch-act
   opacity:0;pointer-events:none;transition:opacity .2s ease;
 }
 body.has-drawer .scrim-mobile{opacity:1;pointer-events:auto}
-body.drawer-dragging .scrim-mobile{opacity:var(--drawer-p,0);transition:none;pointer-events:auto}
-body.drawer-dragging .sidebar{transition:none}
 @media (hover:none){
   .vnum{padding:2px 4px;margin-inline-start:-4px}
 }
@@ -1839,7 +1660,7 @@ body.drawer-dragging .sidebar{transition:none}
   .scrim{padding-top:6vh}
 }
 @media print{
-  .ribbon,.sidebar,.tabbar,.statusbar,.win-buttons,.vbar,.ink-bar{display:none!important}
+  .ribbon,.sidebar,.tabbar,.statusbar,.vbar,.ink-bar{display:none!important}
   body{overflow:visible}
 }
 

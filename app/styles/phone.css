@@ -220,11 +220,60 @@ body[data-phone] .search-pane .field { border-radius: 12px; min-height: 44px; }
 body[data-phone] .result-line { padding: 12px 6px; font-size: 15px; line-height: 1.5; text-align: start; }
 body[data-phone] .leaf-pane input, body[data-phone] .leaf-pane textarea, body[data-phone] .doc input, body[data-phone] .doc textarea, body[data-phone] .ph-sheet input, body[data-phone] .ph-sheet textarea { font-size: 16px; }
 
-/* Library: rows with room. */
-body[data-phone] .library-item { padding: 14px 14px; }
-body[data-phone] .library-meta strong { font-size: 16px; line-height: 1.35; }
-body[data-phone] .library-meta .muted { font-size: 13px; line-height: 1.5; }
-body[data-phone] .lib-has { margin-top: 7px; gap: 5px; }
+/* Library and Study data: a segmented control, the sources as a row of
+   chips that scrolls sideways, and each list a grouped list — the mark,
+   what it is on lines of its own, and one thing to press at the end. */
+body[data-phone] .lib-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 8px; padding: 6px 16px 12px; border-bottom: 0; background: var(--ph-ground); }
+body[data-phone] .lib-bar .spacer, body[data-phone] .lib-bar-sep, body[data-phone] .lib-readout { display: none; }
+body[data-phone] .lib-seg { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; padding: 2px; border-radius: 10px; }
+body[data-phone] .lib-tab { height: 36px; justify-content: center; padding: 0 6px; border-radius: 8px; font-size: 13.5px; min-width: 0; }
+body[data-phone] .lib-bar .lib-tab > span:not(.lib-tab-n) { display: inline; overflow: hidden; text-overflow: ellipsis; }
+body[data-phone] .lib-tab svg { display: none; }
+body[data-phone] .lib-tab-n { display: none; }
+body[data-phone] .lib-srcs { grid-column: 1; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-inline: -16px 0; padding-inline: 16px 0; scroll-padding-inline: 16px; }
+body[data-phone] .lib-srcs::-webkit-scrollbar { display: none; }
+body[data-phone] .lib-bar .lib-src, body[data-phone] .lib-bar.is-tight .lib-src:not([aria-selected="true"]) { width: auto; height: 36px; padding: 0 12px; border-radius: 99px; background: var(--bg-hover); font-size: 13.5px; }
+body[data-phone] .lib-bar .lib-src[aria-selected="true"] { background: var(--accent); color: var(--text-on-accent); }
+body[data-phone] .lib-bar.is-tight .lib-src:not([aria-selected="true"]) .lib-src-t { display: inline; }
+body[data-phone] .lib-srcs { grid-column: 1 / -1; }
+/* The page's own tools sit at the end of the filter's row; where there is no
+   filter (Study data) they sit over the first heading's line. */
+body[data-phone] .lib-bar-acts { grid-column: 2; grid-row: 3; gap: 0; justify-content: flex-end; }
+body[data-phone] .lib-bar-acts:empty { display: none; }
+body[data-phone] .lib-bar .lib-find, body[data-phone] .lib-bar.is-wrapped .lib-find { grid-column: 1; grid-row: 3; order: 0; flex: none; margin: 0; max-width: none; min-height: 40px; border-radius: 12px; }
+body[data-phone] .lib-bar .lib-find:has(+ .spacer + .lib-readout + .lib-bar-acts:empty) { grid-column: 1 / -1; }
+body[data-phone] .lib-bar[data-page="study"] .lib-bar-acts { grid-column: 1 / -1; grid-row: 2; height: 0; margin-bottom: -10px; transform: translateY(18px); position: relative; z-index: 1; }
+body[data-phone] .lib-bar-acts .lib-act { width: 40px; height: 44px; }
+body[data-phone] .lib-bar .lib-find[hidden] { display: none; }
+body[data-phone] .lib-act { width: 44px; height: 44px; border-radius: 99px; }
+body[data-phone] .lib-act svg { width: 20px; height: 20px; }
+body[data-phone] .lib-page { padding: 0 16px 110px; }
+body[data-phone] .library-group h2 { margin: 20px 6px 6px; font-size: 12.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+body[data-phone] .library-group:first-child h2 { margin-top: 6px; }
+body[data-phone] .library-list { border: 0; border-radius: 14px; background: var(--bg-elevated); }
+body[data-phone] .library-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 12px 6px 12px 14px; min-height: 64px; background: none; border: 0; }
+body[data-phone] .library-item + .library-item { border-top: 0; background: linear-gradient(var(--border), var(--border)) no-repeat 64px 0 / 100% .5px; }
+body[data-phone] .library-item:hover { background-color: transparent; }
+body[data-phone] .lib-mark { width: 38px; height: 38px; align-self: start; margin-top: 2px; }
+body[data-phone] .library-meta { display: flex; flex-direction: column; align-items: flex-start; flex-wrap: nowrap; gap: 2px; }
+body[data-phone] .library-meta strong { font-size: 16px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+body[data-phone] .library-meta .muted { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+body[data-phone] .library-meta .badge { margin-top: 4px; }
+/* What it has, as a quiet line of words. */
+body[data-phone] .lib-has { display: block; margin-top: 2px; }
+body[data-phone] .lib-has-i { padding: 0; background: none; box-shadow: none; border-radius: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-muted); display: inline; }
+body[data-phone] .lib-has-i:not(:last-child)::after { content: " · "; white-space: pre; color: var(--text-faint); }
+body[data-phone] .lib-has-i.is-strongs, body[data-phone] .lib-has-i.is-refs { color: var(--accent-2); }
+/* The one thing to press: a round button, its words kept for those who hear them. */
+body[data-phone] .library-actions { grid-column: 3; align-self: center; align-items: center; gap: 0; }
+body[data-phone] .library-actions > .muted { max-width: 96px; padding-inline-end: 8px; font-size: 12px; text-align: end; }
+body[data-phone] .library-actions .btn { width: 36px; height: 36px; min-height: 0; margin: 4px; padding: 0; border-radius: 99px; justify-content: center; gap: 0; font-size: 0; }
+body[data-phone] .library-actions .btn svg { width: 18px; height: 18px; }
+body[data-phone] .sd-what { margin: 0 6px 8px; font-size: 13px; line-height: 1.5; }
+body[data-phone] .sd-sources { margin-top: 10px; }
+body[data-phone] .sd-sources .library-item { border: 0; }
+body[data-phone] .lib-panel { padding: 16px; border-radius: 14px; background: var(--bg-elevated); box-shadow: none; }
+body[data-phone] .lib-url .btn { min-height: 44px; }
 
 /* Settings: a list of sections, then one section at a time. */
 body[data-phone] .settings { padding: 4px 16px 24px; }

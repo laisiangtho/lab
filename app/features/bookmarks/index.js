@@ -7,7 +7,7 @@ import { h } from '../../shell/dom.js';
 import { wantsNewTab } from '../../shell/reflink.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
-import { verseLabelOf, verseRange } from '../../core/annotations.js';
+import { verseRange } from '../../core/annotations.js';
 
 export default {
   id: 'bookmarks',
@@ -34,8 +34,7 @@ export default {
       run: async (p) => {
         const { translation } = state.get();
         const verses = translation ? await store.getChapter(translation, p.book, p.chapter) : null;
-        const span = p.to && p.to !== p.verse ? `${p.verse}–${p.to}` : String(p.verse);
-        const ref = `${shell.workspace.bookName(p.book)} ${p.chapter}:${span}`;
+        const ref = shell.workspace.refLabel(p.book, p.chapter, p.verse, p.to ?? null);
         const lines = [];
         for (let v = p.verse; v <= (p.to ?? p.verse); v += 1) {
           const text = verses?.[v]?.text;
@@ -112,7 +111,7 @@ export default {
               onclick: (e) => shell.openVerse(mark.book, mark.chapter, mark.verse, { newTab: wantsNewTab(e) }),
             },
               h('span', { class: 'mark-ref' },
-                `${shell.workspace.bookName(mark.book)} ${mark.chapter}:${verseLabelOf(mark, (n) => shell.workspace.number(n))}`),
+                shell.workspace.refLabel(mark.book, mark.chapter, mark.verse, mark.to ?? null)),
               text ? h('span', { class: 'mark-text' }, text) : null),
             h('button', {
               class: 'mark-remove', title: L('cmd.unbookmark'), 'aria-label': L('cmd.unbookmark'),

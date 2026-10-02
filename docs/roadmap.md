@@ -40,7 +40,7 @@ Last reviewed at 26.10.01.3.
 4. **Burmese review.** Every Burmese interface string, including the word
    study, interlinear and Help topics added in 26.10.01.1, was written without
    a native reader's check. Settings marks the language as *review*.
-   Done when: a native reader has gone through `locales/my.js` and the mark is
+   Done when: a native reader has gone through `locale/my.json` and the mark is
    removed.
 
 5. **Strong's tense codes.** The KJV's morphology is `strongMorph:TH8804`,

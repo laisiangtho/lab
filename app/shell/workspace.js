@@ -502,6 +502,23 @@ export function createWorkspace(ctx, chrome) {
     return primaryMeta?.books[book]?.name ?? pack()?.books[book]?.name ?? category.book(book).name;
   }
 
+  /**
+   * A passage as the reading names it: the book in the translation's own
+   * language, the numbers in its own digits. "Genesis 1", "Genesis 1:3",
+   * "Genesis 1:3–5". The one place a reference is put together for the
+   * reader, so a bookmark, a card and a note all call a verse the same thing.
+   *
+   * @param {number} book
+   * @param {number} chapter
+   * @param {number|null} [verse]
+   * @param {number|null} [to]  the last verse of a span
+   */
+  function refLabel(book, chapter, verse = null, to = null) {
+    const base = `${bookLabel(book)} ${localNumber(chapter)}`;
+    if (verse === null || verse === undefined) return base;
+    return to && to !== verse ? `${base}:${localNumber(verse)}–${localNumber(to)}` : `${base}:${localNumber(verse)}`;
+  }
+
   /** The canon's own name, for a reader who cannot read the script. */
   const englishBook = (book) => category.book(book).name;
   const englishTestament = (id) => category.testaments.find((t) => t.id === id)?.name ?? '';
@@ -1168,6 +1185,7 @@ export function createWorkspace(ctx, chrome) {
     englishBook,
     englishTestament,
     englishRef,
+    refLabel,
     lang: primaryLang,
     primaryDirection,
     number: localNumber,
