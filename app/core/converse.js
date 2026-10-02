@@ -86,9 +86,12 @@ const PATTERNS = Object.freeze([
     /(?:ဘာ\s*လုပ်\s*ရမလဲ|ဘယ်က\s*စ\s*ရမလဲ)/,
   ]],
   ['tour', [
-    /(?:^|\b)(?:tour|walk ?through|tutorial|show me around|onboarding)(?:\b|$)/,
-    /(?:omvisning|gjennomgang|vis meg rundt)/,
-    /လမ်းညွှန်ချက်/,
+    // The whole question, not a word in it: "how do I walk through a passage"
+    // and "who was the first tour guide" are not asking for the walkthrough.
+    /^(?:(?:can you |could you |please )?(?:play|replay|take|start|restart|run|show|do|give me|open)(?: me)? )?(?:the |a |your )?(?:tour|walk ?through|tutorial|onboarding)(?: again| please)*$/,
+    /^(?:please )?show me (?:around|the tour|how (?:it|this) works)(?: again| please)*$/,
+    /^(?:(?:ta|start|vis|spill av) )?(?:omvisning(?:en)?|gjennomgang(?:en)?)(?: igjen| på nytt)?$/, /^vis meg rundt$/,
+    /^လမ်းညွှန်ချက်(?:\s*(?:ပြန်)?(?:ကြည့်|ပြ)\S*)?$/,
   ]],
   ['version', [
     /^what version(?: is this| are you)?(?: app)?$/, /^(?:app|your) version$/, /^which version is this$/,

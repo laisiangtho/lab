@@ -29,7 +29,7 @@ test('the phone shell', options, async (t) => {
 
   await t.test('five places, and none of the desktop\'s frame', async () => {
     assert.deepEqual(await page.locator('.ph-tab').evaluateAll((els) => els.map((el) => el.dataset.tab)), ['read', 'search', 'library', 'study', 'more']);
-    assert.equal(await tab('library').getAttribute('aria-selected'), 'true', 'the Library, where the first run left off');
+    assert.equal(await tab('library').getAttribute('aria-current'), 'page', 'the Library, where the first run left off');
     for (const part of ['.tabbar', '.ribbon', '.statusbar', '.mobile-bar', '.sidebar.left', '.leaf-head']) {
       assert.equal(await page.locator(part).first().isVisible(), false, `${part} is not on a phone`);
     }
@@ -131,7 +131,7 @@ test('the phone shell', options, async (t) => {
     await page.locator('.ph-screen .ph-row', { hasText: 'Bookmarks' }).tap();
     await page.waitForSelector('.ph-nav .ph-title');
     assert.equal(await page.locator('.ph-nav .ph-title').innerText(), 'Bookmarks');
-    assert.equal(await tab('study').getAttribute('aria-selected'), 'true', 'still under Study');
+    assert.equal(await tab('study').getAttribute('aria-current'), 'page', 'still under Study');
     await page.locator('.ph-nav .ph-btn').first().tap();
     assert.equal(await page.locator('.ph-big').innerText(), 'Study', 'back to the list');
     await tab('more').tap();
@@ -144,7 +144,7 @@ test('the phone shell', options, async (t) => {
     await tab('study').tap();
     await page.locator('.ph-screen .ph-row', { hasText: 'Første Mosebog 1' }).tap();
     await page.waitForFunction(() => document.querySelector('.ph-where span')?.textContent?.endsWith(' 1'));
-    assert.equal(await tab('read').getAttribute('aria-selected'), 'true');
+    assert.equal(await tab('read').getAttribute('aria-current'), 'page');
   });
 
   await t.test('Search and Library carry a large title; search waits for the Search key', async () => {
@@ -180,9 +180,13 @@ test('the phone shell', options, async (t) => {
     const text = await page.locator('.set-section.is-open').innerText();
     assert.match(text, /Theme/);
     assert.doesNotMatch(text, /Ribbon|Status bar/, 'nothing about a ribbon or a status bar');
-    await page.locator('.set-section.is-open .set-back').tap();
-    assert.ok(await page.locator('.set-nav').isVisible(), 'back to the list');
-    await page.locator('.ph-nav .ph-btn').first().tap();
+    assert.equal(await page.evaluate(() => document.activeElement?.className), 'settings-h', 'focus is on the section opened');
+    assert.equal(await page.locator('.ph-nav .ph-back').count(), 1, 'one Back button, the page\'s');
+    await page.locator('.ph-nav .ph-back').tap();
+    assert.ok(await page.locator('.set-nav').isVisible(), 'back to the list of sections first');
+    assert.equal(await page.locator('.set-section.is-open').count(), 0);
+    await page.locator('.ph-nav .ph-back').tap();
+    await page.waitForSelector('.ph-screen:not([hidden])');
   });
 
   await t.test('a translation read alongside goes under each verse, and is taken away from the sheet', async () => {
@@ -208,10 +212,20 @@ test('the phone shell', options, async (t) => {
     await sheet.waitFor();
     assert.equal(await page.locator('#ph-sheet-title').innerText(), 'Word study');
     await page.locator('.ph-sheet .ws').waitFor();
-    assert.equal(await tab('read').getAttribute('aria-selected'), 'true', 'still reading');
+    assert.equal(await tab('read').getAttribute('aria-current'), 'page', 'still reading');
     assert.ok(await page.locator('.leaf[data-pane="0"] .vblock').first().isVisible(), 'the text is still there above it');
+    assert.ok(await page.evaluate(() => document.querySelector('.ph-sheet').contains(document.activeElement)), 'focus is in the sheet');
+    assert.ok(await page.evaluate(() => document.querySelector('.ph-tabs').inert && !document.querySelector('.ph-sheet').inert), 'and what is behind it is out of reach');
+    const handle = page.locator('.ph-grab');
+    assert.equal(await handle.getAttribute('aria-expanded'), 'false');
+    await handle.press('Enter');
+    assert.equal(await handle.getAttribute('aria-expanded'), 'true', 'the handle raises the sheet without a drag');
+    assert.ok(await page.locator('.ph-sheet.is-full').count());
+    await handle.press('Enter');
+    assert.equal(await page.locator('.ph-sheet.is-full').count(), 0);
     await closeSheet();
     assert.equal(await page.locator('.ph-sheet .ws').count(), 0, 'and the pane goes back');
+    assert.ok(await page.evaluate(() => document.querySelector('.ph-sheet').inert && !document.querySelector('.ph-tabs').inert), 'a sheet put away is out of reach itself');
   });
 
   await t.test('a sheet is pulled down to put it away', async () => {

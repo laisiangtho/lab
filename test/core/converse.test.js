@@ -13,7 +13,7 @@ test('the questions worked out rather than looked up', () => {
     'who are you?': 'who', 'What are you': 'who', 'are you an AI?': 'who', 'hvem er du': 'who',
     'can you help me?': 'help', 'how can you help me': 'help', 'what can you do?': 'help',
     'what should I do?': 'start', "I'm new here": 'start',
-    'play the walkthrough again': 'tour', 'show me around': 'tour', 'Take the tour': 'tour',
+    'play the walkthrough again': 'tour', 'show me around': 'tour', 'Take the tour': 'tour', 'tutorial': 'tour', 'can you show me the tour again': 'tour',
     'hello': 'hello', 'Good morning!': 'hello', 'hei': 'hello', 'thanks!': 'thanks', 'how are you?': 'how',
     'how many translations do I have': 'translations', 'what version is this': 'version',
   };
@@ -24,7 +24,8 @@ test('the questions worked out rather than looked up', () => {
 });
 
 test('a request is not small talk', () => {
-  for (const question of ['help me make a note', 'how do I bookmark a verse', 'search for love', 'why is it dark']) {
+  for (const question of ['help me make a note', 'how do I bookmark a verse', 'search for love', 'why is it dark',
+    'how do I walk through a passage', 'is there a tutorial on notes']) {
     assert.equal(intentOf(question), null, question);
   }
 });
@@ -46,6 +47,7 @@ test('what a count is of', () => {
 });
 
 test('a subject, for the reader\'s own dictionaries and topical indexes', () => {
+  assert.equal(intentOf('who was the first tour guide')?.intent, 'define', 'a word in a question is not the question');
   assert.deepEqual(intentOf('What is grace?'), { intent: 'define', rest: 'grace' });
   assert.deepEqual(intentOf('who was Aaron'), { intent: 'define', rest: 'aaron' });
   assert.deepEqual(intentOf('tell me about Moses'), { intent: 'define', rest: 'moses' });

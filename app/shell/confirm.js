@@ -3,7 +3,7 @@
  *
  * The browser's own `confirm()` blocks the whole page, cannot be styled, and on
  * the desktop build opens a window over the app — the same objections that made
- * the colour picker our own. This one is a small dialog in the app: it names
+ * the colour picker the app's own. This one is a small dialog in the app: it names
  * what will happen, offers the cancel first, and resolves to a boolean.
  *
  * Escape and the backdrop both mean no, because the safe answer must be the

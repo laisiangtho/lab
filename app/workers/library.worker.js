@@ -87,7 +87,7 @@ async function install({ identify, url }, post) {
 }
 
 /**
- * A file the reader gave us, in whatever format they said it was.
+ * A file the reader gave, in whatever format they said it was.
  *
  * The identify is the reader's, not the file's: `parseTranslation` cross-checks
  * the two and refusing somebody's own file because its internal name differs

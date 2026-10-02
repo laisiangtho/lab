@@ -499,7 +499,7 @@ export default {
         const marginBox = h('div', { class: 'cd-margin', hidden: true });
         /**
          * The card's own edges. Width and height are on the Shape panel too, but
-         * a picture whose size can only be typed is not a picture you can size:
+         * a picture whose size can only be typed is not a picture that can be sized:
          * the hand goes to the corner first, and finding nothing there is what
          * makes an editor feel like a form.
          */

@@ -238,8 +238,9 @@ export function createKnowledge(ctx, { guideData }) {
     for (const entry of topics) add(entry, 'topics');
     subjects = next;
   }
-  readSubjects().catch(() => {});
-  ctx.study?.on('change', () => { readSubjects().catch(() => {}); });
+  const subjectsFailed = (err) => shell.notify(err.message, 'error');
+  readSubjects().catch(subjectsFailed);
+  ctx.study?.on('change', () => { readSubjects().catch(subjectsFailed); });
 
   /** A subject in the reader's own sets: the word, then without a plural "s". */
   function subject(text, prefer) {
@@ -259,7 +260,7 @@ export function createKnowledge(ctx, { guideData }) {
 
   /** The translations on this device, kept current for answers asked synchronously. */
   let installed = [];
-  const countInstalled = () => ctx.store.list().then((rows) => { installed = rows; }).catch(() => {});
+  const countInstalled = () => ctx.store.list().then((rows) => { installed = rows; }).catch((err) => shell.notify(err.message, 'error'));
   countInstalled();
   ctx.library?.on('change', countInstalled);
 
@@ -312,6 +313,9 @@ export function createKnowledge(ctx, { guideData }) {
       case 'chapters':
       case 'verses': {
         const scope = scopeOf(found.rest, readBook);
+        // What follows reads as the rest of a sentence, not a book's name
+        // ("how many books have I read"): not a count this can give.
+        if (scope.scope === 'unknown' && /^(?:have|has|had|did|do|does|should|can|could|will|would|i|you|we|are|is|was|were)\b/.test(scope.text)) return null;
         if (scope.scope === 'unknown') return live('nobook', L('cv.noBook', { text: scope.text }), L('cv.noBookNote'));
         if (scope.scope === 'bible') {
           const [ot, nt] = [books(1), books(2)];
@@ -326,7 +330,8 @@ export function createKnowledge(ctx, { guideData }) {
           return live(`${found.intent}.t${scope.testament}`, L(`cv.${found.intent}In`, { n: number(n), where: testamentName(scope.testament) }), span);
         }
         const book = category.book(scope.book);
-        const go = { passage: { book: book.id, chapter: scope.scope === 'chapter' ? scope.chapter : 1 } };
+        // A chapter the book does not have is not somewhere to go.
+        const go = { passage: { book: book.id, chapter: scope.scope === 'chapter' && scope.chapter <= book.chapters ? scope.chapter : 1 } };
         if (scope.scope === 'chapter' && found.intent === 'verses') {
           if (scope.chapter > book.chapters) return live('nochapter', L('cv.noChapter', { book: bookName(book.id), n: number(book.chapters) }), '', { passage: { book: book.id, chapter: 1 } });
           return live('verses.c', L('cv.versesIn', { n: number(category.verseCount(book.id, scope.chapter)), where: passageName(shell, { book: book.id, chapter: scope.chapter }) }), L('cv.numbering'), go);

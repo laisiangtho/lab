@@ -4,8 +4,8 @@
  * A translation as it is actually published is a zip. eBible.org hands out
  * `engkjvcpb_usfx.zip`, and inside it are the pieces that make the file worth
  * having: the scripture, the translation's own book names, its metadata, its
- * copyright notice. Asking somebody to unpack it and then feed us one file out
- * of eight is asking them to do our job.
+ * copyright notice. Asking somebody to unpack it and then hand over one file out
+ * of eight is asking them to do the importer's job.
  *
  * There is no dependency here and there does not need to be. A zip's central
  * directory is a few fixed-width fields, and `DecompressionStream('deflate-raw')`

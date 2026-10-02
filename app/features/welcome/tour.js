@@ -8,7 +8,8 @@
  * (`before`). The page under the light can still be used: the rest of the
  * screen is dimmed, not blocked, except by the card itself.
  *
- * Keys: → or Enter next, ← back, Esc ends. Ending, at any step, is final for
+ * Keys: Enter next, the arrow that points the way the text runs next and
+ * the other one back, Esc ends. Ending, at any step, is final for
  * this run; the tour can be taken again from Welcome, the app menu, the
  * palette and the Guide.
  */
@@ -31,14 +32,17 @@ const GAP = 12;
 export function runTour(steps, { onEnd = () => {} } = {}) {
   const ring = h('div', { class: 'tour-ring', 'aria-hidden': 'true' });
   const count = h('span', { class: 'tour-n' });
+  const opener = document.activeElement;
   const title = h('h2', { class: 'tour-t', id: 'tour-title' });
-  const body = h('p', { class: 'tour-b' });
+  const body = h('p', { class: 'tour-b', id: 'tour-body' });
   const back = h('button', { class: 'btn', onclick: () => go(-1) }, icon('arrow-left'), L('tour.back'));
   const next = h('button', { class: 'btn primary', onclick: () => go(1) });
   const skip = h('button', { class: 'tour-skip', onclick: () => end('skipped') }, L('tour.skip'));
-  const card = h('div', { class: 'tour-card', role: 'dialog', 'aria-modal': 'false', 'aria-labelledby': 'tour-title' },
+  const card = h('div', { class: 'tour-card', role: 'dialog', 'aria-modal': 'false', 'aria-labelledby': 'tour-title', 'aria-describedby': 'tour-body' },
     h('div', { class: 'tour-top' }, count, skip),
-    title, body,
+    // Each step is said as it comes: the card is not a modal, so nothing else
+    // announces that its words have changed.
+    h('div', { class: 'tour-words', 'aria-live': 'polite', 'aria-atomic': 'true' }, title, body),
     h('div', { class: 'tour-acts' }, back, next));
   const layer = h('div', { class: 'tour', dataset: { step: '' } }, ring, card);
   document.body.append(layer);
@@ -90,6 +94,8 @@ export function runTour(steps, { onEnd = () => {} } = {}) {
     back.disabled = at === 0;
     next.replaceChildren(L(last ? 'tour.done' : 'tour.next'), last ? icon('check') : icon('arrow-right'));
     place();
+    // What a step opened may still be moving into place.
+    setTimeout(place, 320);
     next.focus({ preventScroll: true });
   }
 
@@ -132,8 +138,11 @@ export function runTour(steps, { onEnd = () => {} } = {}) {
 
   function onKey(event) {
     if (event.key === 'Escape') { event.preventDefault(); end('skipped'); }
-    else if (event.key === 'ArrowRight' && !event.target.closest?.('input, textarea')) { event.preventDefault(); go(1); }
-    else if (event.key === 'ArrowLeft' && !event.target.closest?.('input, textarea')) { event.preventDefault(); go(-1); }
+    else if ((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && !event.target.closest?.('input, textarea, select')) {
+      event.preventDefault();
+      const rtl = getComputedStyle(card).direction === 'rtl';
+      go((event.key === 'ArrowRight') !== rtl ? 1 : -1);
+    }
   }
   const onResize = () => place();
 
@@ -144,6 +153,7 @@ export function runTour(steps, { onEnd = () => {} } = {}) {
     removeEventListener('resize', onResize);
     removeEventListener('scroll', onResize, true);
     layer.remove();
+    if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
     onEnd(how);
   }
 

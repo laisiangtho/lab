@@ -56,7 +56,7 @@ test('a published bundle is taken whole, not one file out of eight', () => {
   assert.equal(raw.info.textdirection, 'ltr');
   assert.match(raw.info.copyright, /Public domain/);
 
-  // And the files that are nothing to do with us are listed, not ignored.
+  // And the files that an import has no use for are listed, not ignored.
   assert.deepEqual(report.skipped, ['dejavuserif.css', 'keys.asc']);
 });
 

@@ -36,6 +36,9 @@ const HISTORY_KEY = 'history';
 const HISTORY_CAP = 30;
 /** How far the tab bar travels to be out of sight. */
 const TRAVEL = 96;
+/** The strip at each side left to the system's own gestures, and how long a swipe may take. */
+const EDGE = 24;
+const SWIPE_MS = 600;
 
 /** What the Study tab lists, in this order, of what the build has. */
 // The Notes pane is the chapter's notes; the list of all of them is the
@@ -63,17 +66,22 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
 
   const nav = h('header', { class: 'ph-nav' });
   const rootTitle = h('h1', { class: 'ph-root-title' });
-  const tabs = h('nav', { class: 'ph-tabs ph-glass', role: 'tablist' });
+  // Navigation between places, not a tab widget: a landmark of plain buttons,
+  // the one in front marked as the current page.
+  const tabs = h('nav', { class: 'ph-tabs ph-glass', 'aria-label': L('mob.nav') });
   const screen = h('section', { class: 'ph-screen', hidden: true });
   const scrim = h('div', { class: 'ph-scrim', onclick: () => closeSheet() });
   const sheetTitle = h('h2', { id: 'ph-sheet-title' });
   const sheetBody = h('div', { class: 'ph-sheet-b' });
-  const grab = h('div', { class: 'ph-grab' });
+  // The handle is also a button: a sheet that has two heights can be raised
+  // and lowered without a drag.
+  const grab = h('button', { class: 'ph-grab', 'aria-label': L('mob.expand'), onclick: () => toggleDetent() });
   const sheetHead = h('div', { class: 'ph-sheet-h' },
     h('span'), sheetTitle,
     h('button', { class: 'ph-done', onclick: () => closeSheet() }, L('mob.done')));
-  const sheet = h('section', { class: 'ph-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ph-sheet-title' },
+  const sheet = h('section', { class: 'ph-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ph-sheet-title', tabindex: '-1' },
     grab, sheetHead, sheetBody);
+  sheet.inert = true;
   body.append(nav, rootTitle, tabs, screen, scrim, sheet);
 
   const glass = (...children) => h('div', { class: 'ph-glass ph-group' }, ...children);
@@ -108,8 +116,21 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
     return origin.get(tab.id) ?? 'more';
   }
 
+  /**
+   * Tabs opened from Study or More are closed when the reader goes somewhere
+   * else: a phone has no tab strip to close them from, and one left behind
+   * would be where its pane opened from then on.
+   */
+  function closeListed() {
+    for (const id of [...origin.keys()]) {
+      origin.delete(id);
+      if (workspace.tabs.some((tab) => tab.id === id)) workspace.closeTab(id);
+    }
+  }
+
   async function go(id) {
     closeSheet();
+    closeListed();
     if (id === 'study' || id === 'more') { list = id; paint(); return; }
     list = null;
     if (id === 'read') {
@@ -130,7 +151,11 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
     paint();
   }
 
+  /** A page with places of its own inside it (Settings' sections) takes Back first. */
+  let backHook = null;
+
   function back() {
+    if (backHook?.()) return;
     const tab = workspace.activeTab;
     const from = tab ? origin.get(tab.id) : null;
     if (tab && from) { origin.delete(tab.id); workspace.closeTab(tab.id); }
@@ -147,24 +172,41 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
     const now = view();
     const tab = workspace.activeTab;
     const reading = now === 'read';
+    // A pane over the reading is about the reading: once a link in it has
+    // gone to another passage, or the reading is no longer in front, the
+    // sheet would only be in the way of what was asked for.
+    if (sheetPane && sheetOpen() && (!reading || passageKey() !== sheetAt)) closeSheet();
     const paged = !list && !reading && now !== 'search' && now !== 'library';
     body.dataset.phoneView = list ? 'list' : reading ? 'read' : paged ? 'page' : 'root';
 
-    fill(tabs, ...TABS.filter((t) => t.id !== 'search' || hasPane('search')).map((t) => h('button', {
-      class: 'ph-tab', role: 'tab', dataset: { tab: t.id }, 'aria-label': t.name(), title: t.name(),
-      'aria-selected': String(now === t.id), onclick: () => go(t.id),
-    }, icon(t.glyph))));
+    // Built once and updated in place: a control rebuilt under a finger, a
+    // focus or a screen reader's cursor is a control taken away.
+    if (!tabs.childElementCount) {
+      fill(tabs, ...TABS.filter((t) => t.id !== 'search' || hasPane('search')).map((t) => h('button', {
+        class: 'ph-tab', dataset: { tab: t.id }, 'aria-label': t.name(), title: t.name(), onclick: () => go(t.id),
+      }, icon(t.glyph))));
+    }
+    for (const button of tabs.children) {
+      if (button.dataset.tab === now) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
+    }
 
-    if (reading && tab) paintReadNav();
-    else if (paged && tab) {
-      const doc = tab.kind.startsWith('pane:')
-        ? registry.panes().find((pane) => pane.id === tab.kind.slice(5))
-        : registry.getDoc(tab.kind);
-      fill(nav,
-        glass(navButton(L('mob.back'), icon('arrow-left'), back)),
-        h('div', { class: 'ph-glass ph-title' }, doc?.title ?? ''),
-        h('span'));
-    } else fill(nav);
+    const doc = paged && tab
+      ? (tab.kind.startsWith('pane:') ? registry.panes().find((pane) => pane.id === tab.kind.slice(5)) : registry.getDoc(tab.kind))
+      : null;
+    const { book, chapter } = state.get();
+    const drawn = reading && tab ? `read|${workspace.primaryName()}|${workspace.bookName(book)}|${workspace.number(chapter)}|${workspace.lang()}`
+      : doc ? `page|${doc.title}` : '';
+    if (drawn !== nav.dataset.drawn) {
+      nav.dataset.drawn = drawn;
+      if (reading && tab) paintReadNav();
+      else if (doc) {
+        fill(nav,
+          glass(navButton(L('mob.back'), icon('arrow-left'), back, 'ph-back')),
+          h('div', { class: 'ph-glass ph-title' }, doc.title),
+          h('span'));
+      } else fill(nav);
+    }
     // Search and Library have no controls over them: a large title instead.
     rootTitle.textContent = !list && !reading && !paged ? TABS.find((t) => t.id === now)?.name() ?? '' : '';
 
@@ -214,13 +256,18 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
 
   const history = () => (Array.isArray(records.get(HISTORY_KEY, null)?.list) ? records.get(HISTORY_KEY, null).list : []);
   let lastSeen = '';
+  let historyFailed = false;
   function remember() {
     const { book, chapter } = state.get();
     const key = `${book}.${chapter}`;
     if (key === lastSeen || workspace.activeTab?.kind !== 'chapter') return;
     lastSeen = key;
     const next = [{ book, chapter, at: Date.now() }, ...history().filter((item) => item.book !== book || item.chapter !== chapter)].slice(0, HISTORY_CAP);
-    records.save(HISTORY_KEY, { list: next }).catch(() => {});
+    // Said once: a store that cannot be written to fails at every chapter.
+    records.save(HISTORY_KEY, { list: next }).catch((err) => {
+      if (!historyFailed) chrome.notify(err.message, 'error');
+      historyFailed = true;
+    });
   }
   function historyRows(limit) {
     const { book, chapter } = state.get();
@@ -242,18 +289,40 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
    * @param {{ tall?: boolean, closed?: () => void }} [options] `tall` opens at
    *        half height and can be pulled to the full screen
    */
+  /** What is behind a sheet, taken out of reach while one is up. */
+  const behind = () => [chrome.element, nav, rootTitle, tabs, screen];
+  let opener = null;
+
+  function setDetent(next) {
+    detent = next;
+    sheet.classList.toggle('is-full', next === 'full');
+    sheet.style.height = next === 'auto' ? '' : next === 'full' ? '94%' : '56%';
+    grab.hidden = false;
+    grab.disabled = next === 'auto';
+    grab.setAttribute('aria-label', L(next === 'full' ? 'mob.collapse' : 'mob.expand'));
+    if (next === 'auto') grab.removeAttribute('aria-expanded'); else grab.setAttribute('aria-expanded', String(next === 'full'));
+  }
+  function toggleDetent() {
+    if (detent === 'auto' || dragged) return;
+    setDetent(detent === 'full' ? 'half' : 'full');
+  }
+
   function openSheet(title, content, { tall = false, closed = null } = {}) {
     if (sheetOpen()) onClose?.();
+    else opener = document.activeElement;
     onClose = closed;
     sheetTitle.textContent = title;
     fill(sheetBody, ...content);
     sheetBody.scrollTop = 0;
-    detent = tall ? 'half' : 'auto';
-    sheet.classList.remove('is-full');
-    sheet.style.height = tall ? '56%' : '';
+    setDetent(tall ? 'half' : 'auto');
     sheet.style.transform = '';
+    sheet.inert = false;
+    for (const el of behind()) el.inert = true;
     sheet.classList.add('is-on');
     scrim.classList.add('is-on');
+    // Focus goes into the sheet, so a keyboard and a screen reader are in it
+    // too; it goes back to what opened the sheet when it is put away.
+    sheet.focus({ preventScroll: true });
     setOff(0);
   }
   function closeSheet() {
@@ -261,17 +330,25 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
     sheet.classList.remove('is-on');
     scrim.classList.remove('is-on');
     sheet.style.transform = '';
+    sheet.inert = true;
+    for (const el of behind()) el.inert = false;
     const done = onClose;
     onClose = null;
     done?.();
+    const back = opener;
+    opener = null;
+    if (back?.isConnected && on()) back.focus({ preventScroll: true });
   }
   window.addEventListener('keydown', (event) => { if (event.key === 'Escape' && sheetOpen()) { event.stopPropagation(); closeSheet(); } }, true);
 
   // Pulled down, a sheet is put away; a tall one pulls up to the full screen.
   let drag = null;
+  /** A drag just ended on the handle: the click that follows it is not a press. */
+  let dragged = false;
   for (const handle of [grab, sheetHead]) {
     handle.addEventListener('pointerdown', (event) => {
-      if (event.target.closest('button')) return;
+      if (event.target.closest('.ph-done')) return;
+      dragged = false;
       drag = { y: event.clientY, height: sheet.offsetHeight };
       sheet.classList.add('is-drag');
       handle.setPointerCapture(event.pointerId);
@@ -286,13 +363,15 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
       if (!drag) return;
       const dy = event.clientY - drag.y;
       drag = null;
+      dragged = Math.abs(dy) > 6;
+      setTimeout(() => { dragged = false; }, 0);
       sheet.classList.remove('is-drag');
       sheet.style.transform = '';
       if (dy > 90) {
-        if (detent === 'full') { detent = 'half'; sheet.style.height = '56%'; sheet.classList.remove('is-full'); } else closeSheet();
+        if (detent === 'full') setDetent('half'); else closeSheet();
       } else if (dy < -50 && detent !== 'auto') {
-        detent = 'full'; sheet.style.height = '94%'; sheet.classList.add('is-full');
-      } else if (detent !== 'auto') sheet.style.height = detent === 'full' ? '94%' : '56%';
+        setDetent('full');
+      } else if (detent !== 'auto') setDetent(detent);
     };
     handle.addEventListener('pointerup', end);
     handle.addEventListener('pointercancel', end);
@@ -362,10 +441,14 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
    * one the desktop has, lent to the sheet for as long as it is up.
    */
   let sheetPane = null;
+  let sheetAt = '';
+  const passageKey = () => { const { book, chapter } = state.get(); return `${book}.${chapter}`; };
   function paneSheet(id) {
     if (!on() || view() !== 'read' || !SHEET_PANES.has(id)) return false;
-    if (workspace.tabs.some((tab) => tab.kind === `pane:${id}`)) return false;
     if (sheetPane === id && sheetOpen()) return true;
+    // A tab of the same pane left from a list would keep the pane; it is closed.
+    const left = workspace.tabs.find((tab) => tab.kind === `pane:${id}`);
+    if (left) { origin.delete(left.id); workspace.closeTab(left.id); }
     const pane = registry.panes().find((p) => p.id === id);
     if (!pane) return false;
     const host = h('div', { class: 'ph-pane-host' });
@@ -376,6 +459,7 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
     sheet.classList.add('has-pane');
     const unhost = chrome.paneTabs.host(id, host);
     sheetPane = id;
+    sheetAt = passageKey();
     return true;
   }
   chrome.paneTabs.sheet(paneSheet);
@@ -462,11 +546,29 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
     idle = setTimeout(settle, 140);
   }, { capture: true, passive: true });
 
+  // A bar that has slid away is still reachable by keyboard and by a screen
+  // reader; reaching it brings it back.
+  tabs.addEventListener('focusin', () => setOff(0));
+
+  // The on-screen keyboard covers the bottom of the page: a sheet stands on
+  // top of it, not under it.
+  const vv = window.visualViewport;
+  if (vv) {
+    const kb = () => body.style.setProperty('--ph-kb', `${Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop))}px`);
+    vv.addEventListener('resize', kb);
+    vv.addEventListener('scroll', kb);
+    kb();
+  }
+
   let swipe = null;
   chrome.panes.addEventListener('touchstart', (event) => {
     touching = true;
     const touch = event.touches[0];
-    swipe = event.touches.length === 1 ? { x: touch.clientX, y: touch.clientY } : null;
+    // The screen's edges belong to the system (its own back gesture), and a
+    // row that scrolls sideways belongs to itself.
+    const edge = touch.clientX < EDGE || touch.clientX > window.innerWidth - EDGE;
+    const own = event.target instanceof Element && event.target.closest('.xrefs, .interlinear, table, pre, [data-noswipe]');
+    swipe = event.touches.length === 1 && !edge && !own ? { x: touch.clientX, y: touch.clientY, at: event.timeStamp } : null;
   }, { passive: true });
   for (const type of ['touchend', 'touchcancel']) {
     chrome.panes.addEventListener(type, (event) => {
@@ -479,6 +581,8 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
       const touch = event.changedTouches[0];
       const dx = touch.clientX - start.x;
       const dy = touch.clientY - start.y;
+      // A swipe is quick and level; a slow drag is a selection or a second thought.
+      if (event.timeStamp - start.at > SWIPE_MS) return;
       if (Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 2.2) return;
       // Forward is the way the text runs: a swipe to the left in English,
       // to the right in Hebrew.
@@ -489,7 +593,7 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
   // A press on the text itself, not on anything in it, shows or hides the bar.
   chrome.panes.addEventListener('click', (event) => {
     if (!on() || view() !== 'read' || window.getSelection()?.toString()) return;
-    if (event.target.closest('button, a, .strongs, .ilw, input, textarea, [contenteditable]')) return;
+    if (event.target.closest('button, a, summary, label, select, [role="button"], [role="link"], [tabindex], .strongs, .ilw, .xrefs, .note-mark, input, textarea, [contenteditable]')) return;
     if (!event.target.closest('.leaf[data-pane="0"] .note')) return;
     setOff(off > TRAVEL / 2 ? 0 : TRAVEL);
   });
@@ -518,6 +622,13 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
     closeSheet,
     /** Bring a tab to the front by name, for the tour and the tests. */
     go,
+    /** The tab bar brought back into view, for whatever is about to point at it. */
+    showBar: () => setOff(0),
+    /**
+     * A page with places inside it takes the Back button first.
+     * @param {(() => boolean)|null} fn  true when it went back itself
+     */
+    onBack(fn) { backHook = fn; },
     /** The verse bar is the desktop's; on a phone its job is a sheet's. */
     verseBar: { show: (anchor, passage, options) => (on() ? openVerse(passage) : verseBar.show(anchor, passage, options)) },
   };

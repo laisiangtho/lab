@@ -9,7 +9,7 @@ Translations are downloaded once and kept: after that everything works with no c
 - **Read** any number of translations side by side, levelled verse by verse even where one merges verses and another does not, each in its own script, direction and digits. Book and testament names in the translation's own language, with the English name on every control for anyone who cannot read the script.
 - **Find** with a search that counts every match and lays the answer out by book; whole words, regular expressions and case on request. A passage typed in shorthand — `ps 23`, `1 jn 2:1-4`, `ကမ္ဘာဦးကျမ်း ၃:၅` — goes straight there.
 - **Study the original words.** Where a translation carries Strong's numbers, a pressed word opens the lexicon and a word study: the Hebrew or Greek word in that verse with its grammar written out, the lexicon entry, and every word the translation uses for it, with the verses. An interlinear line can put the original under each verse.
-- **Bring your own study data.** Cross-references, topical indexes and Bible dictionaries — OpenBible.info's cross-references, Nave's, Easton's, or any CCEL reference work — from the Library's Study data page: links under each verse, articles and topics in a Reference pane.
+- **Study data from outside.** Cross-references, topical indexes and Bible dictionaries — OpenBible.info's cross-references, Nave's, Easton's, or any CCEL reference work — from the Library's Study data page: links under each verse, articles and topics in a Reference pane.
 - **Write and keep**: notes in Markdown with `[[wikilinks]]` and `#tags`, bookmarks over a verse or a run of verses, reading plans and a streak, memory verses on spaced repetition, a study board, freehand ink, and projects for a sermon or a lesson.
 - **Share**: a passage as Markdown, a citation or a printed sheet; a verse card drawn as an image in a studio of its own; a link that opens on the verse; any translation written out as USFM, USX, OSIS, Zefania, JSON or a spreadsheet.
 - **Bring a translation**: from the Lai Siangtho catalog, getBible, eBible.org, a web address or a file — this app's JSON, USFM, USX, USFX, OSIS, Zefania, browserBible, a spreadsheet, or a whole published zip — checked against the canon and reported on, never silently altered.
@@ -63,7 +63,7 @@ This is Phase 2 of the project. The Phase 1 single-file `index.html` is preserve
 | `node scripts/release-plan.mjs "release:all"` | What a release commit would release (see `docs/releasing.md`) |
 | `node scripts/release-notes.mjs` | The notes the next release would get: commits since the last release tag |
 
-The three test commands beyond `npm test`, and `npm run icons`, need a Chromium build to drive through `playwright-core` (found on the usual paths, or set `CHROMIUM_PATH`). Without it they say why and skip. A test that needs the desktop application also needs a display; on a machine without one, `xvfb-run -a node test/e2e/desktop.mjs`.
+Every test command beyond `npm test`, and `npm run icons`, need a Chromium build to drive through `playwright-core` (found on the usual paths, or set `CHROMIUM_PATH`). Without it they say why and skip. A test that needs the desktop application also needs a display; on a machine without one, `xvfb-run -a node test/e2e/desktop.mjs`.
 
 Node ≥ 20.19. Vite is pinned to 7.x because electron-vite 5 supports Vite 5–7; with Vite 8 the `electron` module gets bundled into the main process instead of being externalized.
 
@@ -91,8 +91,8 @@ app/                      shared UI — never imports from targets/
     sources.js settings.js time.js errors.js
     aliases/              app-owned alias overlays, one per translation
   services/               browser APIs
-    store.js              IndexedDB (v7): translations, chapters, catalog, settings,
-                          notes, marks, records, lexicons, guide, lemmas
+    store.js              IndexedDB (v8): translations, chapters, catalog, settings,
+                          notes, marks, records, lexicons, guide, lemmas, study data
     library.js sources.js zip.js     install, update, import, the sources of more
     lexicon.js lemmas.js  lexicons on the device; the lemma index and the originals
     records.js settings.js annotations.js search.js transfer.js
@@ -297,7 +297,7 @@ Interface strings live in `app/shell/locales/{en,nb,my}.js`, read through `L()` 
 
 ### Narrow windows and touch
 
-Under 900 px a sidebar comes in as a drawer over the text with a scrim behind it; under 760 px the status bar gives way to a floating navigation pill and the tab strip shows only the tabs that fit — the `⋯` lists the others. With *Panes as tabs on narrow screens* on, the sidebar buttons list their panes and open the one chosen as a tab instead of a drawer. A window grown back to a column layout puts the drawer away.
+At 600 px and under the desktop's frame gives way to the phone shell (`shell/phone.js`): five places on a tab bar that follows the scroll, the reading's controls over the text, and sheets for everything that was a popover or a sidebar pane. Between that and 900 px a sidebar comes in as a drawer over the text with a scrim behind it; under 760 px the status bar gives way to a floating navigation pill and the tab strip shows only the tabs that fit — the `⋯` lists the others. With *Panes as tabs on narrow screens* on, the sidebar buttons list their panes and open the one chosen as a tab instead of a drawer. A window grown back to a column layout puts the drawer away.
 
 A page lays itself out by the width of the pane it is in, not the window's: a wide window with both sidebars open leaves the page about 400 px, and there Settings puts its menu above the settings, the graph's bar wraps, the card studio drops its size readout, and the one tab the strip keeps shrinks to an ellipsis rather than pushing the new-tab button out of sight.
 

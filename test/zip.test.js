@@ -3,7 +3,7 @@
  *
  * A reader tested only against its own writer is a reader that agrees with
  * itself. So the fixtures here are made with the platform's own deflate — the
- * compressed path, which is what a real archive uses and what our writer never
+ * compressed path, which is what a real archive uses and what the app's writer never
  * produces — as well as with `makeZip`.
  */
 import { strict as assert } from 'node:assert';

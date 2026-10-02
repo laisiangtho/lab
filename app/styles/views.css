@@ -1927,9 +1927,10 @@ label.set-row:hover { background: var(--bg-hover); }
 }
 .tour.is-center .tour-card { left: 50%; top: 50%; transform: translate(-50%, -50%); }
 .tour-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.tour-n { font-size: var(--fs-ui-s); color: var(--text-faint); font-variant-numeric: tabular-nums; }
-.tour-skip { font-size: var(--fs-ui-s); color: var(--text-faint); background: none; }
+.tour-n { font-size: var(--fs-ui-s); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.tour-skip { font-size: var(--fs-ui-s); color: var(--text-muted); background: none; min-height: 32px; }
 .tour-skip:hover { color: var(--text-normal); }
+.tour-words { display: flex; flex-direction: column; gap: 8px; }
 .tour-t { margin: 0; font-size: 16px; font-weight: 600; }
 .tour-b { margin: 0; line-height: 1.55; color: var(--text-muted); }
 .tour-acts { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }

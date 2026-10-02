@@ -70,7 +70,10 @@ export function mountReference(el, ctx) {
     }, icon(id === 'dictionary' ? 'book-open' : 'tag'), L(`sd.type.${id}`))));
   }
 
-  async function paint() {
+  /** Paint, and say in the pane what went wrong if it could not. */
+  const paint = () => draw().catch((err) => { fill(body, note(err.message)); });
+
+  async function draw() {
     const mine = ++turn;
     const live = () => mine === turn && root.isConnected;
     paintTabs();
@@ -130,9 +133,10 @@ export function mountReference(el, ctx) {
     fill(body,
       note(L('rf.inChapter', { where, n: found.length })),
       h('ul', { class: 'rf-list' }, found.slice(0, LIST_AT_ONCE).map(({ entry, verses }) => termItem(entry, sets,
+        // No verse named: the topic cites the chapter as a whole.
         h('span', { class: 'rf-term-s' }, verses.length > 4
           ? `${digits(verses[0])}–${digits(verses.at(-1))} (${digits(verses.length)})`
-          : verses.map(digits).join(', '))))));
+          : verses.length ? verses.map(digits).join(', ') : where)))));
   }
 
   function paintEntry(entry, sets) {

@@ -246,7 +246,7 @@ export default {
      *
      * Reading aloud is the one command whose state is a process rather than a
      * switch, and a button that looks the same idle, speaking and paused is a
-     * button you have to press to find out. So it answers with the glyph for
+     * button that has to be pressed to find out. So it answers with the glyph for
      * what pressing it would do next, what that is in words, and how far
      * through the chapter the voice has got — which the rail draws as a ring.
      */

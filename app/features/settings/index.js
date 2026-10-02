@@ -314,6 +314,26 @@ export default {
           if (opened) page.dataset.open = opened; else delete page.dataset.open;
           for (const section of page.querySelectorAll('.set-section')) section.classList.toggle('is-open', section.id === `set-${opened}`);
         }
+        /**
+         * A section opened or left, on a phone: focus follows to its heading,
+         * or back to the row it was opened from, so a keyboard and a screen
+         * reader are where the eye is.
+         */
+        function openSection(id) {
+          const from = opened;
+          opened = id;
+          showSection();
+          el.scrollTop = 0;
+          const to = id ? el.querySelector(`#set-${id} .settings-h`) : el.querySelector(`.set-nav-item[href="#set-${from}"]`);
+          to?.focus({ preventScroll: true });
+        }
+        // The phone has one Back button, over the page: inside a section it
+        // goes to the list of sections first.
+        shell.phone?.onBack(() => {
+          if (!opened || !el.isConnected || !shell.phone.on) return false;
+          openSection(null);
+          return true;
+        });
         const deskOnly = (row) => { row?.classList?.add('desk-only'); return row; };
 
         async function render() {
@@ -328,7 +348,7 @@ export default {
             onclick: (e) => {
               e.preventDefault();
               // A phone shows one section at a time, from a list of them.
-              if (shell.phone?.on) { opened = id; showSection(); el.scrollTop = 0; return; }
+              if (shell.phone?.on) { openSection(id); return; }
               el.querySelector(`#set-${id}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
             },
           }, icon(glyph), h('span', {}, L(key)))));
@@ -352,8 +372,7 @@ export default {
             if (extra.length) body.push(h('div', { class: 'set-group' }, ...extra));
             if (!body.length) body.push(h('p', { class: 'muted' }, L('set.nothing')));
             return h('section', { class: 'set-section', id: `set-${id}` },
-              h('button', { class: 'set-back', onclick: () => { opened = null; showSection(); } }, icon('arrow-left'), L('doc.settings')),
-              h('h2', { class: 'settings-h' }, L(key)), ...body);
+              h('h2', { class: 'settings-h', tabindex: '-1' }, L(key)), ...body);
           };
 
           keepPlace(el, () => el.replaceChildren(h('section', { class: 'doc settings' },
@@ -496,7 +515,7 @@ export default {
                     ui.action({
                       name: L('pane.notes'), hint: L('set.notesHint'),
                       value: String(annotations.allNotes().length),
-                      label: L('cmd.open'), glyph: 'files', onClick: () => shell.openDoc('notes-all'),
+                      label: L('cmd.open'), glyph: 'files', onClick: () => shell.openDoc('notes-manager'),
                     }),
                     ui.readout({
                       name: L('pane.marks'), hint: L('set.marksHint'),
@@ -542,7 +561,7 @@ export default {
         const offAnnotations = annotations.on('change', run);
         const unsubscribe = state.subscribe(run);
         run();
-        return () => { listeners.delete(run); offChange(); offAnnotations(); unsubscribe(); };
+        return () => { listeners.delete(run); offChange(); offAnnotations(); unsubscribe(); shell.phone?.onBack(null); };
       },
     });
   },

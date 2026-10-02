@@ -445,8 +445,11 @@ export default {
         let timer = null;
         let paintTimer = null;
 
+        /** The query the results on screen are for. */
+        let ran = '';
         async function run() {
           const query = input.value.trim();
+          ran = query;
           generation += 1;
           found = new Map();
           shape = new Map();
@@ -593,7 +596,9 @@ export default {
             const { active } = await scope();
             const rows = [];
             await search.run({
-              query: input.value.trim(), translations: active, books: [bookId], limit: LIMIT,
+              // The search that drew the tree, not what the field says now:
+              // on a phone the two differ until Search is pressed.
+              query: ran, translations: active, books: [bookId], limit: LIMIT,
               options: { mode: modeOf(), matchCase },
               onBatch: (batch) => rows.push(...batch),
             });

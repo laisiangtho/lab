@@ -714,8 +714,9 @@ export function createWorkspace(ctx, chrome) {
     }));
     if (!current()) return;
     [loaded[0].interlinear, loaded[0].studyRefs] = await Promise.all([
-      interlinearFor(loaded[0], book, chapter).catch(() => null),
-      studyRefsFor(loaded[0], book, chapter).catch(() => null),
+      // A line that cannot be drawn is said, not left out in silence.
+      interlinearFor(loaded[0], book, chapter).catch((err) => { chrome.notify(err.message, 'error'); return null; }),
+      studyRefsFor(loaded[0], book, chapter).catch((err) => { chrome.notify(err.message, 'error'); return null; }),
     ]);
     if (!current()) return;
 
@@ -735,7 +736,9 @@ export function createWorkspace(ctx, chrome) {
 
     // A phone has one column: translations read alongside go under each
     // verse of the first, in the one pane, not in panes of their own.
-    const stacked = document.body.dataset.phone === 'on' && loaded.length > 1 && state.get().mode !== 'source';
+    // Where the first has no such book there is nothing to go under, and the
+    // others keep panes of their own.
+    const stacked = document.body.dataset.phone === 'on' && loaded.length > 1 && state.get().mode !== 'source' && Boolean(loaded[0].verses);
     if (stacked) loaded[0].under = loaded.slice(1);
     const drawn = stacked ? [loaded[0]] : loaded;
     const leaves = drawn.map((pane) => buildLeaf(pane, loaded, { book, chapter }));
@@ -847,7 +850,9 @@ export function createWorkspace(ctx, chrome) {
   async function studyRefsFor(pane, book, chapter) {
     if (!ctx.study || state.get().xrefs === false) return null;
     if (!(await ctx.study.list()).some((set) => set.type === 'crossrefs')) return null;
-    const numbering = book <= 39 && ctx.lemmas ? await ctx.lemmas.numbering(pane.identify) : 'english';
+    // The text's numbering matters in any chapter: a link out of Acts into
+    // Joel has to land on the verse as this text numbers it.
+    const numbering = ctx.lemmas ? await ctx.lemmas.numbering(pane.identify) : 'english';
     const out = {};
     for (const key of Object.keys(pane.verses ?? {})) {
       const found = [];
@@ -929,7 +934,7 @@ export function createWorkspace(ctx, chrome) {
    * what was in it. It is now whichever format the reader asks for — which is
    * the same set of writers the library exports with, so this doubles as the
    * demonstration of what this app does when it reads somebody else's file: the
-   * same chapter, as USFM, as OSIS, as our own JSON, side by side with the
+   * same chapter, as USFM, as OSIS, as the app's own JSON, side by side with the
    * reading.
    *
    * **Markdown is the only editable one**, and that is deliberate rather than

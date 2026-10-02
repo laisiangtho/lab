@@ -281,7 +281,7 @@ export function createShell(root, ctx) {
 
   /**
    * The words the palette takes as instructions. The shell owns the ones that
-   * are about where you are; a feature owns the ones that are about what it
+   * are about where the reader is; a feature owns the ones that are about what it
    * does.
    */
   function registerShellVerbs() {

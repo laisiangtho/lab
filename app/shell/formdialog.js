@@ -167,8 +167,8 @@ export function createFormDialog() {
   }
 
   function row(field) {
-    // A line the dialog writes to itself as the answers change: what you
-    // will get, before you press the button that gets it.
+    // A line the dialog writes to itself as the answers change: what
+    // will come of it, before the button that does it is pressed.
     if (field.type === 'note') {
       return h('p', { class: 'fd-live', dataset: { field: field.id } }, values[field.id] ?? '');
     }

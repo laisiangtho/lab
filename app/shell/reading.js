@@ -13,7 +13,7 @@ import { VERSE_LAYOUTS } from '../core/settings.js';
 import { parseReferences } from '../core/reference.js';
 import { refOf, refText } from '../core/studydata.js';
 import { localizeNumber } from '../core/translation.js';
-import { h } from './dom.js';
+import { fill, h } from './dom.js';
 import { icon } from './icons.js';
 import { L } from './i18n.js';
 import { wireRef } from './reflink.js';
@@ -214,8 +214,9 @@ function studyRefsLine(links, meta, p, ctx) {
   );
   const show = (upTo) => {
     const shown = links.slice(0, upTo);
-    line.replaceChildren(h('span', { class: 'xref-mark', 'aria-hidden': 'true' }, icon('link')),
-      ...shown.flatMap((one, i) => [i ? ' · ' : null, link(one)]).filter(Boolean),
+    // `fill`, not the browser's replaceChildren: that one writes a null out as the word.
+    fill(line, h('span', { class: 'xref-mark', 'aria-hidden': 'true' }, icon('link')),
+      ...shown.flatMap((one, i) => [i ? ' · ' : null, link(one)]),
       links.length > upTo ? h('button', {
         class: 'xref xref-more', type: 'button',
         onclick: () => show(links.length),

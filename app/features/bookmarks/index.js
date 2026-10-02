@@ -66,7 +66,7 @@ export default {
       icon: 'bookmark',
       hint: L('verb.markHint'),
       // A whole chapter has no verse to mark, so the first verse stands for it:
-      // a bookmark is a place to come back to, and that is where you come back.
+      // a bookmark is a place to come back to, and that is where a reader comes back to.
       run: async (p) => {
         const verse = p.verse ?? 1;
         const marked = await annotations.toggleMark(p.book, p.chapter, verse, null, p.to ?? null);

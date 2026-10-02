@@ -5,7 +5,7 @@
  * helped.
  */
 
-import { h } from '../../shell/dom.js';
+import { fill, h } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { keyLabel } from '../../shell/keys.js';
 import { currentLocale, L } from '../../shell/i18n.js';
@@ -72,7 +72,7 @@ export function passageCard(ctx, passage) {
         ? shell.openVerse(passage.book, passage.chapter, passage.verse)
         : shell.openChapter(passage.book, passage.chapter)),
     }, icon('book-open'), L('guide.goTo', { where: name }))));
-  fillPassage(ctx, passage, words, links).catch(() => {});
+  fillPassage(ctx, passage, words, links).catch((err) => fill(words, h('p', { class: 'gd-src' }, err.message)));
   return card;
 }
 
@@ -89,7 +89,7 @@ async function fillPassage(ctx, passage, words, links) {
     const keys = Object.keys(verses).map(Number).filter((n) => n >= first && n <= last).sort((a, b) => a - b);
     const shown = keys.slice(0, VERSES_SHOWN);
     const dir = shell.textDirection?.(identify) ?? 'auto';
-    words.replaceChildren(
+    fill(words,
       ...shown.map((n) => h('p', { class: 'gd-verse', dir },
         h('sup', { class: 'gd-vn' }, shell.workspace.number(n)), ' ', String(verses[n]?.text ?? ''))),
       keys.length > shown.length ? h('p', { class: 'gd-more-v' }, L('guide.moreVerses', { n: keys.length - shown.length })) : null,
@@ -99,7 +99,7 @@ async function fillPassage(ctx, passage, words, links) {
   if (!passage.verse || !ctx.study) return;
   const found = (await ctx.study.crossrefs(passage.book, passage.chapter))[passage.verse] ?? [];
   if (!found.length) return;
-  links.replaceChildren(
+  fill(links,
     h('span', { class: 'gd-links-l' }, L('sd.type.crossrefs')),
     ...found.slice(0, 6).map(({ ref }) => {
       const [b, c, v, c2, v2] = ref;

@@ -8,10 +8,10 @@
  *   BookNames.xml                 what this translation calls each book
  *   engkjvcpbmetadata.xml         its name, abbreviation, language, rights
  *   copr.htm                      the copyright notice, in full
- *   dejavuserif.css, keys.asc     nothing to do with us
+ *   dejavuserif.css, keys.asc     nothing an import uses
  *
- * Asking a reader to unpack that and hand us one file out of eight is asking
- * them to do the assembly we are better placed to do — and it throws away the
+ * Asking a reader to unpack that and hand over one file out of eight is asking
+ * them to do the assembly the importer is better placed to do — and it throws away the
  * book names and the metadata, which is most of what makes an import feel like
  * an installed translation rather than a wall of numbered chapters.
  *
@@ -19,7 +19,7 @@
  * A USFM bundle is sixty-six scripture files and this merges them; a USFX
  * bundle is one. Files it does not recognise are listed in the report rather
  * than silently ignored, because a reader looking at "4 files were not used"
- * can tell us what we missed.
+ * can say what was missed.
  *
  * Pure: the caller unpacks the archive (`services/zip.js`) and passes text.
  */
@@ -127,7 +127,7 @@ export function readPack(files, { category, info = {}, source = 'archive' }) {
   }
 
   // One format for the bundle: a USFM bundle is sixty-six USFM files, and a
-  // file in it that sniffs as something else is a file we have misread.
+  // file in it that sniffs as something else is a file that has been misread.
   const votes = new Map();
   for (const file of scripture) {
     const best = sniff(file.text, file.name)[0];

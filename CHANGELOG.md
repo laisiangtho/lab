@@ -250,7 +250,42 @@ newest first.
   pulled up to the full screen. A translation read alongside goes under each
   verse of the first, in one column, and is taken away from the translation
   sheet. The tour counts only the steps a screen will show.
-
+- Phone: a sheet takes the focus when it comes up and gives it back when put
+  away; what is behind it is out of reach of a keyboard and a screen reader
+  meanwhile, and a sheet put away is out of reach itself. The handle is a
+  button that raises and lowers a sheet, for those who cannot drag. A sheet
+  stands on top of the on-screen keyboard instead of under it.
+- Phone: the tab bar and the controls over the reading are no longer rebuilt
+  at every repaint, which took the focus from them. The tab bar is a
+  navigation landmark with the current place marked; reached by keyboard
+  while slid away, it comes back.
+- Phone: a swipe that starts at the screen's edge is left to the system's own
+  back gesture, a slow drag does not turn the chapter, and a press on a
+  cross-reference or a footnote no longer moves the tab bar.
+- Phone: Settings has one Back button, which leaves a section before it
+  leaves the page. A study pane's sheet is put away when a link in it goes to
+  another passage; a pane left open from Study no longer keeps the word study
+  from coming up as a sheet.
+- Phone: touch targets of at least 44 px; solid surfaces where the system
+  asks for less transparency, drawn edges under forced colours, arrows that
+  turn with a right-to-left interface.
+- The walkthrough says each step to a screen reader, gives the focus back
+  where it was, its arrow keys follow the direction of the text, and the
+  step about the phone's tab bar brings the bar into view.
+- Fixed: the cross-reference line under a verse and the Guide's passage card
+  could print the word "null".
+- Fixed: imported cross-references were numbered by the Hebrew verse map only
+  in the Old Testament check, leaving out books past Malachi in a translation
+  that numbers differently.
+- Fixed: Settings' "All notes" opened nothing. A search result opened from a
+  book's group used what was in the box, not what had been searched for.
+- Fixed: study data removed and got again in one sitting could answer from
+  the set that was removed. A whole-chapter topic showed as "verse 0".
+- Fixed: the Guide took any question with "tour" or "walk" in it for a
+  request for the walkthrough.
+- Failures that were kept quiet are said: interlinear and cross-reference
+  lines that could not be read, the Reference pane, the history and the
+  walkthrough's record.
 
 ### 26.10.01.3 — 1 October 2026
 

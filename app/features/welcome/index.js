@@ -56,13 +56,17 @@ export default {
     let tour = null;
     const steps = () => STEPS.map((step) => ({
       ...step, title: L(`tour.${step.id}.t`), body: L(`tour.${step.id}.b`),
+      // The phone's bar slides away while reading; the step about it brings it back.
+      ...(step.id === 'phone' ? { before: () => shell.phone?.showBar() } : {}),
     }));
     function takeTour() {
       if (tour) return;
       tour = runTour(steps(), {
         onEnd: (how) => {
           tour = null;
-          records.save(TOUR_KEY, { pending: false, how, at: new Date().toISOString() }).catch(() => {});
+          // Not kept, the tour would start again at the next launch: said, not hidden.
+          records.save(TOUR_KEY, { pending: false, how, at: new Date().toISOString() })
+            .catch((err) => shell.notify(err.message, 'error'));
         },
       });
     }
@@ -119,7 +123,8 @@ export default {
       if (greeting) {
         shell.openDoc('welcome');
         remember();
-        records.save(TOUR_KEY, { pending: true, at: new Date().toISOString() }).catch(() => {});
+        records.save(TOUR_KEY, { pending: true, at: new Date().toISOString() })
+          .catch((err) => shell.notify(err.message, 'error'));
       }
       ctx.state.subscribe(maybeTour);
       ctx.library.on('change', maybeTour);

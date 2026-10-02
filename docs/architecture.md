@@ -438,7 +438,7 @@ A card is a picture of a passage made for somewhere this app is not — a messag
 
 **The studio is an editor.** Press a frame to pick it up; drag and it follows exactly; take a corner and the opposite one stays where it is; edges keep the edge across from them; guides appear where it lines up with a margin, a centre or the other frame, and Alt ignores them; arrow keys nudge by a pixel of the card, ten with shift; Escape puts down whatever is held; `Mod+Z` and `Mod+Shift+Z` walk the history. None of that is special to cards — it is what an editor is, and until all of it was there the studio was a settings page with a picture beside it.
 
-**The card has its own edges too.** A picture whose size can only be typed is not a picture you can size, so the right edge, the foot and the corner are draggable, with Shift keeping the proportions. The scale at which the card is shown is held still for the length of that drag — re-fitting it to the stage on every step would make dragging the corner outwards do visibly nothing. What happens to the frames is the template's answer, not a guess: `grow` is `scale` (they keep their share, so a post survives becoming a story) or `keep` (they keep their measurements and the card grows around them).
+**The card has its own edges too.** A picture whose size can only be typed is not a picture that can be sized, so the right edge, the foot and the corner are draggable, with Shift keeping the proportions. The scale at which the card is shown is held still for the length of that drag — re-fitting it to the stage on every step would make dragging the corner outwards do visibly nothing. What happens to the frames is the template's answer, not a guess: `grow` is `scale` (they keep their share, so a post survives becoming a story) or `keep` (they keep their measurements and the card grows around them).
 
 **A frame dragged smaller than the words in it is a question, and it is asked where it happened.** The frame is marked, and the foot offers both answers — fit the text to the frame, or grow the frame to the text — because either is what somebody meant. The same choice lives in the type panel as the text size: fitted to the frame, or set by hand.
 
@@ -495,8 +495,8 @@ a setting — a setting is a question asked of everybody, and most readers shoul
 never wonder about this.
 It is not behind a hidden gesture either, because a power-user feature nobody
 can find twice is a feature that was not built. It is the last row of the voice
-list: invisible unless you are already looking at voices, permanent once you
-have. Reading in a crossed voice says so once when it starts, so an accent is
+list: invisible unless voices are already being looked at, permanent once they
+are. Reading in a crossed voice says so once when it starts, so an accent is
 never mistaken for a fault.
 
 ## 3d-vi. Importing somebody else's file
@@ -866,6 +866,19 @@ presentation, not a second app:
   Settings shows one section at a time from its own navigation, and rows
   marked `desk-only` are left out.
 
+**Reach.** A sheet is a dialog: opening one moves the focus into it and
+makes the workspace, the controls and the tab bar `inert`; closing it undoes
+both and returns the focus to what opened it. A closed sheet is `inert`
+itself, so nothing off screen can be tabbed to. The handle is a button
+(`aria-expanded`) for the two heights. The tab bar is a `nav` of buttons
+with `aria-current="page"`, built once — `paint()` updates attributes and
+redraws the controls over the reading only when their signature (translation,
+book, chapter, language, or the page's title) changes, because a control
+rebuilt under a focus is a control taken away. `--ph-kb` is the height the
+on-screen keyboard covers (`visualViewport`), added under a sheet.
+`shell.phone.onBack(fn)` lets a page with places inside it (Settings'
+sections) take the one Back button first.
+
 ## 3d-x-d. One knowledge, three views
 
 Help and the Guide answer from one knowledge (`features/guide/knowledge.js`):
@@ -1012,7 +1025,7 @@ its footnotes. A converter that implied a round trip through here was lossless
 would be lying.
 
 **The source view** is where that machinery is visible: the same chapter as
-USFM, as OSIS, as our own JSON, beside the reading. Markdown is the only
+USFM, as OSIS, as the app's own JSON, beside the reading. Markdown is the only
 editable one, and that is a decision rather than an omission — the notes round
 trip works because `## Notes` is a boundary the reader's own material sits
 below, and USFM has no such line.
