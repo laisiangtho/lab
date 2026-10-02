@@ -165,6 +165,9 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
 
   // --- painting -------------------------------------------------------------------
 
+  /** What was in front at the last paint: the view, the tab, the list. */
+  let front = '';
+
   function paint() {
     const phone = on();
     if (phone) body.dataset.phone = 'on'; else delete body.dataset.phone;
@@ -212,7 +215,21 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
 
     screen.hidden = !list;
     if (list) paintList();
-    if (!reading) setOff(0);
+    // A page that has just come to the front starts with its controls in
+    // place; one being scrolled keeps what the scroll made of them.
+    const shown = `${body.dataset.phoneView}|${tab?.id ?? ''}|${list ?? ''}`;
+    if (shown !== front) {
+      front = shown;
+      setOff(0);
+      const at = (list ? screen : chrome.panes.querySelector('.leaf-scroll'))?.scrollTop ?? 0;
+      // The bar moves by how far this page moves from here, not by where
+      // the last page was left: what a page reports as it arrives (the
+      // workspace putting it back where it was) is where it starts from.
+      rebase = performance.now() + 400;
+      lastY = at;
+      body.classList.toggle('ph-scrolled', at > 8);
+      body.style.setProperty('--ph-y', String(Math.max(0, Math.round(at))));
+    }
   }
 
   function paintReadNav() {
@@ -521,6 +538,8 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
 
   let off = 0;
   let lastY = 0;
+  /** Until when a scroll is the page being put back, not the reader moving it. */
+  let rebase = 0;
   let touching = false;
   let idle = null;
   function setOff(value, tracking = false) {
@@ -530,21 +549,32 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
   }
   /** The finger has lifted and the page is still: all the way in, or all the way out. */
   const settle = () => { if (!touching) setOff(off > TRAVEL / 2 ? TRAVEL : 0); };
-  const reader = (target) => (target instanceof Element && target.matches('.leaf[data-pane="0"] .leaf-scroll') ? target : null);
+  // Every page is the whole screen's, not only the reading: whatever scrolls
+  // a page (a chapter, a document, Study and More) runs under the controls,
+  // and the tab bar gets out of its way going down and comes back going up.
+  const pageScroller = (target) => (target instanceof Element && target.matches('.leaf-scroll, .ph-screen') ? target : null);
 
-  chrome.panes.addEventListener('scroll', (event) => {
-    if (!on() || view() !== 'read') return;
-    const scroller = reader(event.target);
+  function onScroll(event) {
+    if (!on()) return;
+    const scroller = pageScroller(event.target);
     if (!scroller) return;
     const y = scroller.scrollTop;
     const max = scroller.scrollHeight - scroller.clientHeight;
+    if (performance.now() < rebase) lastY = Math.max(0, Math.min(max, y));
     body.classList.toggle('ph-scrolled', y > 8);
+    // How far the page has moved, for what moves away with it (a large title).
+    body.style.setProperty('--ph-y', String(Math.max(0, Math.round(y))));
     // Past either end (the rubber band) is not reading on: the bar stays put.
     if (y >= 0 && y <= max) setOff(y < 12 ? 0 : off + (y - lastY), true);
     lastY = Math.max(0, Math.min(max, y));
     clearTimeout(idle);
     idle = setTimeout(settle, 140);
-  }, { capture: true, passive: true });
+  }
+  chrome.panes.addEventListener('scroll', onScroll, { capture: true, passive: true });
+  screen.addEventListener('scroll', onScroll, { passive: true });
+  for (const type of ['touchstart', 'touchend', 'touchcancel']) {
+    screen.addEventListener(type, () => { touching = type === 'touchstart'; if (!touching) { clearTimeout(idle); idle = setTimeout(settle, 140); } }, { passive: true });
+  }
 
   // A bar that has slid away is still reachable by keyboard and by a screen
   // reader; reaching it brings it back.

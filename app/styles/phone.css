@@ -28,13 +28,19 @@ body[data-phone] .leaf-head { display: none !important; }
 body[data-phone] #app { padding-top: 0; }
 body[data-phone] .body-row { padding-bottom: 0; }
 body[data-phone] .panes { margin: 0; border-radius: 0; }
-/* The reading runs under the tab bar, which moves out of its way; a page or
-   a pane ends above it, since the bar stays put there. */
-body[data-phone][data-phone-view="read"] .leaf-scroll { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
-body[data-phone]:not([data-phone-view="read"]) .panes { padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+/* Every page has the whole screen. What scrolls runs under the floating
+   controls, top and bottom, and the tab bar moves out of its way: no band is
+   kept for them. The room they need is padding inside the scroller, which
+   scrolls away with the page. A pane (Search, the Guide) scrolls inside
+   itself, so it is the pane that keeps clear of them. */
+body[data-phone] .leaf-scroll, body[data-phone] .leaf-pane { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 body[data-phone][data-phone-view="read"] .leaf-scroll { padding-top: calc(52px + env(safe-area-inset-top, 0px)); }
-body[data-phone][data-phone-view="page"] .panes { padding-top: calc(60px + env(safe-area-inset-top, 0px)); }
-body[data-phone][data-phone-view="root"] .panes { padding-top: env(safe-area-inset-top, 0px); }
+body[data-phone][data-phone-view="page"] .leaf-scroll, body[data-phone][data-phone-view="page"] .leaf-pane { padding-top: calc(62px + env(safe-area-inset-top, 0px)); }
+body[data-phone][data-phone-view="root"] .leaf-scroll, body[data-phone][data-phone-view="root"] .leaf-pane { padding-top: calc(64px + env(safe-area-inset-top, 0px)); }
+body[data-phone]:not([data-phone-view="read"]) .panes, body[data-phone]:not([data-phone-view="read"]) .leaf,
+body[data-phone]:not([data-phone-view="read"]) .leaf-scroll, body[data-phone]:not([data-phone-view="read"]) .leaf-pane { background: var(--ph-ground); }
+body[data-phone] { --ph-under: var(--ph-ground); }
+body[data-phone][data-phone-view="read"] { --ph-under: var(--bg-primary); }
 body[data-phone] .note { padding: 18px 22px 30vh; }
 body[data-phone][data-phone-view="list"] .workspace { visibility: hidden; }
 
@@ -55,7 +61,7 @@ body[data-phone] .ph-nav {
 body[data-phone] .ph-nav:empty { display: none; }
 body[data-phone] .ph-nav > * { pointer-events: auto; }
 body[data-phone] .ph-nav .ph-glass { height: 44px; transition: background-color .25s ease, box-shadow .25s ease; }
-body[data-phone].ph-scrolled[data-phone-view="read"] .ph-nav .ph-glass { background: var(--ph-glass-thin); box-shadow: none; }
+body[data-phone].ph-scrolled .ph-nav .ph-glass { background: var(--ph-glass-thin); box-shadow: none; }
 .ph-group { display: inline-flex; align-items: center; padding: 0 2px; justify-self: start; }
 .ph-group:last-child { justify-self: end; }
 .ph-btn { min-width: 44px; height: 44px; display: grid; place-items: center; border-radius: 99px; color: var(--accent-2); font-size: 16px; font-weight: 600; }
@@ -78,14 +84,14 @@ body[data-phone].ph-tracking .ph-tabs { transition: none; }
 .ph-tab[aria-current="page"] { color: var(--accent-2); background: var(--bg-hover); }
 
 /* The text fades out under the floating controls rather than meeting a bar. */
-body[data-phone][data-phone-view="read"] .workspace::before,
-body[data-phone][data-phone-view="read"] .workspace::after {
+body[data-phone] #app::before,
+body[data-phone] #app::after {
   content: ""; position: fixed; left: 0; right: 0; z-index: 44; pointer-events: none; transition: opacity .2s ease;
 }
-body[data-phone][data-phone-view="read"] .workspace::before { top: 0; height: calc(64px + env(safe-area-inset-top, 0px)); background: linear-gradient(var(--bg-primary), transparent); }
-body[data-phone][data-phone-view="read"] .workspace::after { bottom: 0; height: calc(90px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(transparent, var(--bg-primary)); opacity: calc(1 - var(--ph-off, 0) / 96); }
-body[data-phone].ph-scrolled[data-phone-view="read"] .workspace::before { opacity: .55; }
-body[data-phone].ph-tracking .workspace::after { transition: none; }
+body[data-phone] #app::before { top: 0; height: calc(64px + env(safe-area-inset-top, 0px)); background: linear-gradient(var(--ph-under), transparent); }
+body[data-phone] #app::after { bottom: 0; height: calc(90px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(transparent, var(--ph-under)); opacity: calc(1 - var(--ph-off, 0) / 96); }
+body[data-phone].ph-scrolled #app::before { opacity: .55; }
+body[data-phone].ph-tracking #app::after { transition: none; }
 
 /* Study and More: a large title and grouped rows */
 body[data-phone] .ph-screen {
@@ -192,8 +198,8 @@ body[data-phone] .ph-root-title:not(:empty) {
   top: calc(14px + env(safe-area-inset-top, 0px));
   font-family: var(--font-ui); font-size: 32px; font-weight: 800; letter-spacing: -.02em; color: var(--text-normal);
 }
-body[data-phone][data-phone-view="root"] .panes { padding-top: calc(64px + env(safe-area-inset-top, 0px)); background: var(--ph-ground); }
-body[data-phone][data-phone-view="root"] .leaf, body[data-phone][data-phone-view="root"] .leaf-scroll { background: var(--ph-ground); }
+/* The large title is the top of the page, and leaves with it. */
+body[data-phone] .ph-root-title:not(:empty) { transform: translateY(calc(var(--ph-y, 0) * -1px)); z-index: 45; }
 
 /* What only a desktop has is not offered on a phone. */
 body[data-phone] .desk-only { display: none !important; }
@@ -223,7 +229,7 @@ body[data-phone] .leaf-pane input, body[data-phone] .leaf-pane textarea, body[da
 /* Library and Study data: a segmented control, the sources as a row of
    chips that scrolls sideways, and each list a grouped list — the mark,
    what it is on lines of its own, and one thing to press at the end. */
-body[data-phone] .lib-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 8px; padding: 6px 16px 12px; border-bottom: 0; background: var(--ph-ground); }
+body[data-phone] .lib-bar { position: static; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 8px; padding: 6px 16px 12px; border-bottom: 0; background: var(--ph-ground); }
 body[data-phone] .lib-bar .spacer, body[data-phone] .lib-bar-sep, body[data-phone] .lib-readout { display: none; }
 body[data-phone] .lib-seg { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; padding: 2px; border-radius: 10px; }
 body[data-phone] .lib-tab { height: 36px; justify-content: center; padding: 0 6px; border-radius: 8px; font-size: 13.5px; min-width: 0; }
@@ -314,3 +320,21 @@ body[data-phone] .sr-n { font-size: 14px; }
 
 /* Where the text runs the other way, so do the arrows that mean back and onward. */
 [dir="rtl"] .ph-back svg, [dir="rtl"] .ph-row > svg:last-child { transform: scaleX(-1); }
+
+/* ---- every page has the whole screen -------------------------------------- */
+
+/* The controls over a page already say what page it is: its own title, said
+   again under them, only pushes the page down. */
+body[data-phone][data-phone-view="page"] h1.inline-title,
+body[data-phone][data-phone-view="page"] .pj-bar-title { display: none; }
+body[data-phone] .pj-bar { justify-content: flex-end; background: none; border-bottom: 0; }
+/* A canvas (the link graph, the study board) does not scroll, so its tools
+   start below the controls; the canvas itself still runs to the foot. */
+body[data-phone] .doc-full { padding-top: calc(62px + env(safe-area-inset-top, 0px)); }
+body[data-phone] .leaf-scroll:has(> .doc-full) { padding-top: 0; padding-bottom: 0; }
+/* One of many, as a full row to press: the platform's own list opens. */
+body[data-phone] .set-row:has(> .set-select) { flex-wrap: wrap; }
+body[data-phone] .set-select { flex: 1 1 100%; width: 100%; max-width: none; height: auto; min-height: 44px; margin-top: 8px; padding-inline: 12px; border-radius: 12px; font-size: 16px; }
+body[data-phone] .doc-full.projects, body[data-phone] .doc-full.cards { padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
+/* The scroller keeps the room for the controls; the page inside it need not keep it twice. */
+body[data-phone] .doc:not(.doc-full) { padding-top: 8px; padding-bottom: 24px; }

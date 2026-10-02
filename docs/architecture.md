@@ -178,7 +178,8 @@ nothing of Zolai), and fewer than 8% of strings identical to English.
   registers, since command titles and pane names are read once. Changing it
   saves, waits for the write, and restarts the interface (`ctx.locales.use`).
 - **Fetching.** Settings lists what is on the device and, once the index
-  answers, what can be had, marked *(download)*. Choosing one of those
+  answers, what can be had, in one list under two headings — a list, because
+  a row of buttons holds two languages and not twenty. Choosing one of those
   fetches it, keeps it, then restarts; a failure is said and nothing changes.
   From then on a start reads it from the device and needs no network.
   `tendLocale` in `boot.js` looks after the rest once the app is up: a chosen
@@ -922,6 +923,18 @@ presentation, not a second app:
 - Search runs on the Search key, not on input, where `shell.phone.on`;
   Settings shows one section at a time from its own navigation, and rows
   marked `desk-only` are left out.
+
+**The whole screen, on every page.** Nothing is set aside for the controls.
+The room they need is padding inside whatever scrolls (`.leaf-scroll`, the
+Study and More lists), so a page starts under the controls and runs under
+them, and one scroll handler moves the tab bar for all of them (`--ph-off`)
+and reports how far the page has moved (`--ph-y`, which the large title of
+Search and the Library rides away on). A pane (Search, the Guide) scrolls
+inside itself, and a canvas (the graph, the board) does not scroll, so those
+keep clear of the controls instead. The Library's band is in the flow, not
+sticky: options that are not being used do not hold the screen. A scroll
+reported as a page arrives (the workspace restoring its place) is where the
+page starts from, not a movement.
 
 **Reach.** A sheet is a dialog: opening one moves the focus into it and
 makes the workspace, the controls and the tab bar `inert`; closing it undoes

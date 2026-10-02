@@ -308,6 +308,15 @@ newest first.
   digits. Sizes are written one way too ("837 KB", "8.4 MB").
 - Removed: 31 interface strings and 44 style classes that nothing used,
   among them the styles of the old verse sheet and window buttons.
+- Phone: every page has the whole screen, as the reading does. A page
+  scrolls under the controls at the top and the tab bar at the foot, and the
+  tab bar gets out of its way going down; no band is kept for either. The
+  Library's large title, its pages, sources and filter are the top of the
+  page and leave with it instead of holding the upper half of the screen. A
+  page's title is said once, by the controls over it.
+- The interface language is chosen from a list, not a row of buttons, so it
+  takes any number of languages on any screen: what is on the device first,
+  then what would be downloaded.
 
 ### 26.10.01.3 — 1 October 2026
 

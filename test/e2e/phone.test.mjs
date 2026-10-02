@@ -108,6 +108,35 @@ test('the phone shell', options, async (t) => {
     assert.equal(await off(), 0, 'and back on the way up');
   });
 
+  await t.test('every page has the whole screen: it runs under the controls, and the bar gets out of its way', async () => {
+    const off = () => page.evaluate(() => Number(document.body.style.getPropertyValue('--ph-off') || 0));
+    const box = (selector) => page.evaluate((sel) => { const r = document.querySelector(sel).getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom) }; }, selector);
+    await tab('library').tap();
+    await page.waitForSelector('.library-item');
+    const scroller = await box('.leaf-scroll');
+    assert.equal(scroller.top, 0, 'the page starts at the top of the screen');
+    assert.equal(scroller.bottom, 844, 'and ends at its foot: no band is kept for the tab bar');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.lib-bar')).position), 'static', 'the Library\'s options are the top of the page, not a band over it');
+
+    await tab('more').tap();
+    await page.locator('.ph-screen .ph-row', { hasText: 'Data and formats' }).tap();
+    await page.waitForSelector('.doc');
+    assert.equal(await page.locator('h1.inline-title').isVisible(), false, 'a page\'s title is said once, by the controls over it');
+    assert.deepEqual(await box('.leaf-scroll'), { top: 0, bottom: 844 });
+    await page.waitForTimeout(500); // the page has arrived; what moves it now is the reader
+    const moved = await page.evaluate(() => { const el = document.querySelector('.leaf-scroll'); el.scrollTop = 300; return el.scrollTop; });
+    assert.equal(moved, 300, 'a long page');
+    await page.waitForTimeout(400);
+    assert.equal(await off(), 96, 'the tab bar gets out of the way here as it does over a chapter');
+    assert.ok(await page.evaluate(() => document.body.classList.contains('ph-scrolled')), 'and the controls thin out');
+    await page.evaluate(() => { document.querySelector('.leaf-scroll').scrollTop = 200; });
+    await page.waitForTimeout(400);
+    assert.equal(await off(), 0, 'and comes back on the way up');
+    await page.locator('.ph-nav .ph-back').tap();
+    await tab('read').tap();
+    await page.waitForSelector('.leaf[data-pane="0"] .vblock');
+  });
+
   await t.test('a swipe turns the chapter', async () => {
     const swipe = (from, to) => page.evaluate(([x1, x2]) => {
       const el = document.querySelector('.panes');

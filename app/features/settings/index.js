@@ -190,26 +190,32 @@ export default {
             more.why ? L('set.languageNoList', { why: more.why }) : '',
           ].filter(Boolean).join(' ');
           const toFetch = more.list.filter((one) => !hasLocale(one.code));
-          return ui.choice({
-            name: L('set.language'), hint,
-            options: [
-              ['device', L('set.languageDevice')],
-              ...here.map(({ code, name }) => [code, name, null, code]),
-              ...toFetch.map(({ code, name }) => [code, L('set.languageFetch', { name }), null, code]),
-            ],
-            value: current.locale ?? 'device',
-            onChange: async (value) => {
-              const code = value === 'device' ? null : value;
-              const name = [...here, ...toFetch].find((one) => one.code === code)?.name ?? L('set.languageDevice');
-              if (code && !hasLocale(code)) shell.notify(L('msg.localeGetting', { name }));
-              try {
-                await ctx.locales.use(code);
-              } catch (err) {
-                shell.notify(L('msg.localeFailed', { name, why: err.message }), 'error');
-                run();
-              }
-            },
+          const value = current.locale ?? 'device';
+          // A list, not a row of buttons: two languages fit a row and twenty
+          // do not, on any screen. The platform's own picker opens it — a
+          // wheel or a full list on a phone, a menu on a desktop — and takes
+          // however many there are. What is on the device comes first; what
+          // would be downloaded is under its own heading.
+          const option = (code, name) => h('option', { value: code, lang: code === 'device' ? undefined : code }, name);
+          const menu = h('select', { class: 'set-select set-language', 'aria-label': L('set.language') },
+            option('device', L('set.languageDevice')),
+            h('optgroup', { label: L('set.languageHere') }, here.map(({ code, name }) => option(code, name))),
+            toFetch.length
+              ? h('optgroup', { label: L('set.languageMore') }, toFetch.map(({ code, name }) => option(code, name)))
+              : null);
+          menu.value = value;
+          menu.addEventListener('change', async () => {
+            const code = menu.value === 'device' ? null : menu.value;
+            const name = [...here, ...toFetch].find((one) => one.code === code)?.name ?? L('set.languageDevice');
+            if (code && !hasLocale(code)) shell.notify(L('msg.localeGetting', { name }));
+            try {
+              await ctx.locales.use(code);
+            } catch (err) {
+              shell.notify(L('msg.localeFailed', { name, why: err.message }), 'error');
+              menu.value = value;
+            }
           });
+          return ui.row({ name: L('set.language'), hint }, menu);
         }
 
         function accentRow(current) {

@@ -63,7 +63,8 @@ const inspect = () => page.evaluate(() => {
     return r;
   };
   const drawer = document.body.classList.contains('has-drawer');
-  const layer = (el) => el.closest('.composer, .float-win, .popover, .modal, .menu, .cd-panel, .rpanel, .toast, .mobile-bar')
+  // The phone's controls float over a page that scrolls under them.
+  const layer = (el) => el.closest('.composer, .float-win, .popover, .modal, .menu, .cd-panel, .rpanel, .toast, .mobile-bar, .ph-tabs, .ph-nav, .ph-sheet')
     ?? (drawer ? el.closest('.sidebar') : null);
   const boxes = ctrls.map((el) => ({ el, r: shown(el), layer: layer(el) })).filter((b) => b.r.right - b.r.left > 1 && b.r.bottom - b.r.top > 1);
   for (let i = 0; i < boxes.length; i += 1) {

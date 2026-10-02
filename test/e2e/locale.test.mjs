@@ -42,7 +42,7 @@ test('the interface follows the device, and the reader can choose', options, asy
     await page.keyboard.press('Enter');
     await page.waitForSelector('.settings');
     const reload = page.waitForEvent('load');
-    await page.locator('.set-row', { hasText: 'Språk' }).locator('button', { hasText: 'မြန်မာ' }).click();
+    await page.locator('.set-language').selectOption('my');
     await reload;
     await page.waitForSelector('#app .body-row');
     await page.waitForTimeout(800);
@@ -74,7 +74,7 @@ test('the interface follows the device, and the reader can choose', options, asy
     await page.keyboard.press('Enter');
     await page.waitForSelector('.settings');
     const reload = page.waitForEvent('load');
-    await page.locator('.set-row').first().locator('button').first().click();
+    await page.locator('.set-language').selectOption('device');
     await reload;
     await page.waitForSelector('#app .body-row');
     assert.equal(await lang(), 'nb', 'the device language again');
@@ -90,15 +90,17 @@ test('the interface follows the device, and the reader can choose', options, asy
       await page.waitForSelector('.settings');
     };
     await settings('Innstillinger');
-    const row = page.locator('.set-row', { hasText: 'Språk' });
-    await row.locator('button', { hasText: 'Zolai' }).waitFor();
-    const offered = await row.locator('button').allInnerTexts();
-    assert.ok(offered.includes('Zolai (last ned)'), `Zolai is offered for download: ${offered.join(' | ')}`);
-    assert.ok(offered.includes('မြန်မာ'), 'Burmese, fetched a moment ago, is on the device and says nothing of a download');
+    // A list that takes any number of languages: what is on the device,
+    // then what would be downloaded, each under its own heading.
+    const menu = page.locator('.set-language');
+    await menu.locator('option[value="ctd"]').waitFor({ state: 'attached' });
+    const groups = await menu.locator('optgroup').evaluateAll((els) => els.map((el) => [el.label, [...el.children].map((o) => o.value)]));
+    assert.deepEqual(groups, [['På denne enheten', ['en', 'nb', 'my']], ['Kan lastes ned', ['ctd']]],
+      'Burmese, fetched a moment ago, is on the device; Zolai is to download');
     assert.equal(app.requests.filter((url) => /locale\/ctd\.json$/.test(url)).length, 0, 'nothing fetched before it is chosen');
 
     const reload = page.waitForEvent('load');
-    await row.locator('button', { hasText: 'Zolai' }).click();
+    await menu.selectOption('ctd');
     await reload;
     await page.waitForSelector('#app .body-row');
     assert.equal(await lang(), 'ctd');
@@ -119,7 +121,7 @@ test('the interface follows the device, and the reader can choose', options, asy
     assert.match(await page.locator('.set-row').first().innerText(), /^Pau/, 'the language row, in Zolai');
     assert.match(await page.locator('.set-row').first().innerText(), /sittel|sit/i, 'which says it is yet to be checked by a speaker');
     const back = page.waitForEvent('load');
-    await page.locator('.set-row').first().locator('button').first().click();
+    await page.locator('.set-language').selectOption('device');
     await back;
     await page.waitForSelector('#app .body-row');
     assert.equal(await lang(), 'nb');
