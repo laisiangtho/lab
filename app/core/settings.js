@@ -76,11 +76,18 @@ export const defaultSettings = Object.freeze({
   layout: 'paragraph',
   syncScroll: true,
   alignRows: true,
-  /** Chrome the reader can hide. */
+  /**
+   * Chrome the reader can hide. A new reader starts with neither sidebar:
+   * with no translation yet there is nothing for them to hold, and a page
+   * framed on every side by empty panels is a workbench before it is a
+   * book. The left one (Books) opens by itself when the first translation
+   * can be read (workspace `settleTranslations`); the right one when a pane
+   * in it is asked for.
+   */
   ribbon: true,
   statusBar: true,
-  leftSidebar: true,
-  rightSidebar: true,
+  leftSidebar: false,
+  rightSidebar: false,
   leftWidth: 264,
   rightWidth: 300,
   /** Reading typography. */

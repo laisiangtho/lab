@@ -641,7 +641,14 @@ export function createWorkspace(ctx, chrome) {
     if (!installed.length) return false;
     const open = panesOf(state.get());
     const order = open.filter((id) => installed.some((t) => t.identify === id));
-    if (!order.length) { state.set({ translation: installed[0].identify, parallel: [] }); return true; }
+    if (!order.length) {
+      // The first translation there is to read: the books come out with it,
+      // once, since this is the moment they have somewhere to go. A reader
+      // who shuts the sidebar afterwards has shut it.
+      const first = state.get().translation === null;
+      state.set({ translation: installed[0].identify, parallel: [], ...(first ? { leftSidebar: true } : {}) });
+      return true;
+    }
     if (order.length !== open.length) { state.set({ translation: order[0], parallel: order.slice(1) }); return true; }
     return false;
   }

@@ -12,7 +12,7 @@
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { available, launch } from './harness.mjs';
+import { available, launch, openSidebars } from './harness.mjs';
 
 const ready = await available();
 const options = ready.ok ? {} : { skip: `end-to-end: ${ready.why}` };
@@ -211,6 +211,7 @@ test('a wide window with both sidebars open leaves a narrow page', options, asyn
   await firstRun(app);
   await page.locator('[data-identify="kjv1611"] .library-actions .btn').click();
   await page.locator('[data-identify="kjv1611"] .badge-ok').waitFor({ timeout: 60000 });
+  await openSidebars(page);
 
   const cut = () => page.evaluate(() => {
     const out = [];

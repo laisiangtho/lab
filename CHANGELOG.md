@@ -317,6 +317,11 @@ newest first.
 - The interface language is chosen from a list, not a row of buttons, so it
   takes any number of languages on any screen: what is on the device first,
   then what would be downloaded.
+- A new reader starts with the page alone: neither sidebar is open until
+  there is something for it to hold. The Books side opens by itself when the
+  first translation can be read; the study side opens when a pane in it is
+  asked for. The ribbon and the status bar are as before, and an existing
+  install keeps its layout.
 
 ### 26.10.01.3 — 1 October 2026
 

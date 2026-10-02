@@ -422,6 +422,20 @@ export async function installFromLibrary(page, identify, { timeout = 60000 } = {
  * Bring the reading to the front: the chapter's tab on a desktop, the Read
  * tab on a phone, which has no tab strip.
  */
+/**
+ * Both sidebars open, pressed open the way a reader opens them. A new reader
+ * starts with neither; the Books side comes out with the first translation,
+ * and the study side when a pane in it is asked for. A test about the
+ * sidebars themselves asks for both.
+ */
+export async function openSidebars(page) {
+  for (const [side, index] of [['left', 0], ['right', 1]]) {
+    if (await page.evaluate((name) => document.body.dataset[name], side) === 'open') continue;
+    await page.locator('.win-ctl button').nth(index).click();
+    await page.waitForFunction((name) => document.body.dataset[name] === 'open', side);
+  }
+}
+
 export async function toReading(page) {
   const phone = page.locator('.ph-tab[data-tab="read"]');
   if (await phone.isVisible()) await phone.click();

@@ -8,7 +8,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { available, installFromLibrary, launch } from './harness.mjs';
+import { available, installFromLibrary, launch, openSidebars } from './harness.mjs';
 
 const ready = await available();
 const options = ready.ok ? {} : { skip: `end-to-end: ${ready.why}` };
@@ -85,6 +85,8 @@ test('the app in a browser', options, async (t) => {
 
   await t.test('installs a translation and reads a chapter', async () => {
     await install('kjv1611');
+    // The rest of this file works in both sidebars.
+    await openSidebars(page);
     await page.locator('.tab', { hasText: /Genesis/ }).first().click();
     await page.waitForSelector('.verse');
     assert.equal(await page.locator('.verse').count(), 31, 'Genesis 1 has 31 verses');

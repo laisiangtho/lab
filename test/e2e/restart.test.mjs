@@ -48,20 +48,25 @@ test('the app across a restart', options, async (t) => {
     await page.locator('.wl .btn.primary').click();
     await page.waitForSelector('.library-item', { timeout: 20000 });
     firstRun = await sidebars();
-    assert.ok(firstRun.left.open && firstRun.left.panes.length > 0, 'the left sidebar opens with panes');
-    assert.ok(firstRun.right.open && firstRun.right.panes.length > 0, 'the right sidebar opens with panes');
+    // Laid out, and out of the way: with nothing to read yet there is
+    // nothing for a sidebar to hold, and the first screen is the page alone.
+    assert.ok(firstRun.left.panes.length > 0 && firstRun.right.panes.length > 0, 'both sidebars are laid out');
+    assert.ok(!firstRun.left.open && !firstRun.right.open, 'and neither is open');
     const s = await stored();
     assert.deepEqual(s.sidebarLeft.flatMap((r) => r.views), firstRun.left.panes, 'the left arrangement is stored');
     assert.deepEqual(s.sidebarRight.flatMap((r) => r.views), firstRun.right.panes, 'the right arrangement is stored');
   });
 
-  await t.test('installing a translation and reopening keeps both sidebars', async () => {
+  await t.test('the first translation brings the books out; a restart keeps both sidebars as they were', async () => {
     await install('kjv1611');
+    const once = await sidebars();
+    assert.ok(once.left.open, 'the Books side opens with something to read');
+    assert.ok(!once.right.open, 'the study side waits to be asked for');
     await restart();
     const after = await sidebars();
     assert.deepEqual(after.left.panes, firstRun.left.panes, 'the left sidebar has the same panes');
     assert.deepEqual(after.right.panes, firstRun.right.panes, 'the right sidebar has the same panes');
-    assert.ok(after.left.open && after.right.open, 'and both are open');
+    assert.ok(after.left.open && !after.right.open, 'and each is as it was left');
   });
 
   await t.test('a pane put away stays away after a restart', async () => {
@@ -91,7 +96,7 @@ test('the app across a restart', options, async (t) => {
     const after = await sidebars();
     assert.deepEqual(after.left.panes, firstRun.left.panes, 'the left sidebar is laid out again');
     assert.deepEqual(after.right.panes, firstRun.right.panes, 'the right sidebar is laid out again');
-    assert.ok(after.left.open && after.right.open, 'and both are open');
+    assert.ok(after.left.open && !after.right.open, 'and each is open or shut as it was');
     await restart();
     assert.deepEqual((await sidebars()).left.panes, firstRun.left.panes, 'and it stays repaired');
   });
