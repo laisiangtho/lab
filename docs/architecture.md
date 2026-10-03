@@ -56,6 +56,37 @@ Measured on tedim1932, niv2011, judson1835, ddb1931, bbe1949, jwmynwt, mizo1917;
 - `info.shortname` can be `""` (jwmynwt); localised book names are sometimes English (mizo1917, niv2011).
 - Parse time in Node: 50–170 ms per full translation.
 
+### 1.3-b Overlays
+
+Data that belongs to a translation without being in its file: the catalog
+repository keeps `strongs/{identify}.json` (a Strong's number for each word
+of each verse) and `refs/{identify}.json` (a reference line for each verse),
+each folder with an `index.json` of what exists. `core/overlay.js` holds the
+format and `applyOverlays`.
+
+- **Where they go on.** In the install worker, onto the parsed master before
+  it is validated: numbers are written into the verse text in the inline
+  notation (`word{H430}`), a reference line is set on a verse that has none of
+  its own. Everything downstream — the reading, search, export, the word
+  study, the lemma index — sees a translation that happens to be tagged.
+- **What is refused.** A verse entry carries the hash of the text it was made
+  for; a verse whose text has changed, or that is not in the file, keeps the
+  master's text and is counted. The count is said when it is not zero.
+- **Which are laid on.** `library.install(identify, { overlays })`. Left to
+  itself an install takes what the translation already has and whatever else
+  is offered that is not a draft (`review: false`). A draft is only ever added
+  by being asked for: the Library says it is available, offers it once the
+  translation is installed, explains it in a confirmation, and marks the row
+  afterwards. Taking one off is the same install without it, so the master's
+  text comes back from the master and not from stripping.
+- **What is kept.** The installed record's `overlays`: per kind, the version,
+  whether it is a draft, the verses applied and refused, the method and the
+  sources, which the translation's information shows (the sources ask to be
+  named). The indexes are fetched with the catalog and kept beside it; a
+  device whose catalog is fresh but has no index on record fetches them at
+  once. An overlay newer than the one installed makes the row an update.
+- Catalog translations only: an imported translation has no file to match.
+
 ### 1.3-a Faults a file is read past
 
 Nine of the catalog's 64 files (measured 2 October 2026) were refused

@@ -1181,7 +1181,7 @@ test('the app in a browser', options, async (t) => {
       const before = await page.evaluate((s) => document.querySelector(s).scrollTop, scroller);
       assert.ok(before > 40, `scrolled down the list (${before})`);
       // Removing a translation repaints the list; the reader stays where they were.
-      await page.locator('.popover.menu .menu-item', { hasText: 'Remove' }).click();
+      await page.locator('.popover.menu').getByRole('menuitem', { name: 'Remove', exact: true }).click();
       await page.waitForTimeout(1500);
       const after = await page.evaluate((s) => document.querySelector(s).scrollTop, scroller);
       assert.ok(Math.abs(after - before) < 60, `the page did not jump to the top (${before} → ${after})`);

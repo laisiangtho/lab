@@ -322,6 +322,15 @@ newest first.
   first translation can be read; the study side opens when a pane in it is
   asked for. The ribbon and the status bar are as before, and an existing
   install keeps its layout.
+- Overlays: Strong's numbers and cross-references that the catalog
+  repository keeps beside a translation (`strongs/`, `refs/`) are laid over
+  it when it is installed. References that are not a draft come with the
+  translation. Strong's numbers that are a draft are said to be one on the
+  translation's row before it is downloaded, offered once it is installed,
+  explained before they are added, and marked as a draft afterwards; either
+  kind is taken off again from the translation's menu. A newer overlay shows
+  as an update. The translation's information names the method and the
+  sources. First data: Lai Siangtho 1977 (Tedim).
 
 ### 26.10.01.3 — 1 October 2026
 

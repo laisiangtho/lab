@@ -100,6 +100,14 @@ export function createTranslationInfo(ctx) {
         found.short ? L('lbl.chaptersShort', { n: found.short }) : '',
         found.extra ? L('lbl.chaptersExtra', { n: found.extra }) : '',
       ].filter(Boolean).join(' · ') || L('lbl.differs', { n: found.total }));
+      // What was laid over the master, and where it came from: a draft says
+      // so, and its sources are named (they ask to be).
+      for (const [kind, one] of Object.entries(installed?.overlays ?? {})) {
+        row(L(`lib.ov.${kind}`), [
+          one.review ? L('lib.ov.draft') : '', one.method, ...one.sources,
+          one.refused ? L('msg.ovRefused', { n: one.refused, name: meta.info.shortname }) : '',
+        ].filter(Boolean).join(' · '));
+      }
       const faults = Object.entries(found.faults ?? {});
       if (faults.length) row(L('lib.faults'), faults.map(([kind, n]) => L(`lib.faults.${kind}`, { n })).join('; '));
     }

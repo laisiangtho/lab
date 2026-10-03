@@ -7,6 +7,7 @@ import { describe, FORMATS, sniff, slug } from '../../core/formats/index.js';
 import { isBrowserBible } from '../../core/formats/browserbible.js';
 import { isStepLexicon } from '../../core/lexicon.js';
 import { contentOfStats, featuresOf } from '../../core/content.js';
+import { OVERLAY_KINDS } from '../../core/overlay.js';
 import { sniffStudy } from '../../core/studydata.js';
 import { classify, otherEdition, readMetadata } from '../../core/formats/pack.js';
 import { aboutText, lossOf, optionsFor, WRITERS } from '../../core/formats/write.js';
@@ -103,7 +104,27 @@ export default {
       shell.notify(L(granted ? 'lib.kept' : 'lib.notKept'), granted ? 'ok' : 'info');
     }
 
-    async function act(identify, action) {
+    /**
+     * Lay an overlay over a translation, or take one off: the translation is
+     * installed again from its file with the kinds asked for. A draft is
+     * explained before it is added; nothing is added without the press.
+     */
+    async function setOverlay(row, kind, on) {
+      const offered = row.overlays?.[kind];
+      const name = row.entry?.name ?? row.identify;
+      const what = L(`lib.ov.${kind}`);
+      if (on && offered?.review) {
+        const sure = await shell.confirm({ title: L('lib.ov.addDraft', { what }), body: L(`lib.ov.${kind}DraftHint`), confirm: L('lib.ov.add', { what }) });
+        if (!sure) return;
+      }
+      const has = OVERLAY_KINDS.filter((one) => row.held?.overlays?.[one]);
+      const kinds = on ? [...new Set([...has, kind])] : has.filter((one) => one !== kind);
+      await act(row.identify, 'install', { overlays: kinds, said: L(on ? 'msg.ovAdded' : 'msg.ovRemoved', { what, name }) });
+      // Numbers asked for and not shown would look like nothing happened.
+      if (on && kind === 'strongs' && row.held && !state.get().strongs && (await library.status()).find((one) => one.identify === row.identify)?.held?.overlays?.strongs) state.set({ strongs: true });
+    }
+
+    async function act(identify, action, { overlays = null, said = null } = {}) {
       // The reader knows the translation by its name, not by the file it is in.
       const name = library.catalog?.get(identify)?.name ?? identify;
       progress.set(identify, L(action === 'remove' ? 'lib.removing' : 'lib.starting'));
@@ -112,16 +133,29 @@ export default {
           await library.remove(identify);
           shell.notify(L('lib.removed', { name }));
         } else {
-          const result = await library.install(identify);
+          const result = await library.install(identify, overlays ? { overlays } : {});
           // Only what a reader can act on: a catalog that disagrees with the
           // file. How the file differs from the canon belongs with the
           // translation itself, not in a message that disappears.
           const notes = result.versionMismatch
             ? L('lib.versionMismatch', { catalog: result.versionMismatch.catalog, file: result.versionMismatch.file })
             : '';
-          shell.notify(notes ? L('lib.installedNoted', { name, notes }) : L('lib.installed', { name }), 'ok', {
-            actions: [{ label: L('lib.readIt'), icon: 'book-open', run: () => shell.readTranslation(identify) }],
+          // What the repository can lay over it and a reader has to ask for
+          // (a draft) is offered here, once it is installed, and not taken.
+          const offered = library.overlaysFor(identify);
+          const more = OVERLAY_KINDS.filter((kind) => offered[kind]?.review && !result.overlays?.[kind]);
+          shell.notify(said ?? (notes ? L('lib.installedNoted', { name, notes }) : L('lib.installed', { name })), 'ok', {
+            actions: [
+              { label: L('lib.readIt'), icon: 'book-open', run: () => shell.readTranslation(identify) },
+              ...(overlays ? [] : more.map((kind) => ({
+                label: L('lib.ov.addDraft', { what: L(`lib.ov.${kind}`) }), icon: 'plus',
+                run: async () => setOverlay((await library.status()).find((row) => row.identify === identify), kind, true),
+              }))),
+            ],
           });
+          // A verse an overlay was not made for keeps the master's text: said, with how many.
+          const refused = Object.values(result.overlays ?? {}).reduce((n, one) => n + one.refused, 0);
+          if (refused) shell.notify(L('msg.ovRefused', { n: refused, name }));
         }
       } catch (err) {
         shell.notify(`${name}: ${err.message}`, 'error');
@@ -952,6 +986,7 @@ export default {
               h('span', { class: 'muted' }, [info.language?.text, row.held ? held(row.held) : null].filter(Boolean).join(' · ')),
               hasLine(row.held?.stats ? contentOfStats(row.held.stats, row.entry?.content) : row.entry?.content),
               faultsBadge(row.held ? row.held.diagnostics?.faults : row.entry?.content?.faults),
+              overlayLine(row),
               row.state === 'local' ? h('span', { class: 'badge' }, L('lib.yours')) : null,
               origin && row.held?.source !== 'native' ? h('span', { class: 'badge badge-src' }, origin) : null,
               row.state === 'unlisted' ? h('span', { class: 'badge' }, L('lib.unlisted')) : null,
@@ -988,6 +1023,32 @@ export default {
             found.map(({ id, n: count }) => h('span', {
               class: `lib-has-i is-${id}`, dataset: { has: id }, title: L(`lib.has.${id}Hint`, { n: n(count) }),
             }, L(`lib.has.${id}`))));
+        }
+
+        /**
+         * What the repository can lay over a translation, said on its row:
+         * a draft that is on says it is a draft; one that could be added
+         * is a press on a translation already here, and a plain note on
+         * one that is not (it is offered once the translation is installed).
+         */
+        function overlayLine(row) {
+          const out = [];
+          for (const kind of OVERLAY_KINDS) {
+            const offered = row.overlays?.[kind];
+            const has = row.held?.overlays?.[kind];
+            const what = L(`lib.ov.${kind}`);
+            if (has) {
+              if (has.review) out.push(h('span', { class: 'badge badge-draft', title: L(`lib.ov.${kind}DraftHint`), dataset: { overlay: kind } }, L('lib.ov.isDraft', { what })));
+            } else if (offered && row.held) {
+              out.push(h('button', {
+                class: 'badge badge-add', dataset: { overlay: kind, add: kind },
+                onclick: (event) => { event.stopPropagation(); setOverlay(row, kind, true).catch((err) => shell.notify(err.message, 'error')); },
+              }, icon('plus'), L(offered.review ? 'lib.ov.addDraft' : 'lib.ov.add', { what })));
+            } else if (offered?.review) {
+              out.push(h('span', { class: 'badge badge-src', dataset: { overlay: kind } }, L('lib.ov.availableDraft', { what })));
+            }
+          }
+          return out.length ? out : null;
         }
 
         /**
@@ -1235,6 +1296,7 @@ export default {
               h('span', { class: 'muted' }, [e.year, e.publisher].filter(Boolean).join(' · ')),
               hasLine(e.content),
               faultsBadge(row.held ? row.held.diagnostics?.faults : e.content?.faults),
+              overlayLine(row),
               here && row.state !== 'update' ? h('span', { class: 'badge badge-ok' }, icon('check'), L('lib.onDevice')) : null,
               row.state === 'update' ? h('span', { class: 'badge badge-hint' }, `v${row.installedVersion} → v${e.version}`) : null,
               !here && suggested(row) ? h('span', { class: 'badge badge-hint' }, L('lib.suggested')) : null),
@@ -1367,7 +1429,7 @@ export default {
         const offStudy = ctx.study?.on('change', run);
         const offChange = library.on('change', run);
         const offProgress = library.on('progress', ({ detail }) => {
-          const phase = { download: L('lib.downloading'), convert: L('lib.converting'), validate: L('lib.validating'), write: L('lib.saving') }[detail.phase];
+          const phase = { download: L('lib.downloading'), overlay: L('lib.downloading'), convert: L('lib.converting'), validate: L('lib.validating'), write: L('lib.saving') }[detail.phase];
           progress.set(detail.identify, detail.received ? `${phase} ${formatBytes(detail.received)}` : `${phase}…`);
           run();
         });
@@ -1401,6 +1463,15 @@ export default {
         ...(row.state === 'update' ? [{
           id: 'update', title: L('lib.update'), icon: 'sync', run: () => act(row.identify, 'install'),
         }] : []),
+        ...(row.held ? OVERLAY_KINDS.filter((kind) => row.held.overlays?.[kind] || row.overlays?.[kind]).map((kind) => {
+          const on = Boolean(row.held.overlays?.[kind]);
+          const what = L(`lib.ov.${kind}`);
+          return {
+            id: `overlay-${kind}`, icon: on ? 'x' : 'plus',
+            title: on ? L('lib.ov.remove', { what }) : L(row.overlays[kind].review ? 'lib.ov.addDraft' : 'lib.ov.add', { what }),
+            run: () => setOverlay(row, kind, !on).catch((err) => shell.notify(err.message, 'error')),
+          };
+        }) : []),
         {
           id: 'remove',
           title: L('lib.remove'),

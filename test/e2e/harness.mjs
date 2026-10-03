@@ -19,6 +19,7 @@ import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseCategory } from '../../app/core/category.js';
 import { contentOf } from '../../app/core/content.js';
+import { verseHash, wordsOf } from '../../app/core/overlay.js';
 import { parseTranslation } from '../../app/core/translation.js';
 
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -216,6 +217,31 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
     }),
   };
 
+  // Overlays for one translation, the Burmese one: Strong's numbers as a
+  // draft on Genesis 1:1-3 (and on verse 4 from a text that has since
+  // changed, which must be refused), and references that are not a draft.
+  const genesis = translations.judson1835.book[1].chapter[1].verse;
+  const tagged = (n) => {
+    const words = wordsOf(genesis[n].text);
+    return { w: words.map((_, i) => (i === 0 ? 'H7225' : i === 1 ? 'H9999' : null)), of: verseHash(genesis[n].text) };
+  };
+  const overlays = {
+    strongs: {
+      index: { overlays: [{ identify: 'judson1835', version: 1, review: true, verses: 4, words: 4, bytes: 400 }] },
+      judson1835: {
+        info: { identify: 'judson1835', kind: 'strongs', version: 1, review: true, method: 'Word alignment, a test draft.', sources: ['Open Scriptures Hebrew Bible (CC BY 4.0)'] },
+        book: { 1: { chapter: { 1: { verse: { 1: tagged(1), 2: tagged(2), 3: tagged(3), 4: { ...tagged(4), of: 'deadbeef' } } } } } },
+      },
+    },
+    refs: {
+      index: { overlays: [{ identify: 'judson1835', version: 1, review: false, verses: 2, references: 2, bytes: 200 }] },
+      judson1835: {
+        info: { identify: 'judson1835', kind: 'refs', version: 1, review: false, method: 'OpenBible.info, a test.', sources: ['OpenBible.info (CC BY)'] },
+        book: { 1: { chapter: { 1: { verse: { 1: { ref: 'Ps 1:1' }, 2: { ref: 'Ps 23:2' } } } } } },
+      },
+    },
+  };
+
   const canon = parseCategory(category);
   const catalog = {
     name: 'test catalog',
@@ -315,6 +341,9 @@ export function fixtures({ books: only = [1, 2, 19, 40] } = {}) {
         const file = join(ROOT, 'locale', `${locale[1]}.json`);
         return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
       }
+      // What the repository lays over a translation (core/overlay.js).
+      const overlay = url.match(/\/master\/(strongs|refs)\/([^/]+)\.json$/);
+      if (overlay) return overlays[overlay[1]][decodeURIComponent(overlay[2])] ?? null;
       const pack = url.match(/lang\/iso-([a-z]{3})\.json$/);
       if (pack) return packs[pack[1]] ?? null;
       const file = url.match(/json\/([^/]+)\.json$/);

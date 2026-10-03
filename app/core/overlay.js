@@ -91,3 +91,90 @@ export function overlayInfo(raw, { identify, kind }) {
   if (!raw.book || typeof raw.book !== 'object') throw new Error(`${source}: no book`);
   return { identify, kind, version: info.version, review: info.review === true };
 }
+
+/** The kinds of overlay, in the order they are offered. */
+export const OVERLAY_KINDS = Object.freeze(['strongs', 'refs']);
+
+/**
+ * `strongs/index.json` or `refs/index.json`: what the catalog repository has
+ * of one kind, by translation.
+ *
+ * @param {unknown} raw
+ * @param {'strongs'|'refs'} kind
+ * @returns {Map<string, { identify: string, version: number, review: boolean, verses: number, bytes: number }>}
+ */
+export function parseOverlayIndex(raw, kind) {
+  const source = `${kind}/index.json`;
+  if (!raw || !Array.isArray(raw.overlays)) throw new Error(`${source}: expected { overlays: [...] }`);
+  const out = new Map();
+  raw.overlays.forEach((row, i) => {
+    if (!row || typeof row.identify !== 'string' || !row.identify) throw new Error(`${source}: overlays[${i}] has no identify`);
+    if (!Number.isInteger(row.version) || row.version < 1) throw new Error(`${source}: ${row.identify}: version must be a positive integer`);
+    if (out.has(row.identify)) throw new Error(`${source}: ${row.identify} is listed twice`);
+    out.set(row.identify, Object.freeze({
+      identify: row.identify, version: row.version, review: row.review === true,
+      verses: Number.isInteger(row.verses) ? row.verses : 0, bytes: Number.isInteger(row.bytes) ? row.bytes : 0,
+    }));
+  });
+  return out;
+}
+
+/** How many refused verses are kept by name; the count is exact whatever the list holds. */
+const REFUSED_LIMIT = 50;
+
+/**
+ * Lay overlays over a translation file, in place, before it is validated:
+ * Strong's numbers written into the verse text, a reference line set on the
+ * verses that have none of their own. The master's own references win: an
+ * overlay adds to a translation, and does not correct it.
+ *
+ * A verse the overlay was not made for (its text has changed, or it is not
+ * in the file) is left as the master has it and counted, with the first few
+ * named; the rest of the overlay still applies.
+ *
+ * @param {object} raw  json/{identify}.json, parsed; changed in place
+ * @param {{ strongs?: object, refs?: object }} overlays  each file, parsed
+ * @returns {Record<string, { version: number, review: boolean, verses: number, refused: number,
+ *                           refusedAt: string[], method: string, sources: string[] }>}
+ */
+export function applyOverlays(raw, overlays) {
+  const identify = raw?.info?.identify;
+  const out = {};
+  for (const kind of OVERLAY_KINDS) {
+    const overlay = overlays[kind];
+    if (!overlay) continue;
+    const info = overlayInfo(overlay, { identify, kind });
+    let verses = 0;
+    let refused = 0;
+    const refusedAt = [];
+    const refuse = (where) => { refused += 1; if (refusedAt.length < REFUSED_LIMIT) refusedAt.push(where); };
+    for (const [book, bookEntry] of Object.entries(overlay.book)) {
+      for (const [chapter, chapterEntry] of Object.entries(bookEntry?.chapter ?? {})) {
+        for (const [verse, entry] of Object.entries(chapterEntry?.verse ?? {})) {
+          const where = `${book}.${chapter}.${verse}`;
+          const target = raw.book?.[book]?.chapter?.[chapter]?.verse?.[verse];
+          if (!target || typeof target.text !== 'string') { refuse(where); continue; }
+          if (kind === 'strongs') {
+            try {
+              target.text = applyStrongs(target.text, entry, where);
+            } catch {
+              refuse(where);
+              continue;
+            }
+          } else {
+            if (typeof entry?.ref !== 'string' || !entry.ref.trim()) { refuse(where); continue; }
+            if (typeof target.ref === 'string' && target.ref.trim()) continue;
+            target.ref = entry.ref;
+          }
+          verses += 1;
+        }
+      }
+    }
+    out[kind] = {
+      version: info.version, review: info.review, verses, refused, refusedAt,
+      method: typeof overlay.info.method === 'string' ? overlay.info.method : '',
+      sources: Array.isArray(overlay.info.sources) ? overlay.info.sources.filter((one) => typeof one === 'string') : [],
+    };
+  }
+  return out;
+}

@@ -1,12 +1,13 @@
 /**
  * Library worker: download → validate → split → write, off the main thread.
  *
- * Request   { id, type: 'install', identify, url, category }   (category = raw category.json)
+ * Request   { id, type: 'install', identify, url, overlays, category }   (category = raw category.json;
+ *             overlays = { kind: url } to lay over the master, core/overlay.js)
  *           { id, type: 'import', identify, text, format, info, category }
  *           { id, type: 'pack',   identify, files, info, category }
  *           { id, type: 'export', identify, format, books, options, notes, category }
  *           { id, type: 'probe', identify, category }
- * Progress  { id, type: 'progress', phase: 'download'|'convert'|'validate'|'write', received? }
+ * Progress  { id, type: 'progress', phase: 'download'|'overlay'|'convert'|'validate'|'write', received? }
  * Result    { id, type: 'done', identify, version, stats, diagnostics, report? }
  * Failure   { id, type: 'error', message }
  *
@@ -22,6 +23,7 @@ import { parseCategory } from '../core/category.js';
 import { convert, slug } from '../core/formats/index.js';
 import { readPack } from '../core/formats/pack.js';
 import { write } from '../core/formats/write.js';
+import { applyOverlays } from '../core/overlay.js';
 import { hasStrongs } from '../core/strongs.js';
 import { parseTranslation } from '../core/translation.js';
 import { readStudyFile } from '../core/studydata.js';
@@ -65,7 +67,7 @@ async function importStudy({ text, name, studyType }, post) {
   return { meta };
 }
 
-async function install({ identify, url }, post) {
+async function install({ identify, url, overlays = {} }, post) {
   post({ type: 'progress', phase: 'download', received: 0 });
   const res = await fetch(url, { cache: 'no-cache' });
   if (!res.ok) throw new Error(`GET ${url}: HTTP ${res.status}`);
@@ -78,12 +80,30 @@ async function install({ identify, url }, post) {
   } catch (err) {
     throw new Error(`${identify}.json: invalid JSON (${err.message})`);
   }
+  // What is laid over the master goes on before it is validated, so the
+  // result is held to the same standard as a file that came that way.
+  const laid = {};
+  let size = bytes.byteLength;
+  for (const [kind, from] of Object.entries(overlays)) {
+    post({ type: 'progress', phase: 'overlay', received: 0 });
+    const got = await fetch(from, { cache: 'no-cache' });
+    if (!got.ok) throw new Error(`GET ${from}: HTTP ${got.status}`);
+    const body = await readAll(got, (received) => post({ type: 'progress', phase: 'overlay', received }));
+    size += body.byteLength;
+    try {
+      laid[kind] = JSON.parse(new TextDecoder().decode(body));
+    } catch (err) {
+      throw new Error(`${kind}/${identify}.json: invalid JSON (${err.message})`);
+    }
+  }
+  post({ type: 'progress', phase: 'validate' });
+  const applied = applyOverlays(raw, laid);
   const parsed = parseTranslation(raw, { identify, category });
 
   post({ type: 'progress', phase: 'write' });
   const store = await storePromise;
-  await store.install(parsed, { bytes: bytes.byteLength });
-  return { identify, version: parsed.meta.version, stats: parsed.stats, diagnostics: parsed.diagnostics };
+  await store.install(parsed, { bytes: size, overlays: applied });
+  return { identify, version: parsed.meta.version, stats: parsed.stats, diagnostics: parsed.diagnostics, overlays: applied };
 }
 
 /**

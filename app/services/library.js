@@ -9,6 +9,7 @@
  */
 
 import { compareCatalogs, parseCatalog, translationStatus } from '../core/catalog.js';
+import { OVERLAY_KINDS, parseOverlayIndex } from '../core/overlay.js';
 import { requestPersistence } from './store.js';
 
 const HOUR = 3_600_000;
@@ -21,6 +22,8 @@ export function createLibrary({ store, categoryRaw, config }) {
   let catalog = null;
   let origin = null; // 'stored' | 'bundled'
   let fetchedAt = null;
+  /** What the repository has to lay over its translations: kind → identify → index row. */
+  let overlays = Object.fromEntries(OVERLAY_KINDS.map((kind) => [kind, new Map()]));
   let worker = null;
   let nextId = 1;
   const pending = new Map();
@@ -37,6 +40,29 @@ export function createLibrary({ store, categoryRaw, config }) {
       origin = 'bundled';
       fetchedAt = null;
     }
+    const held = await store.getOverlayIndex();
+    if (held) overlays = readOverlayIndexes(held);
+  }
+
+  const readOverlayIndexes = (raw) => Object.fromEntries(OVERLAY_KINDS.map((kind) => [kind, parseOverlayIndex(raw[kind], kind)]));
+  const fileUrl = (path) => config.repoFileUrl.replace('{path}', path);
+
+  /**
+   * The overlay indexes, fetched with the catalog. They are part of what
+   * the repository publishes, so a failure here is a failure of the check,
+   * said by whoever asked for it; what was fetched before stays in use.
+   */
+  async function fetchOverlayIndexes() {
+    const raw = Object.fromEntries(await Promise.all(OVERLAY_KINDS.map(async (kind) => (
+      [kind, await fetchJson(fileUrl(`${kind}/index.json`), `${kind}/index.json`, { cache: 'no-cache' })]))));
+    const read = readOverlayIndexes(raw);
+    await store.putOverlayIndex(raw);
+    overlays = read;
+  }
+
+  /** What can be laid over a translation: { strongs, refs }, each an index row or null. */
+  function overlaysFor(identify) {
+    return Object.fromEntries(OVERLAY_KINDS.map((kind) => [kind, overlays[kind].get(identify) ?? null]));
   }
 
   /**
@@ -45,8 +71,13 @@ export function createLibrary({ store, categoryRaw, config }) {
    */
   async function checkForUpdates({ force = false } = {}) {
     if (!force) {
-      if (config.updateCheckHours === 0) return { checked: false, changed: false };
-      if (fetchedAt && Date.now() - Date.parse(fetchedAt) < config.updateCheckHours * HOUR) return { checked: false, changed: false };
+      const fresh = config.updateCheckHours === 0 || (fetchedAt && Date.now() - Date.parse(fetchedAt) < config.updateCheckHours * HOUR);
+      if (fresh) {
+        // A device that fetched its catalog before there were overlays has
+        // none on record: they are asked for now, not a day from now.
+        if (config.updateCheckHours !== 0 && !(await store.getOverlayIndex())) { await fetchOverlayIndexes(); emit('change'); }
+        return { checked: false, changed: false };
+      }
     }
     const raw = await fetchJson(config.catalogUrl, 'remote book.json', { cache: 'no-cache' });
     const remote = parseCatalog(raw, { source: 'remote book.json', requireRemoteShape: true });
@@ -60,19 +91,42 @@ export function createLibrary({ store, categoryRaw, config }) {
     origin = 'stored';
     fetchedAt = now;
     emit('change');
+    await fetchOverlayIndexes();
+    emit('change');
     return { checked: true, changed: relation === 'newer' };
   }
 
+  /**
+   * Each row also says what can be laid over it (`overlays`), and a
+   * translation whose overlay has a newer version in the repository is an
+   * update like one whose file has.
+   */
   async function status() {
-    return translationStatus(catalog, await store.list());
+    return translationStatus(catalog, await store.list()).map((row) => {
+      const offered = row.entry ? overlaysFor(row.identify) : Object.fromEntries(OVERLAY_KINDS.map((kind) => [kind, null]));
+      const stale = row.held && OVERLAY_KINDS.some((kind) => row.held.overlays?.[kind] && offered[kind] && offered[kind].version > row.held.overlays[kind].version);
+      return { ...row, overlays: offered, state: row.state === 'installed' && stale ? 'update' : row.state };
+    });
   }
 
-  async function install(identify) {
+  /**
+   * @param {string} identify
+   * @param {{ overlays?: string[] }} [options]  the kinds to lay over it. Left
+   *        out: what it already has, and whatever else is offered that is not
+   *        a draft. A draft (`review`) is only ever added by being asked for.
+   */
+  async function install(identify, { overlays: wanted = null } = {}) {
     const entry = catalog.get(identify);
     if (!entry) throw new Error(`${identify} is not in the catalog`);
-    const firstInstall = (await store.list()).length === 0;
+    const list = await store.list();
+    const firstInstall = list.length === 0;
+    const held = list.find((row) => row.identify === identify)?.overlays ?? {};
+    const offered = overlaysFor(identify);
+    const kinds = wanted ?? OVERLAY_KINDS.filter((kind) => offered[kind] && (held[kind] || !offered[kind].review));
+    for (const kind of kinds) if (!offered[kind]) throw new Error(`${identify}: nothing of the kind "${kind}" is published for it`);
     const url = config.translationUrl.replace('{identify}', encodeURIComponent(identify));
-    const result = await call({ type: 'install', identify, url, category: categoryRaw }, identify);
+    const laid = Object.fromEntries(kinds.map((kind) => [kind, fileUrl(`${kind}/${encodeURIComponent(identify)}.json`)]));
+    const result = await call({ type: 'install', identify, url, overlays: laid, category: categoryRaw }, identify);
     // Not fatal (the file is valid), but reported: the catalog and the file disagree,
     // so "update available" will keep showing until the catalog is corrected.
     result.versionMismatch = result.version !== entry.version ? { catalog: entry.version, file: result.version } : null;
@@ -202,6 +256,7 @@ export function createLibrary({ store, categoryRaw, config }) {
     exportTranslation,
     probe,
     remove,
+    overlaysFor,
     get catalog() { return catalog; },
     get origin() { return origin; },
     get fetchedAt() { return fetchedAt; },

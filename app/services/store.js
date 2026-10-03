@@ -115,8 +115,8 @@ class TranslationStore {
   /** Installed translations, without the chapter text. */
   async list() {
     const all = await request(this.#tx('translations').objectStore('translations').getAll());
-    return all.map(({ identify, version, info, bytes, installedAt, stats, diagnostics, source }) => (
-      { identify, version, info, bytes, installedAt, stats: stats ?? null, diagnostics: diagnostics ?? null, source: source ?? null }));
+    return all.map(({ identify, version, info, bytes, installedAt, stats, diagnostics, source, overlays }) => (
+      { identify, version, info, bytes, installedAt, stats: stats ?? null, diagnostics: diagnostics ?? null, source: source ?? null, overlays: overlays ?? {} }));
   }
 
   async getMeta(identify) {
@@ -155,9 +155,9 @@ class TranslationStore {
    * the same one.
    *
    * @param {{ meta: object, chapters: {book:number,chapter:number,verses:object}[], stats?: object, diagnostics?: object[] }} parsed
-   * @param {{ bytes: number, source?: string|null }} info
+   * @param {{ bytes: number, source?: string|null, overlays?: object }} info
    */
-  async install(parsed, { bytes, source = null }) {
+  async install(parsed, { bytes, source = null, overlays = {} }) {
     const { identify } = parsed.meta;
     const found = parsed.diagnostics ?? [];
     const tx = this.#tx(['translations', 'chapters'], 'readwrite');
@@ -172,6 +172,9 @@ class TranslationStore {
       installedAt: new Date().toISOString(),
       stats: parsed.stats ?? null,
       source,
+      // What was laid over the master when it was installed (core/overlay.js),
+      // by kind: its version, whether it is a draft, and what it could not apply.
+      overlays,
       // A translation missing most of the canon produces thousands of these;
       // the count is what a reader needs, the list is what a report needs.
       //
@@ -323,6 +326,18 @@ class TranslationStore {
   async getCatalog() {
     const rec = await request(this.#tx('catalog').objectStore('catalog').get('current'));
     return rec ? { raw: rec.raw, fetchedAt: rec.fetchedAt } : null;
+  }
+
+  /** What the catalog repository has to lay over its translations, as last fetched: { strongs, refs } raw indexes. */
+  async getOverlayIndex() {
+    const rec = await request(this.#tx('catalog').objectStore('catalog').get('overlays'));
+    return rec ? rec.raw : null;
+  }
+
+  async putOverlayIndex(raw) {
+    const tx = this.#tx('catalog', 'readwrite');
+    tx.objectStore('catalog').put({ id: 'overlays', raw, fetchedAt: new Date().toISOString() });
+    await done(tx);
   }
 
   async putCatalog(raw, fetchedAt = new Date().toISOString()) {

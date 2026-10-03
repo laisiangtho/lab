@@ -527,6 +527,11 @@ body.is-dragging-tab .sidebar[data-empty="true"] .side-body::after {
 /* A translation in a language this device asks for */
 .badge-hint { background: var(--accent-fade); color: var(--accent-2); box-shadow: inset 0 0 0 1px var(--accent-line); }
 
+/* What is laid over a translation: a draft that is on, and one to add. */
+.badge-draft { background: color-mix(in srgb, #d97706 14%, transparent); color: var(--text-normal); box-shadow: inset 0 0 0 1px color-mix(in srgb, #d97706 40%, transparent); }
+.badge-add { background: var(--accent-fade); color: var(--accent-2); box-shadow: inset 0 0 0 1px var(--accent-line); cursor: pointer; }
+.badge-add svg { width: 11px; height: 11px; }
+
 /* A file with faults the app reads past: said, and pressed for which. */
 .badge-warn { background: color-mix(in srgb, #d97706 16%, transparent); color: var(--text-normal); box-shadow: inset 0 0 0 1px color-mix(in srgb, #d97706 45%, transparent); cursor: pointer; }
 .badge-warn svg { width: 12px; height: 12px; color: #d97706; }
