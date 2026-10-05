@@ -121,7 +121,7 @@ export default {
       const kinds = on ? [...new Set([...has, kind])] : has.filter((one) => one !== kind);
       await act(row.identify, 'install', { overlays: kinds, said: L(on ? 'msg.ovAdded' : 'msg.ovRemoved', { what, name }) });
       // Numbers asked for and not shown would look like nothing happened.
-      if (on && kind === 'strongs' && row.held && !state.get().strongs && (await library.status()).find((one) => one.identify === row.identify)?.held?.overlays?.strongs) state.set({ strongs: true });
+      if (on && kind === 'strongs' && row.held && state.get().strongsMode !== 'numbers' && (await library.status()).find((one) => one.identify === row.identify)?.held?.overlays?.strongs) state.set({ strongsMode: 'numbers' });
     }
 
     async function act(identify, action, { overlays = null, said = null } = {}) {

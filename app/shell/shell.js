@@ -23,7 +23,10 @@ import { fill, formatBytes, h } from './dom.js';
 import { icon } from './icons.js';
 import { L, when } from './i18n.js';
 import { createLookup, parsePassageQuery, passageOf } from '../core/lookup.js';
-import { MODES } from '../core/settings.js';
+import { MODES, STRONGS_MODES } from '../core/settings.js';
+
+/** A mark for each way of showing words with a Strong's number. */
+const STRONGS_ICON = Object.freeze({ plain: 'lay-flow', quiet: 'eye', marked: 'marker', numbers: 'tag' });
 import { storageStatus } from '../services/store.js';
 import { wordCount } from '../core/markdown.js';
 import { BUILT_AT, VERSION } from '../version.js';
@@ -274,8 +277,7 @@ export function createShell(root, ctx) {
     command('shell.statusbar', L('cmd.statusBar'), () => toggleFlag('statusBar', L('cmd.statusBar')), { icon: 'min', state: () => ctx.state.get().statusBar });
     command('reading.panel', L('cmd.reading'), () => readingPanel.toggle(document.querySelector('.statusbar .sb-reading') ?? document.body), { icon: 'type' });
     command('reading.mode', L('cmd.mode'), toggleMode, { keys: 'Mod+e', icon: 'edit', needsChapter: true, state: () => ctx.state.get().mode === 'source' });
-    command('reading.strongs', L('cmd.strongs'), toggleStrongs, { icon: 'tag', needsChapter: true, state: () => ctx.state.get().strongs });
-    command('reading.tint', L('cmd.tintStrongs'), () => toggleFlag('tintStrongs', L('cmd.tintStrongs')), { icon: 'strongs', needsChapter: true, state: () => ctx.state.get().tintStrongs });
+    command('reading.strongs', L('cmd.strongs'), toggleStrongs, { icon: 'tag', needsChapter: true, state: () => ctx.state.get().strongsMode === 'numbers' });
     command('reading.interlinear', L('cmd.interlinear'), toggleInterlinear, { icon: 'study', needsChapter: true, state: () => ctx.state.get().interlinear });
     command('reading.headings', L('cmd.headings'), () => toggleShown('headings', 'cmd.headings'), { icon: 'heading', needsChapter: true, state: () => ctx.state.get().headings });
     command('reading.xrefs', L('cmd.xrefs'), () => toggleShown('xrefs', 'cmd.xrefs'), { icon: 'link', needsChapter: true, state: () => ctx.state.get().xrefs });
@@ -474,13 +476,31 @@ export function createShell(root, ctx) {
       : L(testament === 'H' ? 'msg.noHebrew' : 'msg.noGreek'), 'info', { about: 'interlinear' });
   }
 
-  function toggleStrongs() {
-    const next = !ctx.state.get().strongs;
-    ctx.state.set({ strongs: next });
+  /**
+   * How words with a Strong's number are shown. The command (and the Guide's
+   * button) turns the numbers themselves on and off, going back to how the
+   * words were shown before; the status bar and the Text box offer all four.
+   */
+  let beforeNumbers = 'marked';
+  function setStrongsMode(next) {
+    const now = ctx.state.get().strongsMode;
+    if (now !== 'numbers') beforeNumbers = now;
+    ctx.state.set({ strongsMode: next });
     const present = document.querySelector('.chapter .strongs');
     shell.notify(present
-      ? L('msg.state', { what: L('cmd.strongs'), value: L(next ? 'val.on' : 'val.off') })
+      ? L('msg.state', { what: L('cmd.strongs'), value: L(`sw.${next}`) })
       : L('msg.noStrongs'), 'info', { about: 'strongs' });
+  }
+  function toggleStrongs() {
+    setStrongsMode(ctx.state.get().strongsMode === 'numbers' ? beforeNumbers : 'numbers');
+  }
+  /** The four ways, as a menu from the control that asked. */
+  function strongsMenu(anchor) {
+    const now = ctx.state.get().strongsMode;
+    openMenu(anchor, STRONGS_MODES.map((id) => ({
+      id, title: L(`sw.${id}`), sub: L(`sw.${id}Hint`), icon: id === now ? 'check' : STRONGS_ICON[id], active: id === now, tall: true,
+      run: () => setStrongsMode(id),
+    })));
   }
 
   /**
@@ -857,7 +877,7 @@ export function createShell(root, ctx) {
    * about what is in front of them rather than about the file.
    */
   function renderStatus() {
-    const { book, chapter, layout, syncScroll, mode, strongs, readingSize } = ctx.state.get();
+    const { book, chapter, layout, syncScroll, mode, strongsMode, readingSize } = ctx.state.get();
     const label = `${workspace.bookName(book)} ${workspace.number(chapter)}`;
     const onChapter = workspace.activeTab?.kind === 'chapter';
     // A control that acts on the chapter is shown but not pressable while a
@@ -886,8 +906,12 @@ export function createShell(root, ctx) {
         icon('lay-list'), h('span', {}, counts ? L('lbl.verses', { n: counts.verses }) : L('val.unmeasured'))),
       reading: () => h('button', { class: 'sb sb-reading', title: L('cmd.reading'), onclick: (e) => readingPanel.toggle(e.currentTarget) }, icon('type'), `${readingSize}px · ${L(`val.${layout}`)}`),
       mode: () => chapterOnly(h('button', { class: 'sb', title: L('cmd.mode'), onclick: toggleMode }, icon(mode === 'source' ? 'edit' : 'eye'), L(`val.${mode}`))),
-      strongs: () => chapterOnly(h('button', { ...on(strongs), title: L('cmd.strongs'), onclick: toggleStrongs },
-        icon('strongs'), h('span', {}, L('cmd.strongs')))),
+      // Which of the four ways is on is said beside the name; the press
+      // offers all four, each with what it does.
+      strongs: () => chapterOnly(h('button', {
+        class: `sb sb-flag sb-words${strongsMode === 'plain' ? '' : ' is-on'}`, title: L('sw.title'), 'aria-haspopup': 'menu', dataset: { words: strongsMode },
+        onclick: (event) => strongsMenu(event.currentTarget),
+      }, icon('strongs'), h('span', {}, L('cmd.strongs')), h('span', { class: 'sb-val' }, L(`sw.${strongsMode}`)))),
       sync: () => chapterOnly(h('button', { ...on(syncScroll), title: L('cmd.sync'), onclick: () => toggleFlag('syncScroll', L('cmd.sync')) },
         icon('sync-scroll'), h('span', {}, L('cmd.sync')))),
       storage: () => h('button', { class: 'sb', title: storage.title, onclick: () => workspace.openDoc('about') },

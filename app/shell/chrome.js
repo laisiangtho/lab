@@ -747,7 +747,7 @@ export function createChrome(root, ctx) {
     body.dataset.ribbon = s.ribbon ? 'on' : 'off';
     refreshRibbonState();
     body.dataset.status = s.statusBar ? 'on' : 'off';
-    body.dataset.tint = s.tintStrongs ? 'on' : 'off';
+    body.dataset.words = s.strongsMode;
     for (const side of ['left', 'right']) {
       const open = side === 'left' ? s.leftSidebar : s.rightSidebar;
       const empty = sides[side].empty;

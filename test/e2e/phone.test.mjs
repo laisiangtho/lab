@@ -197,6 +197,57 @@ test('the phone shell', options, async (t) => {
     assert.notEqual(await page.evaluate(() => document.activeElement?.tagName), 'INPUT', 'and the keyboard is put away');
   });
 
+  await t.test('the results run under the controls, and the search field floats over them as the page moves', async () => {
+    // Left by the test before: results for a word, books still folded.
+    await page.evaluate(() => document.querySelectorAll('.sr-book:not(.is-open) > .sr-head').forEach((el) => el.click()));
+    await page.waitForTimeout(300);
+    await page.evaluate(() => [...document.querySelectorAll('.sr-chapter:not(.is-open) > .sr-head')].slice(0, 4).forEach((el) => el.click()));
+    await page.locator('.result-line').first().waitFor();
+    const scroller = '.leaf-pane > .pane-view > .pane-body';
+    const at = (selector) => page.evaluate((sel) => { const r = document.querySelector(sel).getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom) }; }, selector);
+    const look = () => page.evaluate(() => { const s = getComputedStyle(document.querySelector('.search-pane .search-field')); return { radius: parseFloat(s.borderTopLeftRadius), glass: s.backdropFilter !== 'none' }; });
+    assert.deepEqual(await at(scroller), { top: 0, bottom: 844 }, 'the page is the whole screen');
+    await page.evaluate((sel) => { document.querySelector(sel).scrollTop = 0; }, scroller);
+    await page.waitForTimeout(500);
+    const resting = await at('.search-pane .search-field');
+    assert.ok(resting.top > 60, 'at the top the field sits under the large title');
+    assert.equal((await look()).glass, false);
+
+    await page.evaluate((sel) => { document.querySelector(sel).scrollTop = 500; }, scroller);
+    await page.waitForTimeout(600);
+    const floating = await at('.search-pane .search-field');
+    assert.ok(floating.top >= 0 && floating.top < 20, `the field stays under the top edge (${floating.top}px)`);
+    const capsule = await look();
+    assert.ok(capsule.glass && capsule.radius > 20, 'as a capsule of glass');
+    assert.ok(await page.evaluate(() => document.querySelector('.result-line').getBoundingClientRect().top < 0), 'with the results gone under it');
+    assert.equal(await page.evaluate(() => Number(document.body.style.getPropertyValue('--ph-off'))), 96, 'and the tab bar out of the way, as over a chapter');
+    await page.evaluate((sel) => { document.querySelector(sel).scrollTop = 0; }, scroller);
+    await page.waitForTimeout(600);
+    assert.deepEqual(await at('.search-pane .search-field'), resting, 'back where it was');
+  });
+
+  await t.test('the Library\'s filter comes down from the top once its heading has gone', async () => {
+    await page.setViewportSize({ width: 390, height: 420 });
+    await tab('library').tap();
+    await page.locator('.lib-tab[data-page="more"]').tap();
+    await page.waitForSelector('.library-item');
+    const position = () => page.evaluate(() => getComputedStyle(document.querySelector('.lib-find')).position);
+    assert.notEqual(await position(), 'fixed');
+    const first = await page.evaluate(() => document.querySelector('.library-item').getBoundingClientRect().top);
+    const moved = await page.evaluate(() => { const el = document.querySelector('.leaf-scroll'); el.scrollTop = 200; return el.scrollTop; });
+    assert.ok(moved > 150, `a short screen, so the list scrolls (${moved}px)`);
+    await page.waitForTimeout(500);
+    assert.equal(await position(), 'fixed', 'the filter floats');
+    assert.ok(await page.evaluate(() => document.querySelector('.lib-find').getBoundingClientRect().top < 20));
+    assert.equal(await page.evaluate(() => document.querySelector('.library-item').getBoundingClientRect().top), first - moved, 'and the list has not jumped for it');
+    await page.evaluate(() => { document.querySelector('.leaf-scroll').scrollTop = 0; });
+    await page.waitForTimeout(500);
+    assert.notEqual(await position(), 'fixed');
+    await page.locator('.lib-tab[data-page="home"]').tap();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(300);
+  });
+
   await t.test('Settings: a list of sections, one at a time, without the desktop\'s frame', async () => {
     await tab('more').tap();
     await page.locator('.ph-screen .ph-row', { hasText: 'Settings' }).tap();

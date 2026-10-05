@@ -31,12 +31,14 @@ body[data-phone] .panes { margin: 0; border-radius: 0; }
 /* Every page has the whole screen. What scrolls runs under the floating
    controls, top and bottom, and the tab bar moves out of its way: no band is
    kept for them. The room they need is padding inside the scroller, which
-   scrolls away with the page. A pane (Search, the Guide) scrolls inside
-   itself, so it is the pane that keeps clear of them. */
-body[data-phone] .leaf-scroll, body[data-phone] .leaf-pane { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+   scrolls away with the page. A pane shown as a page (Search, the Guide)
+   scrolls in its body, which is treated the same. */
+/* Two selectors, not :is(): that would take the weight of the longer one and
+   outrank the rule that gives a canvas page (.doc-full) no padding. */
+body[data-phone] .leaf-scroll, body[data-phone] .leaf-pane > .pane-view > .pane-body { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 body[data-phone][data-phone-view="read"] .leaf-scroll { padding-top: calc(52px + env(safe-area-inset-top, 0px)); }
-body[data-phone][data-phone-view="page"] .leaf-scroll, body[data-phone][data-phone-view="page"] .leaf-pane { padding-top: calc(62px + env(safe-area-inset-top, 0px)); }
-body[data-phone][data-phone-view="root"] .leaf-scroll, body[data-phone][data-phone-view="root"] .leaf-pane { padding-top: calc(64px + env(safe-area-inset-top, 0px)); }
+body[data-phone][data-phone-view="page"] .leaf-scroll, body[data-phone][data-phone-view="page"] .leaf-pane > .pane-view > .pane-body { padding-top: calc(62px + env(safe-area-inset-top, 0px)); }
+body[data-phone][data-phone-view="root"] .leaf-scroll, body[data-phone][data-phone-view="root"] .leaf-pane > .pane-view > .pane-body { padding-top: calc(64px + env(safe-area-inset-top, 0px)); }
 body[data-phone]:not([data-phone-view="read"]) .panes, body[data-phone]:not([data-phone-view="read"]) .leaf,
 body[data-phone]:not([data-phone-view="read"]) .leaf-scroll, body[data-phone]:not([data-phone-view="read"]) .leaf-pane { background: var(--ph-ground); }
 body[data-phone] { --ph-under: var(--ph-ground); }
@@ -338,3 +340,53 @@ body[data-phone] .set-select { flex: 1 1 100%; width: 100%; max-width: none; hei
 body[data-phone] .doc-full.projects, body[data-phone] .doc-full.cards { padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
 /* The scroller keeps the room for the controls; the page inside it need not keep it twice. */
 body[data-phone] .doc:not(.doc-full) { padding-top: 8px; padding-bottom: 24px; }
+
+/* ---- what floats once a page has moved ------------------------------------ */
+
+/* Search: the field is the top of the page, under the large title. As the
+   page moves it comes to rest under the top edge and stays, turning into a
+   capsule of glass over the results: narrower, rounder, lifted. The change
+   is one transition, so it is a field settling into place and not one thing
+   swapped for another. */
+body[data-phone] .leaf-pane > .pane-view { max-width: none; }
+body[data-phone] .search-pane { overflow: visible; }
+body[data-phone] .search-pane .search-field {
+  /* Measured from the inside of the scroller's padding, which is the room
+     kept for the large title (64px and the safe area): 8px under the top
+     edge of the screen is 56px above that. */
+  position: sticky; top: -56px; z-index: 6;
+  transition: margin .28s cubic-bezier(.2, .8, .2, 1), border-radius .28s ease, background-color .28s ease, box-shadow .28s ease, min-height .28s ease, border-color .28s ease;
+}
+body[data-phone].ph-scrolled .search-pane .search-field {
+  margin-inline: 6px; min-height: 46px; border-radius: 99px; border-color: transparent;
+  background: var(--ph-glass); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6);
+  box-shadow: 0 6px 22px rgba(10, 8, 20, .16), inset 0 0 0 .5px var(--border);
+}
+/* The Library's filter is far down its heading, so it does not ride along:
+   once the heading has gone it comes down from the top edge as the same
+   capsule, and its place in the heading is kept so the list does not jump. */
+body[data-phone] .lib-bar:has(.lib-find:not([hidden])) { grid-template-rows: auto auto 44px; }
+body[data-phone].ph-deep[data-phone-view="root"] .lib-bar .lib-find {
+  position: fixed; z-index: 46; top: calc(8px + env(safe-area-inset-top, 0px)); left: 22px; right: 22px; margin: 0;
+  min-height: 46px; border-radius: 99px; border-color: transparent;
+  background: var(--ph-glass); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6);
+  box-shadow: 0 6px 22px rgba(10, 8, 20, .16), inset 0 0 0 .5px var(--border);
+  animation: ph-drop .32s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes ph-drop { from { transform: translateY(-140%); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  body[data-phone] .search-pane .search-field { transition: none; }
+  body[data-phone].ph-deep .lib-bar .lib-find { animation: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  body[data-phone].ph-scrolled .search-pane .search-field, body[data-phone].ph-deep .lib-bar .lib-find { background: var(--ph-ground); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* The text settings as a sheet: no taller than most of the screen, scrolling
+   inside itself, with rows a finger can take. */
+body[data-phone] .popover.rpanel { max-height: min(78%, calc(100% - 80px - env(safe-area-inset-top, 0px))); overflow-y: auto; overscroll-behavior: contain; padding: 16px 18px calc(14px + env(safe-area-inset-bottom, 0px)); gap: 14px; }
+body[data-phone] .rp-item { padding: 6px 0; }
+body[data-phone] .rp-item-n { font-size: 15px; }
+body[data-phone] .rp-item-h { font-size: 12.5px; }
+body[data-phone] .rp-word { padding: 12px 4px 9px; }
+body[data-phone] .rp-layouts button { min-height: 40px; }

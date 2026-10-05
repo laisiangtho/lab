@@ -115,20 +115,19 @@ export const defaultSettings = Object.freeze({
   ribbonItems: null,
   /** The status bar's items, in order; null is the default set. */
   statusItems: null,
-  /** Show Strong's numbers where a translation carries them. */
-  strongs: false,
+  /**
+   * How words that carry a Strong's number are shown (STRONGS_MODES):
+   * 'plain' nothing, 'quiet' a faint line for reading, 'marked' standing out,
+   * 'numbers' marked with the number after each. A word with a number can be
+   * pressed in every one of them; this is only how it looks.
+   */
+  strongsMode: 'marked',
   /**
    * Under each verse, the original-language text the reader imported (Hebrew
    * for the Old Testament, Greek for the New), a word at a time, each with its
    * gloss from the lexicon where one is held.
    */
   interlinear: false,
-  /**
-   * Words carrying a Strong's number are a shade apart from the rest while
-   * the numbers themselves are hidden, so a reader sees which words can be
-   * studied without the text being marked up.
-   */
-  tintStrongs: true,
   /** Start the walkthrough on its own, once, on a first run. */
   tour: true,
   /**
@@ -161,6 +160,22 @@ export const defaultSettings = Object.freeze({
 });
 
 const KEYS = Object.keys(defaultSettings);
+
+/** How words with a Strong's number may be shown, from least to most. */
+export const STRONGS_MODES = Object.freeze(['plain', 'quiet', 'marked', 'numbers']);
+
+/**
+ * Settings written before `strongsMode`: two switches, numbers shown
+ * (`strongs`) and words tinted (`tintStrongs`), become the one choice they
+ * add up to. Stored settings and an export from an older build both pass
+ * through here, so neither loses the choice nor is refused for the old keys.
+ */
+export function legacySettings(raw) {
+  if (!isPlainObject(raw) || !('strongs' in raw || 'tintStrongs' in raw)) return raw;
+  const { strongs, tintStrongs, ...rest } = raw;
+  if (rest.strongsMode !== undefined) return rest;
+  return { ...rest, strongsMode: strongs === true ? 'numbers' : tintStrongs === false ? 'plain' : 'marked' };
+}
 const IDENTIFY = /^[a-z0-9][a-z0-9_-]*$/i;
 
 /**
@@ -179,7 +194,7 @@ export function migrateSettings(raw) {
   if (!isPlainObject(raw)) return { raw: {}, notes: [] };
   const out = {};
   const dropped = [];
-  for (const [key, value] of Object.entries(raw)) {
+  for (const [key, value] of Object.entries(legacySettings(raw))) {
     if (KEYS.includes(key)) { out[key] = value; continue; }
     // 26.09.23.3 and earlier kept one flat list of panes per sidebar; a sidebar
     // is now rows of panes, so the old list becomes a single row.
@@ -277,7 +292,8 @@ export function parseSettings(raw, { source, category }) {
     readingLeading: clamp(raw.readingLeading, READING.leading, defaultSettings.readingLeading),
     readingMeasure: clamp(raw.readingMeasure, READING.measure, defaultSettings.readingMeasure),
     uiSize: clamp(raw.uiSize, READING.ui, defaultSettings.uiSize),
-    mode, strongs: flag('strongs'), interlinear: flag('interlinear'), tintStrongs: flag('tintStrongs'), tour: flag('tour'), paneTabs: flag('paneTabs'), headings: flag('headings'), xrefs: flag('xrefs'),
+    mode, strongsMode: STRONGS_MODES.includes(raw.strongsMode) ? raw.strongsMode : defaultSettings.strongsMode,
+    interlinear: flag('interlinear'), tour: flag('tour'), paneTabs: flag('paneTabs'), headings: flag('headings'), xrefs: flag('xrefs'),
     sourceFormat: SOURCE_FORMATS.includes(raw.sourceFormat) ? raw.sourceFormat : defaultSettings.sourceFormat,
     readingFont: READING_FONTS.includes(raw.readingFont) ? raw.readingFont : defaultSettings.readingFont,
     restoreTabs: flag('restoreTabs'), motion: flag('motion'),
@@ -335,7 +351,7 @@ export function parseExport(raw, { source, category }) {
   if (raw.app !== APP) fail(source, '$.app', `expected "${APP}", got ${JSON.stringify(raw.app ?? null)} — this file is not a Lai Siangtho export`);
   if (raw.schema !== SCHEMA) fail(source, '$.schema', `unsupported export schema ${JSON.stringify(raw.schema ?? null)} (this version reads schema ${SCHEMA})`);
 
-  const settings = parseSettings(raw.settings ?? {}, { source: `${source} settings`, category });
+  const settings = parseSettings(legacySettings(raw.settings ?? {}), { source: `${source} settings`, category });
   const library = raw.library === undefined ? {} : expectObject(raw.library, source, '$.library');
   const translations = (library.translations === undefined ? [] : expectArray(library.translations, source, '$.library.translations'))
     .map((t, i) => {

@@ -68,26 +68,53 @@ export function createTranslationInfo(ctx) {
     ];
     if (info.description) out.push(h('p', { class: 'tri-desc' }, info.description));
 
+    // Two shapes, by what a fact is. A short one (a language, a date, a size)
+    // is a tile: its mark, its value, its name under it, two to a row. A long
+    // one (where the numbers came from, what the file lacks) is a block the
+    // width of the box, its name over it. A two-column table gave both the
+    // same narrow right-hand column, which wasted the box on the short ones
+    // and broke the long ones into a strip of four words a line.
     const facts = h('dl', { class: 'tri-facts' });
-    const row = (term, value) => { if (value) facts.append(h('dt', {}, term), h('dd', {}, value)); };
-    row(L('lbl.language'), [info.language.text, pack ? pack.code : info.language.name].filter(Boolean).join(' · '));
-    row(L('lbl.publisher'), info.publisher);
-    // Not in the facts grid: a KJV licence runs to several paragraphs, and in a
-    // narrow right-hand column it turns the popover into a scrolling wall.
+    const fact = (glyph, term, value) => {
+      if (!value) return;
+      // A value too long for half the box takes a row of its own.
+      facts.append(h('div', { class: 'tri-fact' }, icon(glyph), h('dd', { class: String(value).length > 24 ? 'is-long' : '' }, value), h('dt', {}, term)));
+    };
+    fact('globe', L('lbl.language'), [info.language.text, pack ? pack.code : info.language.name].filter(Boolean).join(' · '));
+    fact('building', L('lbl.publisher'), info.publisher);
     const licence = info.copyright;
-    row(L('lbl.version'), entry && entry.version !== meta.version
+    fact('tag', L('lbl.version'), entry && entry.version !== meta.version
       ? L('lbl.versionBehind', { held: meta.version, listed: entry.version })
       : String(meta.version));
-    row(L('lbl.installedOn'), installed?.installedAt ? when.date(installed.installedAt) : '');
-    row(L('lbl.size'), installed?.bytes ? formatBytes(installed.bytes) : '');
+    fact('calendar', L('lbl.installedOn'), installed?.installedAt ? when.date(installed.installedAt) : '');
+    fact('db', L('lbl.size'), installed?.bytes ? formatBytes(installed.bytes) : '');
     const stats = installed?.stats;
+    if (stats?.strongs?.words) fact('strongs', L('lbl.strongs'), L('lbl.strongsWords', { n: stats.strongs.words }));
+    if (facts.children.length) out.push(facts);
+
+    /** A block the width of the box: a mark and a name, then what there is to say. */
+    const block = (glyph, term, ...content) => h('section', { class: 'tri-sec' },
+      h('h3', { class: 'tri-sec-h' }, icon(glyph), h('span', {}, term)),
+      ...content.filter(Boolean));
+    const line = (text, cls = 'tri-sec-p') => (text ? h('p', { class: cls }, text) : null);
+
     if (stats) {
-      row(L('lbl.strongs'), stats.strongs?.words ? L('lbl.strongsWords', { n: stats.strongs.words }) : '');
-      row(L('lbl.contents'), L('lbl.contentsOf', {
+      out.push(block('book', L('lbl.contents'), line(L('lbl.contentsOf', {
         books: L('lbl.books', { n: stats.books }),
         chapters: L('lbl.chapters', { n: stats.chapters }),
         verses: L('lbl.verses', { n: stats.verses }),
-      }));
+      }))));
+    }
+    // What was laid over the master, and where it came from: a draft says
+    // so, and its sources are named (they ask to be).
+    for (const [kind, one] of Object.entries(installed?.overlays ?? {})) {
+      const section = block(kind === 'strongs' ? 'strongs' : 'link', L(`lib.ov.${kind}`),
+        line(one.method),
+        one.sources.length ? h('ul', { class: 'tri-sources' }, one.sources.map((source) => h('li', {}, source))) : null,
+        line(one.refused ? L('msg.ovRefused', { n: one.refused, name: meta.info.shortname }) : '', 'tri-sec-p is-warn'));
+      if (one.review) section.querySelector('.tri-sec-h').append(h('span', { class: 'badge badge-draft' }, L('lib.ov.draft')));
+      section.dataset.overlay = kind;
+      out.push(section);
     }
     // What the install found when it checked the file against the canon. Every
     // published translation departs from it somewhere — books it omits, verses
@@ -95,29 +122,21 @@ export function createTranslationInfo(ctx) {
     // see that it is the edition, not a fault in the download.
     const found = installed?.diagnostics ?? null;
     if (found) {
-      row(L('lbl.differences'), found.total === 0 ? L('lbl.matchesCanon') : [
-        found.missing ? L('lbl.booksMissing', { n: found.missing }) : '',
-        found.short ? L('lbl.chaptersShort', { n: found.short }) : '',
-        found.extra ? L('lbl.chaptersExtra', { n: found.extra }) : '',
-      ].filter(Boolean).join(' · ') || L('lbl.differs', { n: found.total }));
-      // What was laid over the master, and where it came from: a draft says
-      // so, and its sources are named (they ask to be).
-      for (const [kind, one] of Object.entries(installed?.overlays ?? {})) {
-        row(L(`lib.ov.${kind}`), [
-          one.review ? L('lib.ov.draft') : '', one.method, ...one.sources,
-          one.refused ? L('msg.ovRefused', { n: one.refused, name: meta.info.shortname }) : '',
-        ].filter(Boolean).join(' · '));
-      }
       const faults = Object.entries(found.faults ?? {});
-      if (faults.length) row(L('lib.faults'), faults.map(([kind, n]) => L(`lib.faults.${kind}`, { n })).join('; '));
+      out.push(block('inspector', L('lbl.differences'),
+        line(found.total === 0 ? L('lbl.matchesCanon') : [
+          found.missing ? L('lbl.booksMissing', { n: found.missing }) : '',
+          found.short ? L('lbl.chaptersShort', { n: found.short }) : '',
+          found.extra ? L('lbl.chaptersExtra', { n: found.extra }) : '',
+        ].filter(Boolean).join(' · ') || L('lbl.differs', { n: found.total })),
+        line(faults.length ? `${L('lib.faults')}: ${faults.map(([kind, n]) => L(`lib.faults.${kind}`, { n })).join('; ')}.` : '', 'tri-sec-p is-warn'),
+        line(strongsEdition(stats), 'tri-sec-p tri-note'),
+        found.total ? diagnostics(meta, found) : null));
+    } else {
+      const own = strongsEdition(stats);
+      if (own) out.push(h('p', { class: 'tri-note' }, own));
     }
-    if (facts.children.length) out.push(facts);
-    // A sentence, not a cell: in a narrow popover a grid cell this long is a
-    // column one word wide.
-    const own = strongsEdition(stats);
-    if (own) out.push(h('p', { class: 'tri-note' }, own));
     if (licence) out.push(longBlock(L('lbl.copyright'), licence));
-    if (found?.total) out.push(diagnostics(meta, found));
 
     out.push(direction(meta));
 
@@ -186,7 +205,7 @@ export function createTranslationInfo(ctx) {
         place();
       },
     }, L('lbl.showAll'));
-    const block = h('div', { class: 'tri-block' }, h('div', { class: 'tri-term' }, term), text);
+    const block = h('section', { class: 'tri-sec' }, h('h3', { class: 'tri-sec-h' }, icon('note'), h('span', {}, term)), text);
     // Only offer the press when there is something behind it.
     requestAnimationFrame(() => {
       if (text.scrollHeight > text.clientHeight + 2) block.append(more);

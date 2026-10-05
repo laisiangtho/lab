@@ -478,7 +478,9 @@ body.is-dragging-tab .sidebar[data-empty="true"] .side-body::after {
    its own, clamped to six lines with a press for the rest, and the popover is
    wide enough that a long line is a line rather than a column of two words.
    What is left over still scrolls, with a faded edge rather than a bar. */
-.trinfo { width: min(420px, calc(100vw - 20px)); }
+/* The popover's own cap is 300px, which is what this box was held to whatever
+   width it asked for. */
+.trinfo { width: min(440px, calc(100vw - 20px)); max-width: none; }
 .tri-body { max-height: min(62vh, 520px); overflow-y: auto; scrollbar-width: none; }
 .tri-body::-webkit-scrollbar { width: 0; }
 .tri-block { margin-top: 12px; }
@@ -494,11 +496,30 @@ body.is-dragging-tab .sidebar[data-empty="true"] .side-body::after {
 .tri-desc { margin: 10px 0 0; color: var(--text-muted); font-size: var(--fs-ui-m); line-height: 1.55; }
 .tri-note { margin: 8px 0 0; color: var(--text-faint); font-size: var(--fs-ui-s); line-height: 1.5; }
 .tri-facts {
-  display: grid; grid-template-columns: auto 1fr; gap: 4px 12px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;
   margin: 12px 0 0; font-size: var(--fs-ui-m);
 }
-.tri-facts dt { color: var(--text-faint); }
-.tri-facts dd { margin: 0; color: var(--text-muted); overflow-wrap: anywhere; }
+/* A short fact: its mark, its value, and its name under the value. */
+.tri-fact {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: center; align-content: center;
+  padding: 8px 10px; border-radius: var(--radius-m); background: var(--base-10); min-width: 0;
+}
+.tri-fact svg { grid-row: span 2; width: 16px; height: 16px; color: var(--accent-2); }
+.tri-fact dd { margin: 0; color: var(--text-normal); font-weight: 550; overflow-wrap: anywhere; line-height: 1.35; }
+.tri-fact dt { color: var(--text-faint); font-size: var(--fs-ui-s); line-height: 1.3; }
+/* A value too long for half the box takes the whole of it. */
+.tri-fact:has(dd:is(.is-long)) { grid-column: 1 / -1; }
+/* A long fact: its name over it, and the width of the box to say it in. */
+.tri-sec { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.tri-sec-h { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: var(--fs-ui-m); font-weight: 600; color: var(--text-normal); }
+.tri-sec-h svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--accent-2); }
+.tri-sec-h .badge { margin-inline-start: auto; }
+.tri-sec-p { margin: 0 0 4px; color: var(--text-muted); font-size: var(--fs-ui-m); line-height: 1.55; overflow-wrap: anywhere; }
+.tri-sec-p.is-warn { color: var(--c-orange); }
+.tri-sec .tri-note { margin: 2px 0 0; }
+.tri-sources { margin: 2px 0 4px; padding-inline-start: 18px; color: var(--text-faint); font-size: var(--fs-ui-s); line-height: 1.55; }
+.tri-sec .tri-long { margin-top: 0; }
+.tri-sec .tri-more { margin-top: 6px; }
 /* Glyphs, not sentences: three buttons reading "Download again", "Look closer"
    and "Library" wrapped onto two rows in a 420px box and were the loudest
    thing in a popover that is mostly facts. The name is the tooltip and the

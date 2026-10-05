@@ -871,9 +871,46 @@ body[data-measure="full"] .note{max-width:none}
 .popover.rpanel{
   /* The base popover caps at 300px and is declared after this one, so the cap
      is lifted here by name: this panel carries sliders and needs the room. */
-  width:min(380px,calc(100vw - 16px));max-width:calc(100vw - 16px);
-  padding:11px 14px 9px;display:flex;flex-direction:column;gap:9px;
+  width:min(400px,calc(100vw - 16px));max-width:calc(100vw - 16px);
+  padding:12px 14px 9px;display:flex;flex-direction:column;gap:12px;
 }
+/* A question of the box: its name with its mark, then what answers it. */
+.rp-sec{display:flex;flex-direction:column;gap:8px}
+.rp-sec+.rp-sec{padding-top:12px;border-top:1px solid var(--border)}
+.rp-sec>.rp-l{display:flex;align-items:center;gap:6px;margin:0}
+.rp-sec>.rp-l svg{width:13px;height:13px}
+.rp-layouts button{display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 6px}
+.rp-layouts button svg{width:14px;height:14px;flex:0 0 auto}
+/* Something shown or not: a mark, a name over a line on what it is, a switch. */
+.rp-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:10px;padding:4px 0;cursor:pointer}
+.rp-item.is-stack{cursor:default;row-gap:8px}
+.rp-item-i{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--base-10);color:var(--text-muted)}
+.rp-item-i svg{width:15px;height:15px}
+.rp-item-t{display:flex;flex-direction:column;min-width:0}
+.rp-item-n{font-size:var(--fs-ui-m);color:var(--text-normal);font-weight:550}
+.rp-item-h{font-size:var(--fs-ui-s);color:var(--text-faint);line-height:1.4}
+/* On a short window the line under each switch gives way (it is the
+   switch's tooltip too), so the box still fits without scrolling. */
+@media (max-height:960px){.rpanel label.rp-item .rp-item-h{display:none}.popover.rpanel{gap:10px}.rp-sec+.rp-sec{padding-top:10px}}
+/* The four ways of showing a word with a number, each on a sample word. */
+.rp-words{grid-column:1 / -1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.rp-word{display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 4px 7px;border-radius:var(--radius-m);background:var(--base-10);color:var(--text-muted);min-width:0}
+.rp-word:hover{color:var(--text-normal)}
+.rp-word[aria-checked="true"]{background:var(--bg-elevated);color:var(--text-normal);box-shadow:0 0 0 1.5px var(--accent)}
+.rp-word-s{font-family:var(--font-text);font-size:16px;line-height:1.5;color:var(--text-normal);white-space:nowrap}
+.rp-word-s .strongs{cursor:inherit;pointer-events:none}
+.rp-word-n{font-size:11px;font-weight:600}
+/* The samples are drawn by the same rules as the text, whatever mode the text is in. */
+.rp-word-s[data-words="quiet"] .strongs{background:none;box-shadow:none;text-decoration:underline dotted color-mix(in srgb,var(--accent-2) 38%,transparent);text-decoration-thickness:1px;text-underline-offset:.24em}
+.rp-word-s[data-words="marked"] .strongs,.rp-word-s[data-words="numbers"] .strongs{text-decoration:none;background:color-mix(in srgb,var(--accent) 9%,transparent);box-shadow:inset 0 -1.5px 0 color-mix(in srgb,var(--accent-2) 46%,transparent)}
+.rp-word-s[data-words="plain"] .strongs{background:none;box-shadow:none;text-decoration:none}
+/* The status bar says which way is on, beside the name. */
+.sb-words .sb-val{color:var(--text-faint);margin-inline-start:2px}
+.sb-words .sb-val::before{content:"· "}
+.menu-item.is-tall{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:10px;row-gap:1px;align-items:start;max-width:300px;padding-block:7px;text-align:start}
+.menu-item.is-tall svg{grid-row:span 2;margin-top:2px}
+.menu-item.is-tall .menu-name{font-weight:600}
+.menu-item.is-tall .menu-sub{white-space:normal;margin:0;line-height:1.4}
 .rpanel.no-arrow::before{display:none}
 .rpanel:focus{outline:none}
 .rp-row{display:flex;align-items:center;gap:10px}
@@ -911,14 +948,24 @@ body[data-measure="full"] .note{max-width:none}
 .wikilink{color:var(--accent-2);text-decoration:none;cursor:pointer;border-bottom:1px solid transparent}
 .wikilink:hover{border-bottom-color:var(--accent-line)}
 .wikilink.is-unresolved{color:var(--base-50);font-style:italic}
-.strongs{
-  color:inherit;border-bottom:1px dotted var(--c-orange);cursor:help;position:relative;
+/* A word that carries a Strong's number. It can be pressed however it looks;
+   how it looks is the reader's choice (settings.strongsMode, on the body):
+     plain    nothing: the text as a book prints it
+     quiet    a faint dotted line, for reading with the words still findable
+     marked   a wash and a line: which words can be studied, at a glance
+     numbers  marked, with the number after each word
+   The marks are drawn with a shadow and a background, never a border or a
+   change of weight, so switching between them moves no line of the text. */
+.strongs{color:inherit;cursor:help;position:relative;border-radius:3px;transition:background-color .12s,box-shadow .12s,color .12s}
+body[data-words="quiet"] .strongs{
+  text-decoration:underline dotted color-mix(in srgb,var(--accent-2) 38%,transparent);
+  text-decoration-thickness:1px;text-underline-offset:.24em;
 }
-.strongs.is-hidden-code{border-bottom-color:transparent}
-/* With the numbers hidden, a tagged word is a shade toward the accent: there
-   to see, not to read around. Hover deepens it. */
-body[data-tint="on"] .strongs.is-hidden-code{color:color-mix(in srgb,var(--text-normal) 74%,var(--accent-2));transition:color .12s,background-color .12s;border-radius:3px}
-body[data-tint="on"] .strongs.is-hidden-code:hover{color:var(--accent-2);background:var(--accent-fade)}
+body[data-words="marked"] .strongs,body[data-words="numbers"] .strongs{
+  background:color-mix(in srgb,var(--accent) 9%,transparent);
+  box-shadow:inset 0 -1.5px 0 color-mix(in srgb,var(--accent-2) 46%,transparent);
+}
+.strongs:hover,.strongs:focus-visible{color:var(--accent-2);background:var(--accent-fade)}
 .tag-inline{
   font-family:var(--font-ui);font-size:.76em;padding:1px 7px;border-radius:999px;
   background:var(--accent-fade);color:var(--accent-2);text-decoration:none;vertical-align:.1em;

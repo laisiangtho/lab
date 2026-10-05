@@ -221,14 +221,13 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
     if (shown !== front) {
       front = shown;
       setOff(0);
-      const at = (list ? screen : chrome.panes.querySelector('.leaf-scroll'))?.scrollTop ?? 0;
+      const at = (list ? screen : chrome.panes.querySelector(SCROLLERS))?.scrollTop ?? 0;
       // The bar moves by how far this page moves from here, not by where
       // the last page was left: what a page reports as it arrives (the
       // workspace putting it back where it was) is where it starts from.
       rebase = performance.now() + 400;
       lastY = at;
-      body.classList.toggle('ph-scrolled', at > 8);
-      body.style.setProperty('--ph-y', String(Math.max(0, Math.round(at))));
+      mark(at);
     }
   }
 
@@ -552,7 +551,16 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
   // Every page is the whole screen's, not only the reading: whatever scrolls
   // a page (a chapter, a document, Study and More) runs under the controls,
   // and the tab bar gets out of its way going down and comes back going up.
-  const pageScroller = (target) => (target instanceof Element && target.matches('.leaf-scroll, .ph-screen') ? target : null);
+  // A pane shown as a page (Search, the Guide, Bookmarks) scrolls in its body.
+  const SCROLLERS = '.leaf-scroll, .leaf-pane > .pane-view > .pane-body, .ph-screen';
+  const pageScroller = (target) => (target instanceof Element && target.matches(SCROLLERS) ? target : null);
+  /** Past the top of a page by more than its own heading: what floats there is on its own. */
+  const DEEP = 150;
+  const mark = (y) => {
+    body.classList.toggle('ph-scrolled', y > 8);
+    body.classList.toggle('ph-deep', y > DEEP);
+    body.style.setProperty('--ph-y', String(Math.max(0, Math.round(y))));
+  };
 
   function onScroll(event) {
     if (!on()) return;
@@ -561,9 +569,9 @@ export function createPhone(ctx, { chrome, workspace, readingPanel, verseBar }) 
     const y = scroller.scrollTop;
     const max = scroller.scrollHeight - scroller.clientHeight;
     if (performance.now() < rebase) lastY = Math.max(0, Math.min(max, y));
-    body.classList.toggle('ph-scrolled', y > 8);
-    // How far the page has moved, for what moves away with it (a large title).
-    body.style.setProperty('--ph-y', String(Math.max(0, Math.round(y))));
+    // How far the page has moved, for what moves away with it (a large
+    // title) and what comes to float once it has (a search field).
+    mark(y);
     // Past either end (the rubber band) is not reading on: the bar stays put.
     if (y >= 0 && y <= max) setOff(y < 12 ? 0 : off + (y - lastY), true);
     lastY = Math.max(0, Math.min(max, y));

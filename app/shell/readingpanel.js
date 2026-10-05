@@ -2,14 +2,16 @@
  * Reading panel: the size of the scripture, the size of the interface around
  * it, line height, line length and verse layout — applied as CSS variables and
  * kept in settings — and what is shown besides the verses: headings,
- * cross-references, Strong's numbers.
+ * cross-references, how words with a Strong's number look, the interlinear
+ * line.
  *
  * The panel is built once and only its values change, so choosing a layout
  * cannot move it under the pointer. It points at the control that opened it.
  */
 
-import { READING } from '../core/settings.js';
+import { READING, STRONGS_MODES } from '../core/settings.js';
 import { h } from './dom.js';
+import { icon } from './icons.js';
 import { L } from './i18n.js';
 import { numberRow } from './numberrow.js';
 
@@ -47,17 +49,46 @@ export function createReadingPanel(ctx) {
     measure: row('lbl.lineLength', 'readingMeasure', READING.measure, 'ch', 0),
     ui: row('lbl.uiSize', 'uiSize', READING.ui, 'px', 0),
   };
-  const segment = h('div', { class: 'rp-seg' });
-  // What is drawn besides the verses: each a switch of its own, since any mix
-  // of them is a reasonable way to read.
-  const shown = h('div', { class: 'rp-seg rp-shown' });
+  // The box is three questions a reader has, in the order they are asked:
+  // how big, how laid out, and what else is on the page besides the words.
+  const segment = h('div', { class: 'rp-seg rp-layouts' });
+  const LAYOUT_ICON = { paragraph: 'lay-para', list: 'lay-list', continuous: 'lay-flow' };
+
+  /** Something shown or not: its mark, its name, a line on what it is, a switch. */
+  const switches = {};
+  const shownRow = (key, glyph, name, hint) => {
+    const input = h('input', {
+      type: 'checkbox', role: 'switch', 'aria-label': L(name), dataset: { show: key },
+      onchange: (e) => { ctx.state.set({ [key]: e.currentTarget.checked }); paint(); },
+    });
+    switches[key] = input;
+    return h('label', { class: 'rp-item', title: L(hint) },
+      h('span', { class: 'rp-item-i' }, icon(glyph)),
+      h('span', { class: 'rp-item-t' }, h('span', { class: 'rp-item-n' }, L(name)), h('span', { class: 'rp-item-h' }, L(hint))),
+      h('span', { class: 'switch' }, input, h('span', { class: 'switch-track' })));
+  };
+  // Words with a Strong's number: four ways to show them, each drawn on a
+  // sample word the way the text will draw it, so the choice is seen before
+  // it is made.
+  const words = h('div', { class: 'rp-words', role: 'radiogroup', 'aria-label': L('sw.title') });
+  const wordsHint = h('span', { class: 'rp-item-h' });
+  const wordsRow = h('div', { class: 'rp-item is-stack' },
+    h('span', { class: 'rp-item-i' }, icon('strongs')),
+    h('span', { class: 'rp-item-t' }, h('span', { class: 'rp-item-n' }, L('sw.title')), wordsHint),
+    words);
+  const section = (glyph, name, ...content) => h('section', { class: 'rp-sec' },
+    h('h3', { class: 'rp-l' }, icon(glyph), h('span', {}, L(name))), ...content);
+
   const reset = h('button', { class: 'rp-reset', onclick: () => { resetAll(); paint(); } }, L('cmd.reset'));
   const panel = h('div', { class: 'popover rpanel has-arrow', hidden: true },
-    rows.size.element, rows.leading.element, rows.measure.element,
-    h('div', { class: 'rp-row is-wide' }, h('span', { class: 'rp-l' }, L('cmd.layout')), segment),
-    h('div', { class: 'rp-row is-wide' }, h('span', { class: 'rp-l' }, L('lbl.show')), shown),
-    h('div', { class: 'rp-sep' }),
-    rows.ui.element,
+    section('type', 'rp.type', rows.size.element, rows.leading.element, rows.measure.element),
+    section('lay-para', 'cmd.layout', segment),
+    section('eye', 'rp.inText',
+      shownRow('headings', 'heading', 'cmd.headings', 'set.headingsHint'),
+      shownRow('xrefs', 'link', 'cmd.xrefs', 'set.xrefsHint'),
+      wordsRow,
+      shownRow('interlinear', 'compare', 'cmd.interlinear', 'rp.interlinearHint')),
+    h('section', { class: 'rp-sec' }, rows.ui.element),
     h('div', { class: 'rp-foot' }, h('span', {}, L('lbl.readingHint')), reset));
 
 
@@ -97,11 +128,17 @@ export function createReadingPanel(ctx) {
     segment.replaceChildren(...ctx.shell.workspace.layouts.map((id) => h('button', {
       'aria-pressed': String(id === s.layout),
       onclick: () => { ctx.state.set({ layout: id }); paint(); },
-    }, L(`val.${id}`))));
-    shown.replaceChildren(...[['headings', 'cmd.headings'], ['xrefs', 'cmd.xrefs'], ['strongs', 'cmd.strongs'], ['tintStrongs', 'cmd.tintStrongs'], ['interlinear', 'cmd.interlinear']].map(([key, name]) => h('button', {
-      'aria-pressed': String(Boolean(s[key])), dataset: { show: key },
-      onclick: () => { ctx.state.set({ [key]: !ctx.state.get()[key] }); paint(); },
-    }, L(name))));
+    }, LAYOUT_ICON[id] ? icon(LAYOUT_ICON[id]) : null, h('span', {}, L(`val.${id}`)))));
+    for (const [key, input] of Object.entries(switches)) input.checked = Boolean(s[key]);
+    words.replaceChildren(...STRONGS_MODES.map((id) => h('button', {
+      class: 'rp-word', role: 'radio', 'aria-checked': String(id === s.strongsMode), dataset: { wordsPick: id },
+      title: L(`sw.${id}Hint`),
+      onclick: () => { ctx.state.set({ strongsMode: id }); paint(); },
+    },
+      h('span', { class: 'rp-word-s', dataset: { words: id }, 'aria-hidden': 'true' },
+        h('span', { class: 'strongs' }, L('sw.sample'), id === 'numbers' ? h('sup', { class: 'strongs-code' }, 'H1697') : null)),
+      h('span', { class: 'rp-word-n' }, L(`sw.${id}`)))));
+    wordsHint.textContent = L(`sw.${s.strongsMode}Hint`);
     if (!panel.hidden && anchor && panel.offsetHeight !== placedAt) place(anchor);
   }
 

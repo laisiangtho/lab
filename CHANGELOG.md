@@ -156,6 +156,26 @@ newest first.
 
 ### Unreleased
 
+- Words that carry a Strong's number have one setting with four looks, in
+  place of two switches: **plain** (nothing marked), **quiet** (a faint
+  dotted line, for reading), **marked** (a tint and an underline, the
+  default) and **numbers** (the number beside each word). The button in the
+  status bar names the look in use and opens the four; the Text box and
+  Settings offer the same choice. None of the looks moves the text. Settings
+  saved with the two earlier switches are carried over.
+- The Text box is arranged by what a reader is deciding: the type, the verse
+  layout, then what is shown in the text, each with a line saying what it
+  does and a sample of each look for marked words.
+- A translation's information card lays short facts out as tiles with an
+  icon each, and gives anything that is a sentence — what it contains, the
+  overlays added to it, what differs from the usual text, the licence — the
+  full width under its own heading.
+- On a phone the Search and Library pages are whole pages like the reading
+  page: the bottom bar leaves while scrolling down and returns on the way
+  up; the search field stays at the top as a floating capsule once the
+  results move under it, and the Library filter drops in the same way after
+  the heading has scrolled away.
+
 - Messages stay on screen while the pointer is on them, and while part of
   their text is selected; their words select and copy like any text. Left
   alone they go as before, resuming from the time they had left.

@@ -90,3 +90,23 @@ test('a setting this version no longer has is dropped and reported, not refused'
   assert.match(notes[0], /gone/);
   assert.throws(() => parseSettings({ chapter: 3, gone: true }, opts), /unknown setting/);
 });
+
+test('the two old Strong\'s switches become the one choice they add up to', async () => {
+  const { legacySettings } = await import('../../app/core/settings.js');
+  const from = (raw) => parseSettings(migrateSettings(raw).raw, { source: 'stored', category }).strongsMode;
+  assert.equal(defaultSettings.strongsMode, 'marked');
+  assert.equal(from({ strongs: true, tintStrongs: true }), 'numbers');
+  assert.equal(from({ strongs: true, tintStrongs: false }), 'numbers');
+  assert.equal(from({ strongs: false, tintStrongs: true }), 'marked');
+  assert.equal(from({ strongs: false, tintStrongs: false }), 'plain');
+  assert.equal(from({ strongsMode: 'quiet' }), 'quiet');
+  assert.equal(from({ strongsMode: 'nonsense' }), 'marked');
+  assert.deepEqual(migrateSettings({ strongs: true, tintStrongs: true }).notes, [], 'and nothing is reported as dropped');
+  assert.deepEqual(legacySettings({ strongs: true, strongsMode: 'plain' }), { strongsMode: 'plain' }, 'a newer choice wins');
+  // An export written by an older build is still read.
+  const old = buildExport({ settings: { ...defaultSettings }, translations: [], notes: [], bookmarks: [] });
+  delete old.settings.strongsMode;
+  old.settings.strongs = true;
+  old.settings.tintStrongs = true;
+  assert.equal(parseExport(old, { source: 'old.json', category }).settings.strongsMode, 'numbers');
+});

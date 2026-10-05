@@ -105,16 +105,51 @@ test('around the reading', options, async (t) => {
     assert.equal((await items()).length, 9);
   });
 
-  await t.test('words carrying a number are tinted while the numbers are hidden', async () => {
+  await t.test('words carrying a number are shown four ways, chosen from the status bar or the Text box', async () => {
     await palette('gen 1');
-    const word = page.locator('.leaf[data-role="primary"] .strongs.is-hidden-code').first();
+    const word = page.locator('.leaf[data-role="primary"] .strongs').first();
     await word.waitFor();
-    const colour = () => word.evaluate((el) => getComputedStyle(el).color);
-    const plain = await page.locator('.leaf[data-role="primary"] .vtext').first().evaluate((el) => getComputedStyle(el).color);
-    assert.notEqual(await colour(), plain);
-    await palette('Tint words with numbers');
-    assert.equal(await colour(), plain, 'and not when turned off');
-    await palette('Tint words with numbers');
+    const look = () => word.evaluate((el) => { const s = getComputedStyle(el); return { wash: s.backgroundColor !== 'rgba(0, 0, 0, 0)', line: s.textDecorationLine, numbers: Boolean(el.querySelector('.strongs-code')) }; });
+    const mode = () => page.evaluate(() => document.body.dataset.words);
+    const pick = async (id) => {
+      await page.locator('.statusbar .sb-words').click();
+      await page.locator(`.menu .menu-item[data-id="${id}"]`).click();
+      await page.waitForFunction((want) => document.body.dataset.words === want, id);
+      await page.waitForTimeout(250);
+    };
+    assert.equal(await mode(), 'marked', 'marked, until the reader says otherwise');
+    assert.deepEqual(await look(), { wash: true, line: 'none', numbers: false });
+    assert.match(await page.locator('.statusbar .sb-words').innerText(), /Strong's numbers\s*·?\s*Marked/);
+
+    await page.locator('.statusbar .sb-words').click();
+    assert.deepEqual(await page.locator('.menu .menu-item .menu-name').allInnerTexts(), ['Plain', 'Faint', 'Marked', 'Numbers']);
+    assert.match(await page.locator('.menu .menu-item[data-id="quiet"]').innerText(), /For reading/, 'each says what it does');
+    await page.keyboard.press('Escape');
+
+    const top = await word.evaluate((el) => el.getBoundingClientRect().top);
+    await pick('quiet');
+    assert.deepEqual(await look(), { wash: false, line: 'underline', numbers: false });
+    await pick('plain');
+    assert.deepEqual(await look(), { wash: false, line: 'none', numbers: false });
+    assert.equal(await word.evaluate((el) => el.getBoundingClientRect().top), top, 'and no line of the text has moved');
+    await pick('numbers');
+    assert.deepEqual(await look(), { wash: true, line: 'none', numbers: true });
+
+    // The same choice in the Text box, each way drawn on a sample word.
+    await page.locator('.statusbar .sb-reading').click();
+    await page.waitForSelector('.rpanel .rp-word');
+    assert.equal(await page.locator('.rpanel .rp-word[aria-checked="true"]').getAttribute('data-words-pick'), 'numbers');
+    assert.equal(await page.locator('.rpanel .rp-word').count(), 4);
+    await page.locator('.rpanel .rp-word[data-words-pick="marked"]').click();
+    assert.equal(await mode(), 'marked');
+    assert.equal(await page.locator('.rpanel input[data-show="headings"]').isChecked(), true, 'beside what else is in the text');
+    await page.keyboard.press('Escape');
+
+    // The command still turns the numbers on, and off again to how it was.
+    await palette("Strong's numbers");
+    assert.equal(await mode(), 'numbers');
+    await palette("Strong's numbers");
+    assert.equal(await mode(), 'marked');
   });
 
   await t.test('the guide works out the time, the counts and where the reading is', async () => {

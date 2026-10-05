@@ -38,7 +38,9 @@ export function close() {
 /**
  * @param {HTMLElement} from the control the menu belongs to
  * @param {{ id?: string, title: string, icon?: string, active?: boolean,
- *           sub?: string, quiet?: boolean, run: () => void }[]} items
+ *           sub?: string, quiet?: boolean, tall?: boolean, run: () => void }[]} items
+ *        `tall` puts `sub` under the name as a sentence, for a choice that
+ *        needs saying what it does.
  *        `quiet` marks an item that is also reachable without this menu — the
  *        pane whose tab is on show — so the list can say which ones the menu
  *        is actually needed for without hiding the rest.
@@ -49,7 +51,8 @@ export function openMenu(from, items) {
   anchor = from;
   from.setAttribute('aria-expanded', 'true');
   fill(element, items.map((item) => h('button', {
-    class: `menu-item${item.active ? ' is-active' : ''}${item.quiet ? ' is-quiet' : ''}`, role: 'menuitem',
+    class: `menu-item${item.active ? ' is-active' : ''}${item.quiet ? ' is-quiet' : ''}${item.tall ? ' is-tall' : ''}`, role: 'menuitem',
+    ...(item.id ? { dataset: { id: item.id } } : {}),
     onclick: () => { close(); item.run(); },
   },
     item.icon ? icon(item.icon) : null,

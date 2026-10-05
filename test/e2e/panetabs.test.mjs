@@ -56,6 +56,7 @@ test('sidebar panes as workspace tabs', options, async (t) => {
     await page.waitForTimeout(200);
     await page.keyboard.press('Enter');
     await page.waitForSelector('.tabstrip .tab[data-kind="pane:search"].is-active');
+    await page.waitForSelector('.leaf-pane .search-pane');
     assert.equal(await page.locator('.leaf-pane .search-pane').count(), 1, 'the pane is in the workspace');
     assert.equal(await page.locator('.sidebar .search-pane').count(), 0, 'and not in a sidebar as well');
     assert.equal(await page.locator('.leaf-pane .search-pane input').first().inputValue(), 'beginning', 'what was typed came with it');

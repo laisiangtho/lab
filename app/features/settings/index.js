@@ -7,7 +7,7 @@
  * again in one step.
  */
 
-import { buildExport, defaultSettings, parseExport, READING, READING_FONTS } from '../../core/settings.js';
+import { buildExport, defaultSettings, parseExport, READING, READING_FONTS, STRONGS_MODES } from '../../core/settings.js';
 import { numberRow } from '../../shell/numberrow.js';
 import { createRows } from '../../shell/settingrows.js';
 import { requestPersistence, resetStore, storageStatus } from '../../services/store.js';
@@ -492,8 +492,12 @@ export default {
                     flag('alignRows', L('set.align'), L('set.alignHint')),
                     flag('headings', L('cmd.headings'), L('set.headingsHint')),
                     flag('xrefs', L('cmd.xrefs'), L('set.xrefsHint')),
-                    flag('strongs', L('cmd.strongs'), L('set.strongsHint')),
-                    flag('tintStrongs', L('cmd.tintStrongs'), L('set.tintStrongsHint')),
+                    ui.choice({
+                      name: L('cmd.strongs'), hint: `${L('set.strongsHint')} ${L(`sw.${current.strongsMode}Hint`)}`,
+                      options: STRONGS_MODES.map((id) => [id, L(`sw.${id}`)]),
+                      value: current.strongsMode,
+                      onChange: (value) => { state.set({ strongsMode: value }); run(); },
+                    }),
                     flag('interlinear', L('cmd.interlinear'), L('set.interlinearHint')),
                     deskOnly(flag('paneTabs', L('set.paneTabs'), L('set.paneTabsHint'))),
                     deskOnly(flag('restoreTabs', L('set.restore'), L('set.restoreHint')))),

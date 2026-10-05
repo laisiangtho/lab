@@ -896,7 +896,10 @@ export function createWorkspace(ctx, chrome) {
   }
 
   function buildLeaf(pane, all, { book, chapter }, { float = null } = {}) {
-    const { mode, layout, strongs, headings, xrefs } = state.get();
+    const { mode, layout, strongsMode, headings, xrefs } = state.get();
+    // The numbers themselves are drawn in one mode only; how a tagged word
+    // looks in the others is the stylesheet's (body[data-words]).
+    const strongs = strongsMode === 'numbers';
     const annotations = ctx.annotations.chapterIndex(book, chapter);
     const compare = pane.index > 0;
 
