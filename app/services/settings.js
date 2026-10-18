@@ -54,6 +54,12 @@ export async function createSettings({ store, category }) {
       if (timer !== null) { clearTimeout(timer); timer = null; }
       await store.putSettings(value);
     },
+    /** Write a held-back change now, if there is one: the page is going away. */
+    flushPending() {
+      if (timer === null) return;
+      clearTimeout(timer);
+      flush();
+    },
     onError: (fn) => { onError = fn; },
   };
 }

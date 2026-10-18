@@ -31,15 +31,15 @@ const DB_NAME = 'lai-siangtho';
 const DB_VERSION = 9;
 const DIAGNOSTIC_LIMIT = 400;
 
+/** Chapters read per request when a translation is scanned (see #scanRange). */
+const SCAN_PAGE = 100;
+
 /**
  * @param {{ name?: string, onLost?: (reason: string) => void }} [options]
  *   onLost is called when the connection is closed from outside this tab — an
  *   upgrade started elsewhere, or the browser dropping the database. Everything
  *   after that point would fail one call at a time, so the caller is told once.
  */
-/** Chapters read per request when a translation is scanned (see #scanRange). */
-const SCAN_PAGE = 100;
-
 export async function openStore({ name = DB_NAME, onLost = null } = {}) {
   if (typeof indexedDB === 'undefined') throw new Error('IndexedDB is not available in this environment');
   const db = await new Promise((resolve, reject) => {
@@ -415,6 +415,22 @@ class TranslationStore {
   async deleteAnnotation(kind, id) {
     const tx = this.#tx(kind, 'readwrite');
     tx.objectStore(kind).delete(id);
+    await done(tx);
+  }
+
+  /**
+   * Delete some records of one kind and write others, all or nothing: one
+   * transaction, so a write that fails (the quota, a closed connection) leaves
+   * the old records where they were rather than half of each.
+   *
+   * @param {'notes'|'marks'} kind
+   * @param {{ remove?: string[], put?: object[] }} change
+   */
+  async replaceAnnotations(kind, { remove = [], put = [] }) {
+    const tx = this.#tx(kind, 'readwrite');
+    const os = tx.objectStore(kind);
+    for (const id of remove) os.delete(id);
+    for (const record of put) os.put(record);
     await done(tx);
   }
 

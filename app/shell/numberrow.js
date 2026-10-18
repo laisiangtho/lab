@@ -9,7 +9,6 @@
  */
 
 import { h } from './dom.js';
-import { L } from './i18n.js';
 
 /**
  * `onCommit`, where it is given, separates dragging from stopping: `onChange`
@@ -73,18 +72,4 @@ export function numberRow({ label, spec, unit = '', decimals = 0, value, onChang
 
   show(held);
   return { element, update: (next = value()) => show(clamp(next)) };
-}
-
-/** A row of named choices — the same shape, for a setting that is not a number. */
-export function choiceRow({ label, options, value, onChange }) {
-  const segment = h('div', { class: 'rp-seg' });
-  const element = h('div', { class: 'rp-row is-wide' }, h('span', { class: 'rp-l' }, label), segment);
-  const update = () => {
-    segment.replaceChildren(...options.map(([id, text]) => h('button', {
-      'aria-pressed': String(id === value()),
-      onclick: () => onChange(id),
-    }, text ?? L(`val.${id}`))));
-  };
-  update();
-  return { element, update };
 }

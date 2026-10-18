@@ -16,7 +16,7 @@
 
 import { verseLabel } from '../../core/align.js';
 import { coversVerse, verseLabelOf } from '../../core/annotations.js';
-import { toCitation, toMarkdown, toPrintable } from '../../core/passage.js';
+import { PRINT_CSS, toCitation, toMarkdown, toPrintable } from '../../core/passage.js';
 import { L } from '../../shell/i18n.js';
 
 export default {
@@ -96,18 +96,41 @@ export default {
     }
 
     /**
-     * The sheet is printed from a window of its own: the app's own stylesheet
-     * has nothing to do with paper, and a reader who wants a PDF gets one from
-     * the print dialog without this app pretending to make one.
+     * The sheet is printed from a frame of its own, out of sight: the app's own
+     * stylesheet has nothing to do with paper, and a reader who wants a PDF
+     * gets one from the print dialog without this app pretending to make one.
+     *
+     * A frame rather than a window: the desktop build opens no windows of its
+     * own (only https links, in the system browser), and a browser may block a
+     * pop-up. The frame's document inherits the page's content policy, which
+     * refuses a <style> element, so its stylesheet is adopted through the
+     * CSSOM instead.
      */
     function print(html) {
-      const view = window.open('', '_blank', 'width=780,height=920');
-      if (!view) { shell.notify(L('msg.printBlocked'), 'error'); return; }
+      const frame = document.createElement('iframe');
+      frame.setAttribute('aria-hidden', 'true');
+      frame.tabIndex = -1;
+      frame.style.cssText = 'position:fixed;inset-inline-start:0;top:0;width:0;height:0;border:0;visibility:hidden';
+      document.body.append(frame);
+      const view = frame.contentWindow;
+      view.document.open();
       view.document.write(html);
       view.document.close();
-      view.focus();
+      const sheet = new view.CSSStyleSheet();
+      sheet.replaceSync(PRINT_CSS);
+      view.document.adoptedStyleSheets = [sheet];
+      // The dialog blocks until it is closed; the frame goes once it has.
+      view.addEventListener('afterprint', () => frame.remove(), { once: true });
       // Give the document a frame to lay itself out before the dialog opens.
-      setTimeout(() => { view.print(); }, 250);
+      setTimeout(() => {
+        try {
+          view.focus();
+          view.print();
+        } catch (err) {
+          frame.remove();
+          shell.notify(err.message, 'error');
+        }
+      }, 250);
     }
 
     const slug = (passage) => `${passage.identify}-${passage.reference}`

@@ -148,6 +148,9 @@ async function boot({ root, platform, features, config: overrides }) {
   }
 
   settings.onError((err) => ctx.shell.notify(L('msg.settingsNotSaved', { why: err.message }), 'error'));
+  // The last chapter stepped to is written a moment later; a window closed in
+  // that moment would otherwise reopen one chapter back.
+  window.addEventListener('pagehide', () => settings.flushPending());
   // Only the persisted subset travels back into settings; the shell may keep
   // other state (selections, filters) that is not worth remembering.
   const persisted = Object.keys(defaultSettings);
@@ -160,6 +163,18 @@ async function boot({ root, platform, features, config: overrides }) {
   });
 
   ctx.shell.start();
+
+  // A button, a key, a menu item or a toast action runs its command and moves
+  // on; when the command fails later — a clipboard that refuses, a full disk,
+  // a file the system would not write — the promise it returned rejects with
+  // no one waiting for it. Every such failure is said here, in one place,
+  // rather than each caller having to remember to. An abort is someone
+  // stopping a thing on purpose, not a failure.
+  window.addEventListener('unhandledrejection', (event) => {
+    const err = event.reason;
+    if (err?.name === 'AbortError') return;
+    ctx.shell.notify(L('msg.actionFailed', { why: err?.message ?? String(err) }), 'error');
+  });
   for (const note of settings.notes) ctx.shell.notify(note);
   for (const note of broken) ctx.shell.notify(L('msg.featureBroken', { what: note }), 'error');
   if (lost) ctx.shell.notify(lost, 'error');

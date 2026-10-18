@@ -6,10 +6,15 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 
+import { VERSION } from '../../../app/version.js';
+import { isAppUrl, isNewer, saveFilters } from './policy.js';
 import { rendererUrl } from './window.js';
 
 /** The largest file fetch-bytes will download: a whole Bible zip is well under this. */
 const MAX_DOWNLOAD = 150 * 1024 * 1024;
+
+/** A download that sends nothing for this long is given up. */
+const IDLE_TIMEOUT = 30_000;
 
 /** Where releases are published; the packaging config points at the same repository. */
 const RELEASES_URL = 'https://api.github.com/repos/laisiangtho/lab/releases/latest';
@@ -22,7 +27,7 @@ export function registerIpc() {
     const win = BrowserWindow.fromWebContents(event.sender);
     const { canceled, filePath } = await dialog.showSaveDialog(win, {
       defaultPath: basename(options.defaultName),
-      filters: [{ name: 'Text', extensions: ['txt'] }],
+      filters: saveFilters(options.defaultName),
     });
     if (canceled || !filePath) return { saved: false };
     await writeFile(filePath, options.content, 'utf8');
@@ -59,13 +64,18 @@ export function registerIpc() {
   /**
    * Is there a newer release?
    *
-   * The check runs here rather than in the renderer: the page's content policy
-   * allows the catalog host and nothing else, and widening it for a version
-   * check would be a poor trade. Nothing is downloaded or installed — the
-   * answer is a version and a link, and the reader decides.
+   * The check runs here rather than in the renderer, which is held to the
+   * page's content policy and to GitHub's CORS answers; here neither applies.
+   * Nothing is downloaded or installed — the answer is a version and a link,
+   * and the reader decides.
+   *
+   * The running build is VERSION from app/version.js (yy.mm.dd.build), the
+   * same form as a release tag. app.getVersion() is package.json's semver
+   * (26.10.1), which drops the build number: compared with it, every build
+   * of a day would call the day's own release newer.
    */
   handle('lai:check-update', async () => {
-    const current = app.getVersion();
+    const current = VERSION;
     const response = await fetch(RELEASES_URL, {
       headers: { accept: 'application/vnd.github+json', 'user-agent': `${app.getName()}/${current}` },
     });
@@ -86,7 +96,29 @@ export function registerIpc() {
   handle('lai:fetch-bytes', async (_event, url) => {
     const u = new URL(String(url));
     if (u.protocol !== 'https:') throw new Error(`fetch-bytes: refusing non-https URL ${u.href}`);
-    const response = await fetch(u.href, { headers: { 'user-agent': `${app.getName()}/${app.getVersion()}` }, redirect: 'follow' });
+    // A server that stops sending is given up after IDLE_TIMEOUT, rather than
+    // left holding the call open; the clock restarts with every chunk, so a
+    // large file on a slow line is not cut off for being large.
+    const abort = new AbortController();
+    let idle = setTimeout(() => abort.abort(), IDLE_TIMEOUT);
+    const alive = () => { clearTimeout(idle); idle = setTimeout(() => abort.abort(), IDLE_TIMEOUT); };
+    try {
+      return await download(u, abort.signal, alive);
+    } catch (err) {
+      if (abort.signal.aborted) throw new Error(`${u.href} sent nothing for ${IDLE_TIMEOUT / 1000} s`);
+      throw err;
+    } finally {
+      clearTimeout(idle);
+    }
+  });
+
+  async function download(u, signal, alive) {
+    const response = await fetch(u.href, { headers: { 'user-agent': `${app.getName()}/${VERSION}` }, redirect: 'follow', signal });
+    // Redirects are followed, but what is read must still come over https.
+    if (new URL(response.url).protocol !== 'https:') {
+      await response.body?.cancel();
+      throw new Error(`fetch-bytes: ${u.href} redirected to ${response.url}, which is not https`);
+    }
     if (!response.ok) throw new Error(`HTTP ${response.status} for ${u.href}`);
     const declared = Number(response.headers.get('content-length') ?? 0);
     if (declared > MAX_DOWNLOAD) throw new Error(`${u.href} is ${Math.round(declared / 1048576)} MB, more than a translation can be`);
@@ -96,6 +128,7 @@ export function registerIpc() {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
+      alive();
       total += value.byteLength;
       if (total > MAX_DOWNLOAD) { await reader.cancel(); throw new Error(`${u.href} is more than ${MAX_DOWNLOAD / 1048576} MB, more than a translation can be`); }
       chunks.push(value);
@@ -104,37 +137,24 @@ export function registerIpc() {
     let at = 0;
     for (const chunk of chunks) { out.set(chunk, at); at += chunk.byteLength; }
     return { bytes: out, type: response.headers.get('content-type') ?? '' };
-  });
+  }
 
   // `runtime` is a display string: shared code prints it without knowing what
   // this target runs on (app/ must stay target-agnostic).
   handle('lai:app-info', () => ({
     name: app.getName(),
-    version: app.getVersion(),
+    version: VERSION,
     runtime: `Electron ${process.versions.electron}`,
     platform: process.platform,
   }));
 }
 
-/**
- * Compare two `yy.mm.dd.build` versions numerically, part by part. String
- * comparison would call 26.9.24 newer than 26.10.1.
- */
-function isNewer(latest, current) {
-  const parts = (v) => v.split('.').map((n) => Number.parseInt(n, 10) || 0);
-  const a = parts(latest);
-  const b = parts(current);
-  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
-    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
-  }
-  return false;
-}
-
 function handle(channel, fn) {
   ipcMain.handle(channel, (event, ...args) => {
-    const origin = new URL(rendererUrl()).origin;
-    if (new URL(event.senderFrame.url).origin !== origin) {
-      throw new Error(`${channel}: rejected sender ${event.senderFrame.url}`);
+    // Only the app's own pages may ask. Not by URL.origin, which Node gives as
+    // 'null' for app:, file: and data: alike (see policy.js).
+    if (!event.senderFrame || !isAppUrl(event.senderFrame.url, rendererUrl())) {
+      throw new Error(`${channel}: rejected sender ${event.senderFrame?.url ?? '(none)'}`);
     }
     return fn(event, ...args);
   });

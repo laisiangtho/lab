@@ -27,8 +27,6 @@
 import { splitRow } from './formats/csv.js';
 import { twoLetter } from './langcode.js';
 
-export const SOURCES = Object.freeze(['catalog', 'getbible', 'ebible']);
-
 /** @returns {object[]} rows, sorted by language then name */
 export function readGetBibleList(json) {
   if (!json || typeof json !== 'object' || Array.isArray(json)) throw new Error('getBible: the translation list is not an object keyed by abbreviation');

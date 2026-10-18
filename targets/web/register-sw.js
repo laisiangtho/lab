@@ -3,7 +3,9 @@
  *
  * A new version never replaces a running one underneath the reader: the fresh
  * worker waits until it is asked to take over, and taking over reloads the page
- * once. That way a page never mixes assets from two builds.
+ * once — every open page of the app, not only the one where the reader said
+ * yes, since the new worker deletes the old build's cache and the host no
+ * longer has its files. That way a page never mixes assets from two builds.
  *
  * The registration is created before start() so nothing is missed, and what the
  * app needs from it — is an update waiting, tell me when one arrives, take it —
@@ -15,14 +17,19 @@ export function createUpdates() {
   const listeners = new Set();
   let registration = null;
   let waiting = null;
-  let reloading = false;
+  let reloaded = false;
 
   if ('serviceWorker' in navigator) {
-    // A worker that took over while this page was running means the page is
-    // already out of step with its assets; one reload puts it right.
+    // A worker that took over from another while this page was running means
+    // the page is out of step with its assets — whichever tab asked for it. One
+    // reload puts it right. The first worker ever to arrive takes over a page
+    // that had none; nothing is out of step then, and nothing is reloaded.
+    let controlled = Boolean(navigator.serviceWorker.controller);
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!reloading) return;
-      reloading = false;
+      const wasControlled = controlled;
+      controlled = true;
+      if (!wasControlled || reloaded) return;
+      reloaded = true;
       location.reload();
     });
 
@@ -65,7 +72,6 @@ export function createUpdates() {
     },
     apply() {
       if (!waiting) return;
-      reloading = true;
       waiting.postMessage({ type: 'take-over' });
     },
   });

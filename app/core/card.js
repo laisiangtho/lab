@@ -32,8 +32,6 @@ export const CARD_BACKGROUNDS = Object.freeze(['theme', 'solid', 'gradient']);
  * why it is asked rather than assumed.
  */
 export const CARD_GROW = Object.freeze(['scale', 'keep']);
-/** What can be picked up and moved on a card. */
-export const CARD_PARTS = Object.freeze(['text', 'reference']);
 
 export const CARD_LIMITS = Object.freeze({
   width: { min: 320, max: 4096, step: 10, default: 1080 },

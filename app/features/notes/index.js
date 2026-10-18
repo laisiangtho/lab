@@ -7,6 +7,7 @@ import { h } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { L } from '../../shell/i18n.js';
 import { verseLabelOf } from '../../core/annotations.js';
+import { later } from '../../shell/later.js';
 
 const SAVE_DELAY_MS = 600;
 
@@ -46,7 +47,8 @@ export default {
         el.append(h('div', { class: 'notes-pane stack' }, target, editor, list));
 
         let editing = null; // the note being edited, or null for a new one
-        let timer = null;
+        const saves = later(SAVE_DELAY_MS);
+        const saveNow = () => save().catch((err) => shell.notify(err.message, 'error'));
         let lastKey = '';
 
         function passage() {
@@ -104,15 +106,15 @@ export default {
         }
 
         editor.addEventListener('input', () => {
-          clearTimeout(timer);
-          timer = setTimeout(() => save().catch((err) => shell.notify(err.message, 'error')), SAVE_DELAY_MS);
+          saves.schedule('note', saveNow);
         });
-        editor.addEventListener('blur', () => { clearTimeout(timer); save().catch((err) => shell.notify(err.message, 'error')); });
+        editor.addEventListener('blur', () => saves.flush());
 
         const offState = state.subscribe(paint);
         const offNotes = annotations.on('change', paint);
         paint();
-        return () => { clearTimeout(timer); offState(); offNotes(); };
+        // What was typed just before the pane closed is saved, not dropped.
+        return () => { saves.dispose(); offState(); offNotes(); };
       },
     });
   },

@@ -69,25 +69,12 @@ export function toCitation(passage) {
 }
 
 /**
- * A sheet to print or hand out: the passage large enough to read from, the
- * reader's notes under it, and room in the margin for a pen.
- *
- * Returned as a whole document because it is printed on its own, not inside the
- * app. The styles are inline for the same reason.
- *
- * @param {Passage} passage
- * @param {{ title?: string }} options
+ * The sheet's look, kept apart from its markup. The app's content policy
+ * (style-src 'self') refuses a <style> element written into a document the
+ * page makes, so the stylesheet is handed to that document through the CSSOM,
+ * which the policy does not govern (see printSheet in export-passage).
  */
-export function toPrintable(passage, { title = passage.reference } = {}) {
-  const rows = passage.lines.map((line) => `${line.title ? `<h3>${escapeHtml(line.title)}</h3>` : ''}
-      <p class="v${line.marked ? ' m' : ''}"><b>${escapeHtml(line.label)}</b> ${escapeHtml(line.text)}</p>`).join('\n');
-  const notes = passage.notes?.length
-    ? `<section class="notes"><h2>Notes</h2>${passage.notes.map((note) => `
-      <article><h4>${escapeHtml(note.label)}</h4><p>${escapeHtml(note.text).replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>')}</p></article>`).join('')}</section>`
-    : '';
-  return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
-<style>
+export const PRINT_CSS = `
   @page { margin: 22mm 18mm; }
   body { font: 12pt/1.6 Georgia, "Times New Roman", serif; color: #111; max-width: 34em; margin: 0 auto; }
   h1 { font: 600 17pt/1.3 system-ui, sans-serif; margin: 0 0 2pt; }
@@ -101,7 +88,28 @@ export function toPrintable(passage, { title = passage.reference } = {}) {
   .notes h4 { font: 600 10pt system-ui, sans-serif; margin: 10pt 0 2pt; color: #444; }
   .notes p { font: 10.5pt/1.55 Georgia, serif; margin: 0 0 6pt; }
   @media print { a[href]::after { content: ""; } }
-</style></head>
+`;
+
+/**
+ * A sheet to print or hand out: the passage large enough to read from, the
+ * reader's notes under it, and room in the margin for a pen.
+ *
+ * Returned as a whole document because it is printed on its own, not inside the
+ * app; its look is PRINT_CSS.
+ *
+ * @param {Passage} passage
+ * @param {{ title?: string }} options
+ */
+export function toPrintable(passage, { title = passage.reference } = {}) {
+  const rows = passage.lines.map((line) => `${line.title ? `<h3>${escapeHtml(line.title)}</h3>` : ''}
+      <p class="v${line.marked ? ' m' : ''}"><b>${escapeHtml(line.label)}</b> ${escapeHtml(line.text)}</p>`).join('\n');
+  const notes = passage.notes?.length
+    ? `<section class="notes"><h2>Notes</h2>${passage.notes.map((note) => `
+      <article><h4>${escapeHtml(note.label)}</h4><p>${escapeHtml(note.text).replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>')}</p></article>`).join('')}</section>`
+    : '';
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+</head>
 <body>
   <h1>${escapeHtml(passage.reference)}</h1>
   <p class="src">${escapeHtml(passage.translation ?? '')}</p>

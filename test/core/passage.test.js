@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import test from 'node:test';
 
-import { toCitation, toMarkdown, toPrintable } from '../../app/core/passage.js';
+import { PRINT_CSS, toCitation, toMarkdown, toPrintable } from '../../app/core/passage.js';
 
 const passage = {
   reference: 'Psalm 23:1–3',
@@ -57,4 +57,11 @@ test('the printable sheet is a whole document and escapes what it is given', () 
   assert.match(out, /Bread &amp; &lt;wine&gt;/);
   assert.ok(!out.includes('<wine>'));
   assert.match(out, /<p>first<\/p><p>second<\/p>/);
+});
+
+test('the sheet carries no <style> of its own: the content policy would refuse it', () => {
+  const out = toPrintable({ ...passage, lines: [{ verse: 1, label: '1', text: 'x' }] });
+  assert.ok(!/<style/i.test(out));
+  assert.match(PRINT_CSS, /@page/);
+  assert.match(PRINT_CSS, /p\.v\.m/, 'and the stylesheet styles what the markup uses');
 });

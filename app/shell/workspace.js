@@ -859,7 +859,9 @@ export function createWorkspace(ctx, chrome) {
       identify: source.identify,
       verses,
       dir: directionOf(source.identify) ?? source.info?.language?.textdirection ?? (testament === 'H' ? 'rtl' : 'ltr'),
-      lang: source.info?.language?.name || (testament === 'H' ? 'hbo' : 'grc'),
+      // A language tag, as the reading surface uses (`language.code`), not the
+      // language's name: "Hebrew" in `lang` picks no voice and no font.
+      lang: languageTag(source.info?.language?.code) ?? (testament === 'H' ? 'hbo' : 'grc'),
       gloss: (code) => glossOf(lookup(ctx.lexicons?.held ?? {}, code).entry),
     };
   }
@@ -1216,4 +1218,9 @@ export function createWorkspace(ctx, chrome) {
     get activeTab() { return activeTab(); },
     get tabs() { return tabs.map((t) => ({ ...t })); },
   };
+}
+
+/** `code` if it has the shape of a BCP 47 language tag (`hbo`, `grc`, `en-GB`), else null. */
+function languageTag(code) {
+  return typeof code === 'string' && /^[a-z]{2,3}(-[A-Za-z0-9]{1,8})*$/.test(code) ? code : null;
 }

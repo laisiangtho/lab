@@ -33,6 +33,7 @@ import { L, when } from '../../shell/i18n.js';
 import { openMenu } from '../../shell/menu.js';
 import { renderMarkdown } from '../../shell/markdown.js';
 import { VERSION } from '../../version.js';
+import { later } from '../../shell/later.js';
 
 const KEY = 'projects';
 const SAVE_DELAY_MS = 500;
@@ -55,9 +56,14 @@ export default {
       if (!quiet) repaint();
     }
 
-    /** Change the open project in place. */
-    function update(fn, options) {
-      const project = openProject();
+    /**
+     * Change a project in place: the open one, or the one named by `id` — a
+     * save held back while typing names the project it was typed in, so a
+     * reader who switches projects in the meantime does not have the next one
+     * renamed.
+     */
+    function update(fn, options, id = openProject()?.id) {
+      const project = shelf.projects.find((p) => p.id === id);
       if (!project) return;
       const next = fn(project);
       keep({ ...shelf, projects: shelf.projects.map((p) => (p.id === next.id ? next : p)) }, options);
@@ -176,15 +182,15 @@ export default {
       mount(el) {
         /** Entries whose preview is showing rather than their editor. */
         const previewing = new Set();
-        const timers = new Map();
+        const saves = later(SAVE_DELAY_MS);
 
         /** Typing saves itself, a little after the typing stops. */
         function typed(entryId, text) {
-          clearTimeout(timers.get(entryId));
-          timers.set(entryId, setTimeout(() => {
-            update((project) => editEntry(project, entryId, { text }), { quiet: true });
+          const id = openProject()?.id;
+          saves.schedule(entryId, () => {
+            update((project) => editEntry(project, entryId, { text }), { quiet: true }, id);
             paintCounts();
-          }, SAVE_DELAY_MS));
+          });
         }
 
         function paintCounts() {
@@ -382,8 +388,8 @@ export default {
             class: 'pj-name', value: project.name, 'aria-label': L('proj.name'),
             oninput: (e) => {
               const value = e.currentTarget.value;
-              clearTimeout(timers.get('name'));
-              timers.set('name', setTimeout(() => update((p) => ({ ...p, name: value.trim() || L('proj.untitled') }), { quiet: true }), SAVE_DELAY_MS));
+              const id = openProject()?.id;
+              saves.schedule(`name:${id}`, () => update((p) => ({ ...p, name: value.trim() || L('proj.untitled') }), { quiet: true }, id));
             },
           });
 
@@ -435,8 +441,8 @@ export default {
             class: 'pj-summary', dir: 'auto', placeholder: L('proj.phSummary'),
             oninput: (e) => {
               const value = e.currentTarget.value;
-              clearTimeout(timers.get('summary'));
-              timers.set('summary', setTimeout(() => update((p) => ({ ...p, summary: value }), { quiet: true }), SAVE_DELAY_MS));
+              const id = openProject()?.id;
+              saves.schedule(`summary:${id}`, () => update((p) => ({ ...p, summary: value }), { quiet: true }, id));
             },
           });
           summaryBox.value = project.summary;
@@ -467,7 +473,8 @@ export default {
         return () => {
           listeners.delete(paint);
           offState();
-          for (const timer of timers.values()) clearTimeout(timer);
+          // What was typed just before the page closed is saved, not dropped.
+          saves.dispose();
         };
       },
     });

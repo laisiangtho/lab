@@ -85,7 +85,18 @@ try {
   const guide = await page.waitForSelector('.gd-card', { timeout: 15000 }).then(() => true, () => false);
   check('a part loaded on demand loads (the guide)', guide);
   check('the preload bridge answers', Boolean(info?.version));
+  check('it reports the build\'s own yy.mm.dd.build version', /^\d{2}\.\d{2}\.\d{2}\.\d+$/.test(info?.version ?? ''), info?.version);
   check('nothing was logged', problems.length === 0, problems.join(' / '));
+  // The window shows the app and nothing else (after the console check:
+  // Chromium logs its own refusal of file: and data:). A file dropped on the window
+  // is a navigation to file:; so is a data: address. Both are refused, and the
+  // app is still there — with its bridge — afterwards.
+  const home = page.url();
+  for (const away of ['app://other/index.html', 'file:///etc/hostname', 'data:text/html,<p>elsewhere']) {
+    await page.evaluate((url) => { window.location.href = url; }, away).catch(() => {});
+    await page.waitForTimeout(600);
+    check(`it does not leave the app for ${away.split(/[/,]/)[0]}${away.startsWith('app') ? ' (another host)' : ''}`, page.url() === home && await page.locator('.ribbon').count() === 1, page.url());
+  }
   console.log(`  ${info.name} ${info.version} · ${info.runtime} · ${info.platform}`);
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
   await browser.close();

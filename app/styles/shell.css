@@ -916,8 +916,6 @@ body[data-measure="full"] .note{max-width:none}
 .rp-row{display:flex;align-items:center;gap:10px}
 .rp-row>.rp-l{flex:0 0 88px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* A control too wide to sit beside its label takes the line under it. */
-.rp-row.is-wide{flex-direction:column;align-items:stretch;gap:6px}
-.rp-row.is-wide>.rp-l{flex:0 0 auto}
 .rp-l{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-faint)}
 .rp-ctl{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
 .rp-ctl input[type=range]{flex:1;min-width:0;accent-color:var(--accent)}

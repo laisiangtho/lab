@@ -318,7 +318,7 @@ Nothing is allowed to fail silently, and nothing that can be recovered is left w
 
 ### Staying current
 
-The web build downloads a new version and **waits**: the reader is offered *Reload*, and assets from two builds never mix. The desktop build asks the releases API from its main process — so the renderer's `connect-src` stays limited to the catalog host — and offers a link; it downloads nothing by itself. Both check once a day, silently unless there is something to say, and by hand from the command palette.
+The web build downloads a new version and **waits**: the reader is offered *Reload*, and assets from two builds never mix. The desktop build asks the releases API from its main process, comparing the release's tag with the build's own `yy.mm.dd.build` version, and offers a link; it downloads nothing by itself. Both check once a day, silently unless there is something to say, and by hand from the command palette.
 
 ### Rules
 

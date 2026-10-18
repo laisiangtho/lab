@@ -160,6 +160,36 @@ newest first.
   on a dark tab bar, taskbar or theme as well as a light one, and a browser in
   a dark scheme shows it with the colours swapped. Android's adaptive icon is
   the disc itself, whatever shape the launcher cuts.
+- Fixed (desktop): the window could be led away from the app — a file
+  dropped on it, or an address under another app:// host — and the page it
+  went to could use the app's bridge to the system. Addresses are now
+  compared by scheme and host; the old comparison treated every app:, file:
+  and data: address as the same place.
+- Fixed (desktop): the update check offered every installed copy its own
+  version as an update, by comparing the release tag with package.json's
+  three-part version instead of the build's own.
+- Fixed: "Print a sheet" never opened on the desktop and printed unstyled on
+  the web. The sheet is now printed from a hidden frame, with its styles
+  applied in a way the app's content policy allows.
+- Fixed: saving a chapter's notes in source mode deleted the old notes before
+  writing the new ones, one by one; a failure on the way lost them. It is
+  now one transaction.
+- Fixed: what was typed in the last moment before a note, the composer or a
+  project closed — or the window did — was dropped instead of saved. A name
+  typed into one project just before switching to another no longer renames
+  the other.
+- An action that fails after its button was pressed (a clipboard that
+  refuses, a full disk) now says so, instead of failing without a word.
+- Web: a new version reloads every open tab of the app, not only the one
+  where it was accepted, and is cached past the browser's own HTTP cache, so
+  an offline start never pairs one build's page with another's files.
+- Desktop: saving a file offers its own type (Markdown for a passage), a
+  download that redirects off https is refused, and one that stops sending
+  is given up after 30 s. Electron 44.9.0.
+- The palette tells a screen reader which entry is selected, has a label,
+  returns the focus where it was when closed, and its key hints are in the
+  interface language. The interlinear line carries a language tag instead of
+  a language name.
 
 - Words that carry a Strong's number have one setting with four looks, in
   place of two switches: **plain** (nothing marked), **quiet** (a faint

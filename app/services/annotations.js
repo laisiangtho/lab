@@ -119,23 +119,27 @@ export async function createAnnotations({ store, category }) {
     /**
      * Replace every note of one chapter — what source mode saves. Notes that
      * vanished from the text are deleted, the rest are written as given.
+     *
+     * Every note is checked before anything is touched, and the deletes and
+     * writes go to the store in one transaction; memory changes only once the
+     * store has them. A failure on the way leaves the chapter's notes as they
+     * were, rather than deleted with their replacements unwritten.
      */
     async replaceChapterNotes(book, chapter, incoming) {
       const existing = [...notes.values()].filter((n) => n.book === book && n.chapter === chapter);
-      for (const note of existing) {
-        notes.delete(note.id);
-        await store.deleteAnnotation('notes', note.id);
-      }
-      for (const { verse, text } of incoming) {
-        if (!text.trim()) continue;
+      const now = new Date().toISOString();
+      const written = incoming.filter(({ text }) => text.trim()).map(({ verse, text }) => {
         const keep = existing.find((n) => n.verse === (verse ?? null));
-        const note = parseNote({
+        return parseNote({
           id: keep?.id ?? newNoteId(), book, chapter, verse: verse ?? null, text,
-          created: keep?.created, updated: new Date().toISOString(),
+          created: keep?.created, updated: now,
         }, { source: 'source mode', category });
-        notes.set(note.id, note);
-        await store.putAnnotation('notes', note);
-      }
+      });
+      const kept = new Set(written.map((n) => n.id));
+      const removed = existing.filter((n) => !kept.has(n.id)).map((n) => n.id);
+      await store.replaceAnnotations('notes', { remove: removed, put: written });
+      for (const id of removed) notes.delete(id);
+      for (const note of written) notes.set(note.id, note);
       emit();
     },
 

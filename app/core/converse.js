@@ -120,8 +120,6 @@ const PATTERNS = Object.freeze([
   ]],
 ]);
 
-export const INTENTS = Object.freeze(PATTERNS.map(([intent]) => intent));
-
 /**
  * @param {string} question
  * @returns {{ intent: string, rest: string } | null}

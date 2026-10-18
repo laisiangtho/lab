@@ -470,6 +470,9 @@ Two rules keep the rest honest. A stored id this build no longer has is dropped 
 - **Strong's** (`core/strongs.js`) reads `{H7225}`, `<S>430</S>` and `[H430]`, attaching each code to the preceding word. No published translation carries the markup today, so the toggle reports that rather than appearing to do nothing. The regex is built per call — a shared `/g` regex carries `lastIndex` between `test()` and `matchAll()`, which silently skipped the first match until a test caught it.
 - **Marked words**: `settings.strongsMode` is one of `STRONGS_MODES` (`plain`, `quiet`, `marked`, `numbers`) and replaces the `strongs` and `tintStrongs` booleans; `legacySettings()` in `core/settings.js` carries the old pair over, for stored settings and for imported backups alike. The chapter is rendered with numbers only in `numbers`; the other three differ by `body[data-words]` alone, in CSS that changes no metrics, so switching between them repaints without reflow. The status bar button (`strongsMenu` in `shell/shell.js`), the reading panel and Settings all write the same key. `reading.strongs` toggles between `numbers` and the look held before it.
 - **Phone pages** (`shell/phone.js`): every scroller named in `SCROLLERS` drives the same handler, which sets `--ph-off` for the tab bar and the classes `ph-scrolled` (past 8px) and `ph-deep` (past 150px) on the body. The search field is `position: sticky` and takes its capsule look under `ph-scrolled`; the Library filter becomes `position: fixed` under `ph-deep`. A scroll within 400 ms of a page change is a restore, not the reader, and is not counted.
+- **Saves held back while typing** go through `later()` (`shell/later.js`): a key per thing being typed, run a moment after the typing stops, run at once when its holder unmounts (`dispose`) or the page goes away (`pagehide`), never cancelled. The notes pane, the composer and the projects page use it; a project edit names the project it was typed in. Settings coalesce chapter steps for 250 ms and are flushed on `pagehide` the same way.
+- **Failures nobody awaits**: buttons, keys, menus and toast actions call `run()` and move on. `boot.js` listens for `unhandledrejection` and says the failure in a toast (`msg.actionFailed`); an `AbortError` is a stop, not a failure, and is not reported.
+- **Printing a passage** (`features/export-passage`) writes the sheet into a hidden iframe and calls its `print()`. Not a window: the desktop opens none, and a browser may block one. The frame's document inherits the page's CSP, which refuses a `<style>` element, so `PRINT_CSS` (`core/passage.js`) is adopted through the CSSOM (`adoptedStyleSheets`), which the policy does not govern.
 - **Typography**: text size, line height and line length are CSS variables set from settings by the reading panel — on the **root element**, not the body. The ramp derives `--fs-text` from `--reading-size` at `:root`, and a custom property is resolved where it is declared, so setting them on the body moved every number in the panel while the text never changed.
 - **Interface line height**: `body { line-height: 1.5 }`, unitless. With `line-height: normal` the line box comes from the font's own ascent and descent, and the Myanmar faces ask for close to twice the Latin metrics, so a button with a Burmese label grew taller than the same button in Latin. Unitless (not `1.5em` or `150%`) because a length inherits as a fixed number of pixels, which would give nested text at another size the wrong leading. Labels clipped to one line take `padding-block: 3px; margin-block: -3px` — ink room that costs no layout height.
 - **Digits**: a number that names a chapter is written in the primary translation's own digits (`localizeNumber`) wherever it appears — tabs, breadcrumbs, the books tree, the status bar, the breadcrumb picker. A count (39 books, 30 verses) is a quantity and stays in the interface's digits.
@@ -639,9 +642,8 @@ short name and language from the file's own first few kilobytes, and a reader
 who accepts every default never types a character. Changing the format re-reads
 the file so the boxes agree with the answer above them.
 
-URL import is deliberately not here: the web target pins `connect-src` to the
-catalog host, and widening that is a decision about the app's security posture
-rather than a step in this feature.
+URL import is not part of this dialog: it came later, in the Library (3d-x-b),
+with `connect-src` widened to any https address for it.
 
 ## 3d-x. The guide
 
@@ -1668,9 +1670,10 @@ All three are git-ignored.
 ## 9. Security (desktop)
 
 - Renderer: `contextIsolation`, `sandbox`, no `nodeIntegration`; preload exposes only `saveFile`, `openExternal`, `appInfo`, `checkUpdate`, `fetchBytes` and the window-frame hint.
-- IPC handlers reject senders whose frame origin is not the app's; inputs are validated; `openExternal` and `fetchBytes` accept `https:` only, and `fetchBytes` stops at 150 MB.
+- The window shows the app and nothing else: `will-navigate`, `will-redirect` and `will-frame-navigate` refuse any address that is not the app's (a link the app does not handle, a file dropped on the window), and `window.open` is refused, with https links handed to the system browser.
+- IPC handlers reject senders whose frame is not the app's; inputs are validated; `openExternal` and `fetchBytes` accept `https:` only, `fetchBytes` refuses a redirect off https, gives up on a server silent for 30 s, and stops at 150 MB.
+- "The app's" is decided by protocol and host (`isAppUrl` in `targets/desktop/electron/policy.js`), not by `URL.origin`: Node's URL gives every non-special scheme the origin `'null'`, so `app://lai`, `file:`, `data:` and `about:blank` would all compare equal. That was the first version, and a dropped file could replace the app and reach the bridge. `test/desktop-policy.test.js` holds the cases.
 - `app://` handler normalises paths and refuses anything outside `out/renderer/` (traversal requests return 404/403).
-- Navigation away from the app origin is blocked; `window.open` to `https:` opens in the system browser.
 - Production CSP on both targets: scripts and styles from `'self'`; `connect-src` is `'self'` and `https:` (see 3d-x-b) — fetched data is parsed, never executed.
 
 ---
@@ -1699,11 +1702,11 @@ Neither target downloads anything without being asked. The mechanism differs and
 
 | Target | Capability | Behaviour |
 |---|---|---|
-| Web | `updates` (`targets/web/register-sw.js`) | A new service worker installs and **waits**. The reader is offered *Reload*; `apply()` posts `take-over`, the worker calls `skipWaiting()`, and the one `controllerchange` reloads the page. Assets from two builds never mix. |
+| Web | `updates` (`targets/web/register-sw.js`) | A new service worker installs and **waits**. The reader is offered *Reload*; `apply()` posts `take-over`, the worker calls `skipWaiting()`, and `controllerchange` reloads every open page of the app — not only the one where the reader said yes, since the new worker deletes the old build's cache and the host no longer has its hashed files. The first worker ever installed takes over a page that had none, and that reloads nothing. The precache is fetched with `cache: 'reload'`, past the browser's HTTP cache, so a build never caches the previous build's `index.html`. Assets from two builds never mix. |
 | Web | `install` | The browser's own install offer, held until the reader asks for it, rather than shown as a banner. |
 | Desktop | `checkUpdate` | The **main process** queries the releases API and returns `{ current, latest, url, newer }`; versions are compared part by part, so `26.10.1` is newer than `26.9.24`. Nothing is downloaded or installed — the reader gets a link. |
 
-The check runs at most once a day, silently unless there is something to say, and by hand from the palette. Running it in the main process keeps `connect-src` on the renderer limited to the catalog host.
+The check runs at most once a day, silently unless there is something to say, and by hand from the palette. It runs in the main process, which is held to neither the page's content policy nor GitHub's CORS answers, and compares the release tag with `VERSION` from `app/version.js` — the same `yy.mm.dd.build` form — never with `app.getVersion()`, which is package.json's three-part semver and would call the running build's own release newer.
 
 ---
 

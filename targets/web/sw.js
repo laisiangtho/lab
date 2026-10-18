@@ -10,7 +10,10 @@ const CACHE = 'lai-shell-__CACHE_VERSION__';
 const PRECACHE = /*__PRECACHE__*/[];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)));
+  // Past the HTTP cache: a host that lets browsers keep files for minutes
+  // (GitHub Pages: max-age=600) would otherwise hand this build's cache the
+  // previous index.html, whose hashed assets this build no longer has.
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(PRECACHE.map((url) => new Request(url, { cache: 'reload' })))));
 });
 
 self.addEventListener('activate', (event) => {

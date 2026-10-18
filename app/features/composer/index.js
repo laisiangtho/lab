@@ -16,6 +16,7 @@ import { h } from '../../shell/dom.js';
 import { icon } from '../../shell/icons.js';
 import { L, when } from '../../shell/i18n.js';
 import { renderMarkdown } from '../../shell/markdown.js';
+import { later } from '../../shell/later.js';
 
 const KEY = 'composer';
 const MODES = Object.freeze(['write', 'split', 'preview']);
@@ -72,7 +73,7 @@ export default {
 
     let editing = null;          // the note being written, once it exists
     let target = null;           // { book, chapter, verse }
-    let timer = null;
+    const saves = later(SAVE_DELAY_MS);
 
     const held = () => ({ ...DEFAULT, ...(records.get(KEY, null) ?? {}) });
     const remember = (patch) => records.save(KEY, { ...held(), ...patch }).catch((err) => shell.notify(err.message, 'error'));
@@ -198,12 +199,11 @@ export default {
     }
 
     const queueSave = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => save().catch((err) => shell.notify(err.message, 'error')), SAVE_DELAY_MS);
+      saves.schedule('note', () => save().catch((err) => shell.notify(err.message, 'error')));
     };
 
     text.addEventListener('input', () => { paint(); queueSave(); });
-    text.addEventListener('blur', () => { clearTimeout(timer); save().catch((err) => shell.notify(err.message, 'error')); });
+    text.addEventListener('blur', () => saves.flush());
 
     // The title line is the note's first heading: editing it rewrites that line.
     title.addEventListener('input', () => {

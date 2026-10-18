@@ -31,10 +31,9 @@ jobs:
       - run: npm ci
       # Unit tests and the boundary rules: no browser, a second or two.
       - run: npm test
-      # The end-to-end suite drives the real build in a browser. The driver is
-      # optional for a working copy; here it is installed so the suite runs
-      # rather than skips.
-      - run: npm i --no-save playwright-core
+      # The end-to-end suite drives the real build in a browser. The driver,
+      # playwright-core, is a devDependency at the locked version (npm ci);
+      # only the browser it drives is fetched here.
       - run: npx playwright-core install --with-deps chromium || npx playwright install --with-deps chromium
       - run: npm run test:e2e
       # The packaged desktop app, started on a virtual display.

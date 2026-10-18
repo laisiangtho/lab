@@ -130,5 +130,39 @@ test('exporting a translation', options, async (t) => {
     assert.match(about, /Copyright/);
   });
 
+  await t.test('a passage prints as a styled sheet, from a frame rather than a window', async () => {
+    await page.keyboard.press('Escape');
+    await page.locator('.tabstrip .tab[data-kind="chapter"]').first().click();
+    await page.waitForSelector('.vblock[data-verse="1"]');
+    // The frame is caught as it is added, and its print() answered here: what
+    // the dialog would have shown is read instead of a dialog opening.
+    await page.evaluate(() => {
+      window.__sheet = null;
+      new MutationObserver((changes) => {
+        for (const change of changes) for (const node of change.addedNodes) {
+          if (node.tagName !== 'IFRAME') continue;
+          node.contentWindow.print = () => {
+            const doc = node.contentDocument;
+            const style = node.contentWindow.getComputedStyle(doc.body);
+            window.__sheet = { font: style.fontFamily, title: doc.querySelector('h1')?.textContent, verses: doc.querySelectorAll('p.v').length };
+            node.contentWindow.dispatchEvent(new Event('afterprint'));
+          };
+        }
+      }).observe(document.body, { childList: true });
+    });
+    await page.keyboard.press('Control+p');
+    await page.locator('.modal-input').fill('export gen 1');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Enter');
+    await page.locator('.modal-list .mi[data-id="sheet"]').click();
+    await page.waitForFunction(() => window.__sheet !== null, null, { timeout: 5000 });
+    const sheet = await page.evaluate(() => window.__sheet);
+    assert.match(sheet.font, /Georgia/, 'the sheet\'s own stylesheet applies, though the content policy refuses <style>');
+    assert.match(sheet.title, /Genesis 1/);
+    assert.equal(sheet.verses, 31);
+    assert.equal(page.context().pages().length, 1, 'no window was opened');
+    await page.waitForFunction(() => !document.querySelector('body > iframe'), null, { timeout: 2000 });
+  });
+
   await t.test('nothing went wrong on the way', () => assert.deepEqual(app.problems, []));
 });

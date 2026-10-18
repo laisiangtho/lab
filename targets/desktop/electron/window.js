@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 // electron-vite copy the file next to the build and give its path.
 import linuxIcon from '../../../assets/icons/256x256.png?asset';
 
+import { isAppUrl } from './policy.js';
 import { APP_ORIGIN } from './protocol.js';
 import { loadWindowState, watchWindowState } from './state.js';
 
@@ -64,9 +65,15 @@ export function createMainWindow() {
     },
   });
 
-  const origin = new URL(rendererUrl()).origin;
-  win.webContents.on('will-navigate', (event, url) => {
-    if (new URL(url).origin !== origin) event.preventDefault();
+  // The window only ever shows the app. A link the app does not handle, or a
+  // file dropped on the window, would otherwise replace it with that page —
+  // and give that page the window.lai bridge.
+  const base = rendererUrl();
+  const stay = (event) => { if (!isAppUrl(event.url, base)) event.preventDefault(); };
+  win.webContents.on('will-navigate', stay);
+  win.webContents.on('will-redirect', stay);
+  win.webContents.on('will-frame-navigate', (event) => {
+    if (!event.isMainFrame && !isAppUrl(event.url, base) && event.url !== 'about:blank') event.preventDefault();
   });
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://')) shell.openExternal(url);
