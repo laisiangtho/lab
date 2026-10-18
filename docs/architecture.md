@@ -1038,13 +1038,21 @@ strip, with the browser counting clicks at the system's own speed.
 
 ## 3d-xii. Icons
 
-The icon is an open book with a red ribbon in one purple, with no background:
-a silhouette that reads at 14 px on a dark or a light surface, as the marks of
-VS Code or GitHub do. The book-cover icon before it printed "the HOLY BIBLE"
-on the cover, legible at 128 px and grey noise below 32. With no background of
-its own, the desktop icons are set in from the edge as a desktop's own are (84
-% for macOS and Windows, 90 % for the larger Linux sizes), and Android's
-adaptive icon puts it at 60 % on the app's background, inside the safe zone.
+The icon is a lit candle in a dark disc. As drawn, the candle is a hole in
+the disc, which vanishes on a dark surface — a dark browser tab bar, a dark
+taskbar, the app's dark theme — and takes the candle with it. So the SVG fills
+the candle white under the disc (the disc's own path is untouched, and the
+candle runs a little under it so no seam of the background shows), and where
+the viewer asks for a dark scheme the two colours change places; a browser
+applies that to an SVG favicon. The PNGs are drawn in the light scheme: a dark
+disc with a white candle, which still reads on a dark taskbar by the candle
+alone. With no background of its own, the desktop icons are set in from the
+edge as a desktop's own are (84 % for macOS and Windows, 90 % for the larger
+Linux sizes). Android's adaptive icon puts the mark at 80 % on the disc's own
+colour, so whatever shape the launcher cuts becomes the disc, and the candle
+stays inside the safe zone. Before it came an open book with a red ribbon, and
+before that a book cover that printed "the HOLY BIBLE", legible at 128 px and
+grey noise below 32.
 The app does not show its own mark in its chrome: the ribbon's corner is the
 window's drag handle, and the window, the taskbar and the browser tab already
 say which app this is.

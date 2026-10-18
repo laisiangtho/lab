@@ -19,10 +19,11 @@
  * changed SVG with stale PNGs is caught.
  *
  * The maskable icon (Android's adaptive shapes crop it to a circle or a
- * squircle) is the icon at 60 % on the app's own background, so nothing that
- * matters falls outside the safe zone. The mark has no background of its own,
- * so the desktop icons are set in from the edge (`inset`), as a desktop's own
- * icons are.
+ * squircle) is the mark at 80 % on the disc's own colour: whatever shape the
+ * launcher cuts, the disc fills it, and the candle stays inside the safe zone
+ * (the middle 80 % circle). The mark has no background of its own, so the
+ * desktop icons are set in from the edge (`inset`), as a desktop's own icons
+ * are.
  */
 
 import { createHash } from 'node:crypto';
@@ -33,8 +34,8 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE = join(ROOT, 'public/icons/icon.svg');
 const STAMP = join(ROOT, 'assets/icons/source.sha256');
-/** The manifest's background_color: what a maskable icon sits on. */
-const BACKGROUND = '#181818';
+/** What a maskable icon sits on: the disc's colour in icon.svg (`.disc`). */
+const BACKGROUND = '#1a1a1a';
 
 /** @type {{ path: string, size: number, maskable?: boolean }[]} */
 export const ICONS = Object.freeze([
@@ -71,9 +72,9 @@ function chromium() {
 async function draw(svg, { size, maskable, inset = 1 }) {
   const src = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
   // A maskable icon is cut to a circle, a squircle or a rounded square by
-  // the launcher; only the middle 80 % circle is sure to survive, and a
-  // book wider than it is tall needs to sit well inside that.
-  const inner = Math.round(size * (maskable ? 0.6 : inset));
+  // the launcher; only the middle 80 % circle is sure to survive. At 80 % the
+  // disc's rim lies just inside that circle and blends into the background.
+  const inner = Math.round(size * (maskable ? 0.8 : inset));
   const html = `<!doctype html><html><body style="margin:0;background:${maskable ? BACKGROUND : 'transparent'}">
     <div style="width:${size}px;height:${size}px;display:grid;place-items:center">
       <img src="${src}" width="${inner}" height="${inner}" style="display:block"></div></body></html>`;

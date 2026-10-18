@@ -1,6 +1,6 @@
 # Icons
 
-Every PNG the builds ship is drawn from one source, `public/icons/icon.svg`: an open book with a red ribbon, one colour, no background, drawn on a 64-unit grid so it reads at 14 px on dark and light alike.
+Every PNG the builds ship is drawn from one source, `public/icons/icon.svg`: a lit candle in a dark disc, drawn on a 64-unit grid. The candle is filled white under the disc, so the mark reads on a dark surface as well as a light one; in a dark colour scheme the SVG swaps the two colours.
 
 | File | Size | Used by |
 |---|---|---|
@@ -8,7 +8,7 @@ Every PNG the builds ship is drawn from one source, `public/icons/icon.svg`: an 
 | `assets/icons/NxN.png` | 16–512 | the Linux hicolor theme (`linux.icon`), `256x256.png` as the window icon; 48 px and up at 90 % |
 | `public/icons/favicon-32.png` | 32 | the web build's fallback favicon |
 | `public/icons/icon-192.png`, `icon-512.png` | 192, 512 | the web manifest |
-| `public/icons/icon-maskable-512.png` | 512 | the manifest's maskable icon: 60 % of the icon on the app background, inside Android's safe zone |
+| `public/icons/icon-maskable-512.png` | 512 | the manifest's maskable icon: the mark at 80 % on the disc's colour, so the launcher's shape becomes the disc; the candle stays inside Android's safe zone |
 
 After `icon.svg` changes:
 

@@ -156,6 +156,11 @@ newest first.
 
 ### Unreleased
 
+- A new icon: a lit candle in a disc. The candle is filled, so the mark reads
+  on a dark tab bar, taskbar or theme as well as a light one, and a browser in
+  a dark scheme shows it with the colours swapped. Android's adaptive icon is
+  the disc itself, whatever shape the launcher cuts.
+
 - Words that carry a Strong's number have one setting with four looks, in
   place of two switches: **plain** (nothing marked), **quiet** (a faint
   dotted line, for reading), **marked** (a tint and an underline, the
